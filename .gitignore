@@ -1,0 +1,17 @@
+.gocache/
+.vscode/
+backup/
+data/
+dist/
+*.exe
+fluxstream
+tmp_*.log
+tmp_*.out
+tmp_*.err
+tmp_*.bin
+tmp_*.json
+chunk-*.tmp
+*.m4s.tmp
+*.ts
+*.db
+*.zip
