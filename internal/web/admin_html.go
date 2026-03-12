@@ -706,7 +706,10 @@ function getConfiguredDomain(s){
   return configured;
 }
 function hasConfiguredSSL(s){
-  return !!(isTruthy(s&&s.ssl_enabled)&&(s&&s.ssl_cert_path)&&(s&&s.ssl_key_path));
+  if(!isTruthy(s&&s.ssl_enabled))return false;
+  const mode=String((s&&s.ssl_mode)||'file').toLowerCase();
+  if(mode==='letsencrypt')return !!String((s&&s.ssl_le_domain)||'').trim();
+  return !!(String((s&&s.ssl_cert_path)||'').trim()&&String((s&&s.ssl_key_path)||'').trim());
 }
 function shouldUsePublicHTTPS(s){
   return !!(isTruthy(s&&s.embed_use_https)&&hasConfiguredSSL(s));
@@ -1118,47 +1121,54 @@ function outputCard(name,desc,enableKey,s,extra){
 async function renderSettingsSSL(c){
   const s=await api('/api/settings');
   const sslStatus=await api('/api/ssl/status');
+  const webSSL=(sslStatus&&sslStatus.web)||{};
+  const streamSSL=(sslStatus&&sslStatus.stream)||{};
   c.innerHTML=
     '<div class="page-header"><h1 class="page-title">SSL/TLS Sertifika</h1></div>'+
-    '<div class="card" style="max-width:700px;margin-bottom:16px">'+
-      '<div class="card-title" style="margin-bottom:16px">Sertifika Yukle</div>'+
-      '<div style="padding:14px;background:var(--bg-primary);border-radius:var(--radius-sm);margin-bottom:16px;font-size:13px;color:var(--text-secondary);line-height:1.6">'+
-        'CRT/KEY yukleme calisir, ancak yeni sertifika ve port degisiklikleri restart sonrasi uygulanir.<br>'+
-        'Web HTTPS portu: <b>'+(sslStatus.https_port||s.https_port||'443')+'</b> | RTMPS portu: <b>'+(sslStatus.rtmps_port||s.rtmps_port||'1936')+'</b>'+
-      '</div>'+
-      '<div style="padding:16px;background:var(--bg-primary);border-radius:var(--radius-sm);margin-bottom:16px">'+
-        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'+
-          '<div style="width:12px;height:12px;border-radius:50%;background:'+(sslStatus.has_cert?'var(--success)':'var(--danger)')+'"></div>'+
-          '<span style="font-size:13px">Sertifika: '+(sslStatus.has_cert?'Yuklendi':'Yuklenmedi')+'</span></div>'+
-        '<div style="display:flex;align-items:center;gap:8px">'+
-          '<div style="width:12px;height:12px;border-radius:50%;background:'+(sslStatus.has_key?'var(--success)':'var(--danger)')+'"></div>'+
-          '<span style="font-size:13px">Anahtar: '+(sslStatus.has_key?'Yuklendi':'Yuklenmedi')+'</span></div>'+
-      '</div>'+
-      '<div class="form-group"><label class="form-label">Sertifika Dosyasi (.crt / .pem)</label>'+
-        '<input type="file" id="ssl-cert-file" accept=".crt,.pem,.cert" class="form-input" style="padding:8px"></div>'+
-      '<div class="form-group"><label class="form-label">Ozel Anahtar (.key / .pem)</label>'+
-        '<input type="file" id="ssl-key-file" accept=".key,.pem" class="form-input" style="padding:8px"></div>'+
-      '<button class="btn btn-primary" onclick="uploadSSL()">Sertifika Yukle</button>'+
+    '<div class="card" style="max-width:920px;margin-bottom:16px">'+
+      '<div class="card-title" style="margin-bottom:12px">Kullanim Mantigi</div>'+
+      '<div class="form-hint" style="line-height:1.8">Web HTTPS sertifikasi admin paneli ve embed/player sayfalari icin kullanilir. Stream SSL ise yalnizca RTMPS ingest tarafini korur. Isterseniz ayni domaini, isterseniz ayri domain ve ayri sertifika kullanabilirsiniz. Let\\'s Encrypt icin alan adlarinin bu VPS\\'e yonlenmis olmasi ve 80/443 portlarinin acik olmasi gerekir.</div>'+
     '</div>'+
-    '<div class="card" style="max-width:700px;margin-bottom:16px">'+
-      '<div class="card-title" style="margin-bottom:16px">Manuel Yol</div>'+
-      settingInput('ssl_cert_path','Sertifika Dosyasi (.crt)',s.ssl_cert_path||'','text','Orn: /data/certs/cert.crt')+
-      settingInput('ssl_key_path','Ozel Anahtar (.key)',s.ssl_key_path||'','text','Orn: /data/certs/key.pem')+
-      '<button class="btn btn-primary" onclick="saveSettingsCategory(\'ssl\')">Kaydet</button>'+
+    '<div class="card-grid card-grid-2">'+
+      renderSSLProfileCard('web','Web HTTPS',webSSL,s,'ssl_enabled','https_port','ssl_mode','ssl_cert_path','ssl_key_path','ssl_le_domain','ssl_le_email','Admin paneli, embed ve player linkleri bu sertifikayi kullanir.')+
+      renderSSLProfileCard('stream','Stream RTMPS',streamSSL,s,'rtmps_enabled','rtmps_port','stream_ssl_mode','stream_ssl_cert_path','stream_ssl_key_path','stream_ssl_le_domain','stream_ssl_le_email','OBS veya baska encoder RTMPS ile baglanacaksa bu sertifika kullanilir.')+
     '</div>'+
-    '<div class="card" style="max-width:700px">'+
-      '<div class="card-title" style="margin-bottom:16px">Let\'s Encrypt (Otomatik)</div>'+
-      settingInput('ssl_le_domain','Domain',s.ssl_le_domain||'','text','Orn: stream.example.com')+
-      settingInput('ssl_le_email','E-posta',s.ssl_le_email||'','text','Let\'s Encrypt bildirimleri icin')+
-      '<button class="btn btn-primary" onclick="saveSettingsCategory(\'ssl\')">Kaydet</button>'+
-    '</div>';
-}async function uploadSSL(){
-  const certInput=document.getElementById('ssl-cert-file');
-  const keyInput=document.getElementById('ssl-key-file');
+    '<div style="margin-top:16px"><button class="btn btn-primary" onclick="saveSSLSettings()">SSL Ayarlarini Kaydet</button></div>';
+}
+function renderSSLProfileCard(target,title,status,s,enableKey,portKey,modeKey,certKey,keyKey,domainKey,emailKey,desc){
+  const mode=String((s&&s[modeKey])||'file').toLowerCase();
+  const ready=!!(status&&status.ready);
+  const enabled=isTruthy(s&&s[enableKey]);
+  return '<div class="card">'+
+    '<div class="card-title" style="margin-bottom:10px">'+title+'</div>'+
+    '<div class="form-hint" style="line-height:1.7;margin-bottom:14px">'+desc+'</div>'+
+    '<div class="setting-row"><div><div class="setting-label">Ozellik Acik</div><div class="setting-desc">Kapaliysa bu profil hic kullanilmaz.</div></div>'+
+      '<label class="toggle"><input type="checkbox" class="setting-input" data-key="'+enableKey+'" '+(enabled?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+    '<div style="padding:14px;background:var(--bg-primary);border-radius:var(--radius-sm);margin-bottom:14px">'+
+      '<div style="display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:8px"><strong>Durum</strong><span class="tag '+(ready?'tag-green':'tag-red')+'">'+(ready?'Hazir':'Hazir Degil')+'</span></div>'+
+      '<div class="form-hint">Port: <b>'+escHtml(String((s&&s[portKey])||(status&&status[portKey])||''))+'</b></div>'+
+      (mode==='letsencrypt'
+        ?'<div class="form-hint" style="margin-top:6px">Domain: <b>'+escHtml(String((s&&s[domainKey])||(status&&status.domain)||'-'))+'</b></div>'
+        :'<div class="form-hint" style="margin-top:6px">CRT: <code>'+escHtml(String((status&&status.cert_path)||(s&&s[certKey])||'-'))+'</code></div><div class="form-hint">KEY: <code>'+escHtml(String((status&&status.key_path)||(s&&s[keyKey])||'-'))+'</code></div>')+
+    '</div>'+
+    '<div class="form-group"><label class="form-label">Sertifika Modu</label><select class="form-select setting-input" data-key="'+modeKey+'"><option value="file" '+(mode==='file'?'selected':'')+'>Manuel CRT/KEY</option><option value="letsencrypt" '+(mode==='letsencrypt'?'selected':'')+'>Let\\'s Encrypt</option></select><div class="form-hint">Manuel modda dosya yuklersiniz. Let\\'s Encrypt modunda domain ve e-posta yeterlidir.</div></div>'+
+    '<div class="form-group"><label class="form-label">CRT / PEM Yukle</label><input type="file" id="ssl-cert-file-'+target+'" accept=".crt,.pem,.cert" class="form-input" style="padding:8px"></div>'+
+    '<div class="form-group"><label class="form-label">KEY / PEM Yukle</label><input type="file" id="ssl-key-file-'+target+'" accept=".key,.pem" class="form-input" style="padding:8px"></div>'+
+    '<div style="margin-bottom:16px"><button class="btn btn-secondary" onclick="uploadSSL(\''+target+'\')">Bu Profil Icin Sertifika Yukle</button></div>'+
+    settingInput(certKey,'Sertifika Dosyasi (.crt)',s[certKey]||'','text','Orn: /opt/fluxstream/data/certs/'+target+'/server.crt')+
+    settingInput(keyKey,'Ozel Anahtar (.key)',s[keyKey]||'','text','Orn: /opt/fluxstream/data/certs/'+target+'/server.key')+
+    settingInput(domainKey,'Let\\'s Encrypt Domain',s[domainKey]||'','text','Orn: '+(target==='web'?'panel.example.com':'stream.example.com'))+
+    settingInput(emailKey,'Let\\'s Encrypt E-posta',s[emailKey]||'','text','Bildirim ve yenileme icin kullanilir.')+
+  '</div>';
+}
+async function uploadSSL(target){
+  const certInput=document.getElementById('ssl-cert-file-'+target);
+  const keyInput=document.getElementById('ssl-key-file-'+target);
   if(!certInput.files[0]||!keyInput.files[0]){toast('Her iki dosyayi da secin','error');return}
   const fd=new FormData();
   fd.append('cert',certInput.files[0]);
   fd.append('key',keyInput.files[0]);
+  fd.append('target',target);
   try{
     const res=await fetch('/api/ssl/upload',{method:'POST',body:fd});
     const data=await res.json();
@@ -1370,6 +1380,23 @@ async function saveSettingsCategory(category){
     else updates[key]=el.value;
   });
   await saveSettingsValues(category,updates,false);
+}
+async function saveSSLSettings(){
+  const inputs=document.querySelectorAll('.setting-input');
+  const generalUpdates={};
+  const protocolUpdates={};
+  const sslUpdates={};
+  inputs.forEach(el=>{
+    const key=el.dataset.key;
+    if(!key)return;
+    const value=el.type==='checkbox'?(el.checked?'true':'false'):el.value;
+    if(key==='https_port')generalUpdates[key]=value;
+    else if(key==='rtmps_enabled'||key==='rtmps_port')protocolUpdates[key]=value;
+    else sslUpdates[key]=value;
+  });
+  if(Object.keys(generalUpdates).length)await saveSettingsValues('general',generalUpdates,true);
+  if(Object.keys(protocolUpdates).length)await saveSettingsValues('protocols',protocolUpdates,true);
+  await saveSettingsValues('ssl',sslUpdates,false);
 }
 async function saveGuidedPublic(){
   const httpsToggle=document.querySelector('.guided-input[data-key="embed_use_https"]');

@@ -10,42 +10,30 @@ import (
 	"github.com/fluxstream/fluxstream/internal/ingest/rtmp"
 )
 
-// Server is the RTMPS (TLS) listener
+// Server is the RTMPS (TLS) listener.
 type Server struct {
 	port      int
 	handler   rtmp.StreamHandler
-	certFile  string
-	keyFile   string
+	tlsConfig *tls.Config
 }
 
-// NewServer creates a new RTMPS server
-func NewServer(port int, handler rtmp.StreamHandler, certFile, keyFile string) *Server {
+// NewServer creates a new RTMPS server.
+func NewServer(port int, handler rtmp.StreamHandler, tlsConfig *tls.Config) *Server {
 	return &Server{
-		port:     port,
-		handler:  handler,
-		certFile: certFile,
-		keyFile:  keyFile,
+		port:      port,
+		handler:   handler,
+		tlsConfig: tlsConfig,
 	}
 }
 
-// Start begins listening for RTMPS connections
+// Start begins listening for RTMPS connections.
 func (s *Server) Start(ctx context.Context) error {
-	if s.certFile == "" || s.keyFile == "" {
-		return fmt.Errorf("RTMPS: sertifika dosyaları belirtilmedi")
-	}
-
-	cert, err := tls.LoadX509KeyPair(s.certFile, s.keyFile)
-	if err != nil {
-		return fmt.Errorf("RTMPS TLS sertifika yükleme: %w", err)
-	}
-
-	tlsConfig := &tls.Config{
-		Certificates: []tls.Certificate{cert},
-		MinVersion:   tls.VersionTLS12,
+	if s.tlsConfig == nil {
+		return fmt.Errorf("RTMPS TLS config belirtilmedi")
 	}
 
 	addr := fmt.Sprintf(":%d", s.port)
-	listener, err := tls.Listen("tcp", addr, tlsConfig)
+	listener, err := tls.Listen("tcp", addr, s.tlsConfig.Clone())
 	if err != nil {
 		return fmt.Errorf("RTMPS listen %s: %w", addr, err)
 	}
@@ -54,7 +42,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 	go func() {
 		<-ctx.Done()
-		listener.Close()
+		_ = listener.Close()
 	}()
 
 	for {
@@ -64,34 +52,23 @@ func (s *Server) Start(ctx context.Context) error {
 			case <-ctx.Done():
 				return nil
 			default:
-				log.Printf("[RTMPS] Accept hatası: %v", err)
+				log.Printf("[RTMPS] Accept hatasi: %v", err)
 				continue
 			}
 		}
 
-		log.Printf("[RTMPS] Yeni TLS bağlantı: %s", conn.RemoteAddr())
+		log.Printf("[RTMPS] Yeni TLS baglanti: %s", conn.RemoteAddr())
 		handler := rtmp.NewHandler(conn, s.handler)
 		go handler.Handle()
 	}
 }
 
-// SetCerts updates the certificate paths (for runtime cert changes)
-func (s *Server) SetCerts(certFile, keyFile string) {
-	s.certFile = certFile
-	s.keyFile = keyFile
-}
-
-// HasValidCerts checks if certificate files are configured
-func (s *Server) HasValidCerts() bool {
-	return s.certFile != "" && s.keyFile != ""
-}
-
-// Addr returns the listen address
+// Addr returns the listen address.
 func (s *Server) Addr() string {
 	return fmt.Sprintf(":%d", s.port)
 }
 
-// dummyConn wraps net.Conn for the handler
+// dummyConn wraps net.Conn for the handler.
 type dummyConn struct {
 	net.Conn
 }

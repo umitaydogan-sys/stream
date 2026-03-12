@@ -140,12 +140,17 @@ func (m *Manager) LoadDefaults() error {
 		"icecast_port":    {"8000", "outputs"},
 
 		// SSL
-		"ssl_enabled":   {"false", "ssl"},
-		"ssl_mode":      {"file", "ssl"},
-		"ssl_cert_path": {"", "ssl"},
-		"ssl_key_path":  {"", "ssl"},
-		"ssl_le_domain": {"", "ssl"},
-		"ssl_le_email":  {"", "ssl"},
+		"ssl_enabled":          {"false", "ssl"},
+		"ssl_mode":             {"file", "ssl"},
+		"ssl_cert_path":        {"", "ssl"},
+		"ssl_key_path":         {"", "ssl"},
+		"ssl_le_domain":        {"", "ssl"},
+		"ssl_le_email":         {"", "ssl"},
+		"stream_ssl_mode":      {"file", "ssl"},
+		"stream_ssl_cert_path": {"", "ssl"},
+		"stream_ssl_key_path":  {"", "ssl"},
+		"stream_ssl_le_domain": {"", "ssl"},
+		"stream_ssl_le_email":  {"", "ssl"},
 
 		// Security
 		"stream_key_required": {"true", "security"},

@@ -25,6 +25,7 @@ import (
 	"github.com/fluxstream/fluxstream/internal/config"
 	"github.com/fluxstream/fluxstream/internal/storage"
 	"github.com/fluxstream/fluxstream/internal/stream"
+	"github.com/fluxstream/fluxstream/internal/tlsutil"
 )
 
 // Server handles HTTP requests
@@ -77,38 +78,53 @@ func NewServer(port int, db *storage.SQLiteDB, cfg *config.Manager, streamMgr *s
 
 // Start begins serving HTTP
 func (s *Server) Start(ctx context.Context) error {
+	webTLSSource, err := tlsutil.NewSource(s.cfg, tlsutil.ProfileWeb, s.dataDir)
+	if err != nil {
+		return err
+	}
+	streamTLSSource, err := tlsutil.NewSource(s.cfg, tlsutil.ProfileStream, s.dataDir)
+	if err != nil {
+		return err
+	}
+
+	baseHandler := s.corsMiddleware(s.mux)
+	challengeFallback := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, "FluxStream ACME endpoint\n")
+	})
+	challengeHandler := tlsutil.ChallengeHandler(challengeFallback, webTLSSource, streamTLSSource)
+	httpHandler := baseHandler
+	if s.port == 80 && (webTLSSource.UsesLetsEncrypt() || streamTLSSource.UsesLetsEncrypt()) {
+		httpHandler = tlsutil.ChallengeHandler(baseHandler, webTLSSource, streamTLSSource)
+	}
+
 	httpAddr := fmt.Sprintf(":%d", s.port)
 	httpServer := &http.Server{
 		Addr:    httpAddr,
-		Handler: s.corsMiddleware(s.mux),
+		Handler: httpHandler,
 	}
 
 	var httpsServer *http.Server
 	httpsAddr := ""
-	sslEnabled := s.cfg.GetBool("ssl_enabled", false)
-	certPath := s.cfg.Get("ssl_cert_path", "")
-	keyPath := s.cfg.Get("ssl_key_path", "")
-	if certPath == "" {
-		fallback := filepath.Join(s.dataDir, "certs", "server.crt")
-		if _, err := os.Stat(fallback); err == nil {
-			certPath = fallback
-		}
-	}
-	if keyPath == "" {
-		fallback := filepath.Join(s.dataDir, "certs", "server.key")
-		if _, err := os.Stat(fallback); err == nil {
-			keyPath = fallback
-		}
-	}
-	if sslEnabled && certPath != "" && keyPath != "" {
+	if webTLSSource.Enabled && webTLSSource.Ready {
 		httpsAddr = fmt.Sprintf(":%d", s.cfg.GetInt("https_port", 443))
 		httpsServer = &http.Server{
-			Addr:    httpsAddr,
-			Handler: s.corsMiddleware(s.mux),
+			Addr:      httpsAddr,
+			Handler:   baseHandler,
+			TLSConfig: webTLSSource.TLSConfig(),
 		}
 	}
 
-	errCh := make(chan error, 2)
+	var acmeServer *http.Server
+	if (webTLSSource.UsesLetsEncrypt() || streamTLSSource.UsesLetsEncrypt()) && s.port != 80 {
+		acmeServer = &http.Server{
+			Addr:    ":80",
+			Handler: challengeHandler,
+		}
+	}
+
+	errCh := make(chan error, 3)
 
 	go func() {
 		<-ctx.Done()
@@ -117,6 +133,9 @@ func (s *Server) Start(ctx context.Context) error {
 		_ = httpServer.Shutdown(shutdownCtx)
 		if httpsServer != nil {
 			_ = httpsServer.Shutdown(shutdownCtx)
+		}
+		if acmeServer != nil {
+			_ = acmeServer.Shutdown(shutdownCtx)
 		}
 	}()
 
@@ -130,12 +149,30 @@ func (s *Server) Start(ctx context.Context) error {
 	if httpsServer != nil {
 		go func() {
 			log.Printf("[HTTPS] Dinleniyor: %s", httpsAddr)
-			if err := httpsServer.ListenAndServeTLS(certPath, keyPath); err != nil && err != http.ErrServerClosed {
+			httpsListener, err := net.Listen("tcp", httpsAddr)
+			if err != nil {
+				errCh <- err
+				return
+			}
+			if err := httpsServer.Serve(tls.NewListener(httpsListener, webTLSSource.TLSConfig())); err != nil && err != http.ErrServerClosed {
 				errCh <- err
 			}
 		}()
-	} else if sslEnabled {
-		log.Printf("[HTTPS] SSL etkin fakat cert/key hazir degil, HTTPS baslatilmadi")
+	} else if webTLSSource.Enabled {
+		if webTLSSource.UsesLetsEncrypt() {
+			log.Printf("[HTTPS] Let's Encrypt etkin fakat domain henuz hazir degil: %s", webTLSSource.Domain)
+		} else {
+			log.Printf("[HTTPS] SSL etkin fakat cert/key hazir degil, HTTPS baslatilmadi")
+		}
+	}
+
+	if acmeServer != nil {
+		go func() {
+			log.Printf("[ACME] HTTP-01 dinleniyor: :80")
+			if err := acmeServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				errCh <- err
+			}
+		}()
 	}
 
 	select {
@@ -1234,7 +1271,15 @@ func (s *Server) handleSSLUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	certsDir := filepath.Join(s.dataDir, "certs")
+	target := strings.ToLower(strings.TrimSpace(r.FormValue("target")))
+	profile := tlsutil.ProfileWeb
+	certKeyPrefix := "ssl"
+	certsDir := filepath.Join(s.dataDir, "certs", "web")
+	if target == "stream" {
+		profile = tlsutil.ProfileStream
+		certKeyPrefix = "stream_ssl"
+		certsDir = filepath.Join(s.dataDir, "certs", "stream")
+	}
 	if err := os.MkdirAll(certsDir, 0755); err != nil {
 		jsonError(w, fmt.Sprintf("Sertifika klasoru olusturulamadi: %v", err), 500)
 		return
@@ -1251,13 +1296,19 @@ func (s *Server) handleSSLUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.cfg.Set("ssl_cert_path", certPath, "ssl")
-	s.cfg.Set("ssl_key_path", keyPath, "ssl")
+	_ = s.cfg.Set(certKeyPrefix+"_cert_path", certPath, "ssl")
+	_ = s.cfg.Set(certKeyPrefix+"_key_path", keyPath, "ssl")
+	if profile == tlsutil.ProfileWeb {
+		_ = s.cfg.Set("ssl_mode", "file", "ssl")
+	} else {
+		_ = s.cfg.Set("stream_ssl_mode", "file", "ssl")
+	}
 
-	s.db.AddLog("INFO", "ssl", "SSL sertifikalari yuklendi")
+	s.db.AddLog("INFO", "ssl", fmt.Sprintf("%s SSL sertifikalari yuklendi", strings.ToUpper(string(profile))))
 
 	jsonResponse(w, map[string]interface{}{
 		"success":          true,
+		"target":           string(profile),
 		"cert_path":        certPath,
 		"key_path":         keyPath,
 		"requires_restart": true,
@@ -1265,32 +1316,43 @@ func (s *Server) handleSSLUpload(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSSLStatus(w http.ResponseWriter, r *http.Request) {
-	certPath := s.cfg.Get("ssl_cert_path", "")
-	keyPath := s.cfg.Get("ssl_key_path", "")
-
-	hasCert := false
-	hasKey := false
-	if certPath != "" {
-		if _, err := os.Stat(certPath); err == nil {
-			hasCert = true
-		}
+	webSource, err := tlsutil.NewSource(s.cfg, tlsutil.ProfileWeb, s.dataDir)
+	if err != nil {
+		jsonError(w, err.Error(), 500)
+		return
 	}
-	if keyPath != "" {
-		if _, err := os.Stat(keyPath); err == nil {
-			hasKey = true
-		}
+	streamSource, err := tlsutil.NewSource(s.cfg, tlsutil.ProfileStream, s.dataDir)
+	if err != nil {
+		jsonError(w, err.Error(), 500)
+		return
 	}
-
 	jsonResponse(w, map[string]interface{}{
-		"has_cert":         hasCert,
-		"has_key":          hasKey,
-		"cert_path":        certPath,
-		"key_path":         keyPath,
-		"ready":            hasCert && hasKey,
-		"ssl_enabled":      s.cfg.GetBool("ssl_enabled", false),
-		"https_port":       s.cfg.GetInt("https_port", 443),
-		"rtmps_enabled":    s.cfg.GetBool("rtmps_enabled", false),
-		"rtmps_port":       s.cfg.GetInt("rtmps_port", 1936),
+		"web": map[string]interface{}{
+			"enabled":          s.cfg.GetBool("ssl_enabled", false),
+			"mode":             s.cfg.Get("ssl_mode", "file"),
+			"domain":           s.cfg.Get("ssl_le_domain", ""),
+			"email":            s.cfg.Get("ssl_le_email", ""),
+			"cert_path":        webSource.CertPath,
+			"key_path":         webSource.KeyPath,
+			"has_cert":         fileExists(webSource.CertPath),
+			"has_key":          fileExists(webSource.KeyPath),
+			"ready":            webSource.Ready,
+			"https_port":       s.cfg.GetInt("https_port", 443),
+			"requires_restart": true,
+		},
+		"stream": map[string]interface{}{
+			"enabled":          s.cfg.GetBool("rtmps_enabled", false),
+			"mode":             s.cfg.Get("stream_ssl_mode", "file"),
+			"domain":           s.cfg.Get("stream_ssl_le_domain", ""),
+			"email":            s.cfg.Get("stream_ssl_le_email", ""),
+			"cert_path":        streamSource.CertPath,
+			"key_path":         streamSource.KeyPath,
+			"has_cert":         fileExists(streamSource.CertPath),
+			"has_key":          fileExists(streamSource.KeyPath),
+			"ready":            streamSource.Ready,
+			"rtmps_port":       s.cfg.GetInt("rtmps_port", 1936),
+			"requires_restart": true,
+		},
 		"requires_restart": true,
 	})
 }
@@ -1319,36 +1381,14 @@ func (s *Server) publicHost(r *http.Request) string {
 }
 
 func (s *Server) publicUseHTTPS() bool {
-	if !s.cfg.GetBool("ssl_enabled", false) {
-		return false
-	}
 	if !s.cfg.GetBool("embed_use_https", false) {
 		return false
 	}
-	certPath := strings.TrimSpace(s.cfg.Get("ssl_cert_path", ""))
-	keyPath := strings.TrimSpace(s.cfg.Get("ssl_key_path", ""))
-	if certPath == "" {
-		fallback := filepath.Join(s.dataDir, "certs", "server.crt")
-		if _, err := os.Stat(fallback); err == nil {
-			certPath = fallback
-		}
-	}
-	if keyPath == "" {
-		fallback := filepath.Join(s.dataDir, "certs", "server.key")
-		if _, err := os.Stat(fallback); err == nil {
-			keyPath = fallback
-		}
-	}
-	if certPath == "" || keyPath == "" {
+	webSource, err := tlsutil.NewSource(s.cfg, tlsutil.ProfileWeb, s.dataDir)
+	if err != nil {
 		return false
 	}
-	if _, err := os.Stat(certPath); err != nil {
-		return false
-	}
-	if _, err := os.Stat(keyPath); err != nil {
-		return false
-	}
-	return true
+	return webSource.Ready
 }
 
 func (s *Server) publicBaseURL(r *http.Request) string {
@@ -1394,6 +1434,14 @@ func requestHostName(hostPort string) string {
 		}
 	}
 	return hostPort
+}
+
+func fileExists(path string) bool {
+	if strings.TrimSpace(path) == "" {
+		return false
+	}
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 func slugifyFileName(name string) string {

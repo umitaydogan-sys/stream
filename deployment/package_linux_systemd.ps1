@@ -40,10 +40,13 @@ ExecStart=/opt/fluxstream/fluxstream
 Restart=always
 RestartSec=2
 LimitNOFILE=65535
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
 
 [Install]
 WantedBy=multi-user.target
-'@ | Set-Content -Path (Join-Path $OutputDir 'systemd\fluxstream.service') -Encoding UTF8
+'@ | Set-Content -Path (Join-Path $OutputDir 'systemd\fluxstream.service') -Encoding ascii
 
 @'
 #!/usr/bin/env bash
@@ -64,7 +67,7 @@ sudo cp "$INSTALL_DIR/systemd/fluxstream.service" /etc/systemd/system/fluxstream
 sudo systemctl daemon-reload
 sudo systemctl enable --now fluxstream
 echo "FluxStream systemd kurulumu tamamlandi."
-'@ | Set-Content -Path (Join-Path $OutputDir 'install.sh') -Encoding UTF8
+'@ | Set-Content -Path (Join-Path $OutputDir 'install.sh') -Encoding ascii
 
 @'
 #!/usr/bin/env bash
@@ -75,7 +78,7 @@ sudo rm -f /etc/systemd/system/fluxstream.service
 sudo systemctl daemon-reload
 sudo rm -rf /opt/fluxstream
 echo "FluxStream systemd kurulumu kaldirildi."
-'@ | Set-Content -Path (Join-Path $OutputDir 'uninstall.sh') -Encoding UTF8
+'@ | Set-Content -Path (Join-Path $OutputDir 'uninstall.sh') -Encoding ascii
 
 @"
 FluxStream Linux systemd Package
@@ -89,6 +92,6 @@ Icerik:
 Not:
 - Linux ffmpeg binary saglanirsa ./ffmpeg/ffmpeg olarak pakete eklenir.
 - Saglanmazsa sistem PATH icindeki ffmpeg kullanilir.
-"@ | Set-Content -Path (Join-Path $OutputDir 'README.txt') -Encoding UTF8
+"@ | Set-Content -Path (Join-Path $OutputDir 'README.txt') -Encoding ascii
 
 Write-Host "Linux systemd package hazir:" $OutputDir

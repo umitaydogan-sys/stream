@@ -4,7 +4,7 @@ backup/
 data/
 dist/
 *.exe
-fluxstream
+/fluxstream
 tmp_*.log
 tmp_*.out
 tmp_*.err
