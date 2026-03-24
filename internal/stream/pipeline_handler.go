@@ -22,12 +22,13 @@ type PipelineHandler struct {
 	liveHLSEnabled   bool
 	liveDASHEnabled  bool
 	liveOptions      transcode.LiveOptions
+	allowABRByPolicy bool
 	autoRecordings   map[string]string
 	mu               sync.Mutex
 }
 
 // NewPipelineHandler creates an ingest handler for the live pipeline.
-func NewPipelineHandler(manager *Manager, transcodeManager *transcode.Manager, recordingManager autoRecordingManager, liveHLSEnabled, liveDASHEnabled bool, liveOptions transcode.LiveOptions) *PipelineHandler {
+func NewPipelineHandler(manager *Manager, transcodeManager *transcode.Manager, recordingManager autoRecordingManager, liveHLSEnabled, liveDASHEnabled bool, liveOptions transcode.LiveOptions, allowABRByPolicy bool) *PipelineHandler {
 	return &PipelineHandler{
 		manager:          manager,
 		transcodeManager: transcodeManager,
@@ -35,6 +36,7 @@ func NewPipelineHandler(manager *Manager, transcodeManager *transcode.Manager, r
 		liveHLSEnabled:   liveHLSEnabled,
 		liveDASHEnabled:  liveDASHEnabled,
 		liveOptions:      liveOptions,
+		allowABRByPolicy: allowABRByPolicy,
 		autoRecordings:   make(map[string]string),
 	}
 }
@@ -49,7 +51,7 @@ func (h *PipelineHandler) OnPublish(streamKey string, conn net.Conn) error {
 		opts := h.liveOptions
 		if active := h.manager.GetActiveStream(streamKey); active != nil && active.DBStream != nil {
 			policy := ParsePolicyJSON(active.DBStream.PolicyJSON)
-			if policy.EnableABR {
+			if h.allowABRByPolicy && policy.EnableABR {
 				opts.ABREnabled = true
 			}
 			if policy.ProfileSet != "" {

@@ -366,7 +366,7 @@ func (m *Manager) StartLiveHLS(streamKey string) (*Job, error) {
 		cmd:          cmd,
 		cancel:       cancel,
 		stdin:        stdin,
-		packetCh:     make(chan *media.Packet, 4096),
+		packetCh:     make(chan *media.Packet, 16384),
 	}
 	job.logFile = openLogFile(jobOutputDir)
 	if job.logFile != nil {
@@ -552,7 +552,15 @@ func (m *Manager) WriteLivePacket(streamKey string, pkt *media.Packet) {
 	select {
 	case job.packetCh <- pkt.Clone():
 	default:
-		log.Printf("[TC] CanlÄ± HLS kuyruk dolu, paket atÄ±ldÄ±: %s", streamKey)
+		select {
+		case <-job.packetCh:
+		default:
+		}
+		select {
+		case job.packetCh <- pkt.Clone():
+		default:
+			log.Printf("[TC] Canli HLS kuyrugu tikandi, paket atlandi: %s", streamKey)
+		}
 	}
 }
 
@@ -794,7 +802,10 @@ func normalizeLiveOptions(opts LiveOptions) LiveOptions {
 		opts.SegmentDuration = 2
 	}
 	if opts.PlaylistLength <= 0 {
-		opts.PlaylistLength = 6
+		opts.PlaylistLength = 10
+	}
+	if opts.PlaylistLength < 10 {
+		opts.PlaylistLength = 10
 	}
 	if strings.TrimSpace(opts.ProfileSet) == "" {
 		opts.ProfileSet = "balanced"
@@ -808,6 +819,10 @@ func normalizeLiveOptions(opts LiveOptions) LiveOptions {
 func (m *Manager) buildLiveHLSArgs(outputDir string, opts LiveOptions) []string {
 	opts = normalizeLiveOptions(opts)
 	encoder := m.selectVideoEncoder()
+	deleteThreshold := opts.PlaylistLength * 2
+	if deleteThreshold < 8 {
+		deleteThreshold = 8
+	}
 	args := []string{
 		"-hide_banner",
 		"-loglevel", "warning",
@@ -915,6 +930,7 @@ func (m *Manager) buildLiveHLSArgs(outputDir string, opts LiveOptions) []string 
 			"-f", "hls",
 			"-hls_time", fmt.Sprintf("%d", opts.SegmentDuration),
 			"-hls_list_size", fmt.Sprintf("%d", opts.PlaylistLength),
+			"-hls_delete_threshold", fmt.Sprintf("%d", deleteThreshold),
 			"-hls_allow_cache", "0",
 			"-hls_flags", "delete_segments+independent_segments+append_list",
 			"-master_pl_name", "master.m3u8",
@@ -949,6 +965,7 @@ func (m *Manager) buildLiveHLSArgs(outputDir string, opts LiveOptions) []string 
 		"-f", "hls",
 		"-hls_time", fmt.Sprintf("%d", opts.SegmentDuration),
 		"-hls_list_size", fmt.Sprintf("%d", opts.PlaylistLength),
+		"-hls_delete_threshold", fmt.Sprintf("%d", deleteThreshold),
 		"-hls_allow_cache", "0",
 		"-hls_flags", "delete_segments+independent_segments+append_list",
 		"-hls_segment_filename", filepath.Join(outputDir, "seg_%06d.ts"),

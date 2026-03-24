@@ -33,7 +33,7 @@ func buildLiveOptionsFromConfig(cfg *config.Manager) transcode.LiveOptions {
 	opts.ProfilesJSON = cfg.Get("abr_profiles_json", "")
 	opts.Profiles = transcode.ResolveProfiles(opts.ProfileSet, opts.ProfilesJSON)
 	opts.SegmentDuration = cfg.GetInt("hls_segment_duration", 2)
-	opts.PlaylistLength = cfg.GetInt("hls_playlist_length", 6)
+	opts.PlaylistLength = cfg.GetInt("hls_playlist_length", 10)
 	opts.AudioPassthrough = cfg.GetBool("abr_audio_passthrough", false)
 	return opts
 }

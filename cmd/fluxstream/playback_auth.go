@@ -84,7 +84,7 @@ func streamAllowsFormat(raw, format string) bool {
 func normalizeOutputFormat(format string) string {
 	format = strings.TrimSpace(strings.ToLower(format))
 	switch format {
-	case "", "player", "embed", "iframe", "jsapi", "hls_master", "ll_hls", "hls_audio":
+	case "", "auto", "player", "embed", "iframe", "jsapi", "hls_master", "ll_hls", "hls_audio":
 		return "hls"
 	case "dash_audio":
 		return "dash"

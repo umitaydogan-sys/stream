@@ -73,7 +73,7 @@ func (m *Muxer) AddStream(streamKey string) *StreamMuxer {
 		outputDir:       dir,
 		tsMuxer:         ts.NewMuxer(),
 		segmentDuration: 2 * time.Second,
-		maxSegments:     6,
+		maxSegments:     10,
 		currentSegIdx:   0,
 		aacProfile:      1, // AAC-LC
 		aacFreqIndex:    4, // 44100Hz
@@ -383,10 +383,11 @@ func (sm *StreamMuxer) startNewSegment(timestamp uint32) error {
 // writePlaylist generates the M3U8 playlist file
 func (sm *StreamMuxer) writePlaylist() error {
 	playlistPath := filepath.Join(sm.outputDir, "index.m3u8")
+	segments := sm.playlistSegments()
 
 	// Calculate target duration
 	targetDuration := sm.segmentDuration.Seconds()
-	for _, seg := range sm.segments {
+	for _, seg := range segments {
 		if seg.Duration > targetDuration {
 			targetDuration = seg.Duration
 		}
@@ -396,13 +397,13 @@ func (sm *StreamMuxer) writePlaylist() error {
 	content += "#EXT-X-VERSION:3\n"
 	content += fmt.Sprintf("#EXT-X-TARGETDURATION:%d\n", int(targetDuration)+1)
 
-	if len(sm.segments) > 0 {
-		content += fmt.Sprintf("#EXT-X-MEDIA-SEQUENCE:%d\n", sm.segments[0].Index)
+	if len(segments) > 0 {
+		content += fmt.Sprintf("#EXT-X-MEDIA-SEQUENCE:%d\n", segments[0].Index)
 	} else {
 		content += "#EXT-X-MEDIA-SEQUENCE:0\n"
 	}
 
-	for _, seg := range sm.segments {
+	for _, seg := range segments {
 		content += fmt.Sprintf("#EXTINF:%.3f,\n", seg.Duration)
 		content += seg.Filename + "\n"
 	}
@@ -439,21 +440,40 @@ func (sm *StreamMuxer) Close() {
 
 func (sm *StreamMuxer) writeEndPlaylist() {
 	playlistPath := filepath.Join(sm.outputDir, "index.m3u8")
+	segments := sm.playlistSegments()
 	targetDuration := sm.segmentDuration.Seconds()
+	for _, seg := range segments {
+		if seg.Duration > targetDuration {
+			targetDuration = seg.Duration
+		}
+	}
 
 	content := "#EXTM3U\n"
 	content += "#EXT-X-VERSION:3\n"
 	content += fmt.Sprintf("#EXT-X-TARGETDURATION:%d\n", int(targetDuration)+1)
-	if len(sm.segments) > 0 {
-		content += fmt.Sprintf("#EXT-X-MEDIA-SEQUENCE:%d\n", sm.segments[0].Index)
+	if len(segments) > 0 {
+		content += fmt.Sprintf("#EXT-X-MEDIA-SEQUENCE:%d\n", segments[0].Index)
 	}
-	for _, seg := range sm.segments {
+	for _, seg := range segments {
 		content += fmt.Sprintf("#EXTINF:%.3f,\n", seg.Duration)
 		content += seg.Filename + "\n"
 	}
 	content += "#EXT-X-ENDLIST\n"
 
 	os.WriteFile(playlistPath, []byte(content), 0644)
+}
+
+func (sm *StreamMuxer) playlistSegments() []SegmentInfo {
+	if len(sm.segments) == 0 {
+		return nil
+	}
+	out := make([]SegmentInfo, 0, len(sm.segments))
+	for _, seg := range sm.segments {
+		if info, err := os.Stat(filepath.Join(sm.outputDir, seg.Filename)); err == nil && !info.IsDir() {
+			out = append(out, seg)
+		}
+	}
+	return out
 }
 
 // GetPlaylistPath returns the path to the M3U8 playlist

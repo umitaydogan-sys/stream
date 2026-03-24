@@ -280,6 +280,9 @@ func (h *Handler) handleVideoData(msg *Message) error {
 	if err != nil {
 		return err
 	}
+	if pkt == nil || pkt.TrackID != 0 {
+		return nil
+	}
 	pkt.StreamKey = h.streamKey
 	pkt.ReceivedAt = time.Now()
 	h.handler.OnPacket(h.streamKey, pkt)
@@ -295,6 +298,9 @@ func (h *Handler) handleAudioData(msg *Message) error {
 	pkt, err := reader.ReadTag(0x08, uint32(len(msg.Data)), msg.Timestamp, msg.Data)
 	if err != nil {
 		return err
+	}
+	if pkt == nil || pkt.TrackID != 0 {
+		return nil
 	}
 	pkt.StreamKey = h.streamKey
 	pkt.ReceivedAt = time.Now()

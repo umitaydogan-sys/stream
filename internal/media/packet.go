@@ -13,13 +13,16 @@ const (
 
 // Packet represents a generic media packet flowing through FluxStream
 type Packet struct {
-	Type      PacketType
-	Timestamp uint32 // milliseconds
-	Data      []byte
-	IsKeyframe bool
+	Type             PacketType
+	Timestamp        uint32 // milliseconds
+	Data             []byte
+	IsKeyframe       bool
 	IsSequenceHeader bool // codec config (SPS/PPS for H.264, AudioSpecificConfig for AAC)
-	StreamKey  string
-	ReceivedAt time.Time
+	TrackID          uint8
+	IsEnhanced       bool
+	FourCC           string
+	StreamKey        string
+	ReceivedAt       time.Time
 }
 
 // Clone creates a deep copy of the packet
@@ -32,6 +35,9 @@ func (p *Packet) Clone() *Packet {
 		Data:             data,
 		IsKeyframe:       p.IsKeyframe,
 		IsSequenceHeader: p.IsSequenceHeader,
+		TrackID:          p.TrackID,
+		IsEnhanced:       p.IsEnhanced,
+		FourCC:           p.FourCC,
 		StreamKey:        p.StreamKey,
 		ReceivedAt:       p.ReceivedAt,
 	}

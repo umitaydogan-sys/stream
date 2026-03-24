@@ -1,10 +1,12 @@
 .gocache/
 .vscode/
+.tmpref/
 backup/
 data/
 dist/
 *.exe
 /fluxstream
+tmp_admin_check.js
 tmp_*.log
 tmp_*.out
 tmp_*.err

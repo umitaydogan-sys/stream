@@ -84,7 +84,7 @@ func (m *LLMuxer) AddStream(streamKey string) *LLStreamMuxer {
 		tsMuxer:         ts.NewMuxer(),
 		partDuration:    200 * time.Millisecond,
 		segmentDuration: 2 * time.Second,
-		maxSegments:     6,
+		maxSegments:     10,
 	}
 	m.streams[streamKey] = sm
 	return sm

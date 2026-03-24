@@ -1,351 +1,198 @@
 # FluxStream Production Durum Raporu
 
-Tarih: 10 Mart 2026
+Tarih: 24 Mart 2026
 
-## Ozet
+## 1. Genel Karar
 
-Bu turda dort ana alan tamamlandi:
+FluxStream artik yalnizca bir prototip degil.
+Bugun itibariyla tek sunucuda kurulabilen, admin paneli olan,
+yayin ingest alan, player ve embed linki ureten, recording yapan,
+lisans ve servis katmani bulunan bir medya sunucusu haline geldi.
 
-- acilan `cmd` penceresinde startup banner ve servis adresleri geri getirildi
-- kayip ikon/font zinciri duzeltildi
-- ust bara `Yeniden Baslat` ve `Durdur` butonlari eklendi
-- ham `DASH` zinciri canli repack mantigiyla calisir hale getirildi ve `HTTP-FLV` ham output yeniden benchmark edildi
-- portable release icin `ffmpeg` runtime paketleme ve otomatik kesif eklendi
-- Windows service paketi hazirlandi
-- Linux systemd paketi hazirlandi
-- Inno Setup tabanli Windows GUI installer uretildi
-- Windows service install/start/stop/uninstall self-test basariyla gecti
+Ancak bu karar tum alanlar icin esit degil.
+Bazi bolumler production-ready seviyesine yaklasti,
+bazi bolumler ise beta veya ilk faz olgunlugunda.
 
-Genel sonuc:
+Kisa karar:
 
-- `HLS`: production-ready
-- `LL-HLS`: production-ready
-- `DASH` ham output: production-ready
-- `HTTP-FLV` ham output: production-ready
-- `MP4` ham output: production-ready
-- `WebM` ham output: production-ready
-- `MP3/AAC/WAV/FLAC/Icecast` direkt linkler: production-ready
-- admin/player asset zinciri: artik tamamen local vendor, CDN bagimliligi yok
-- Windows portable release: `fluxstream.exe` + `ffmpeg/` runtime ile production-ready
-- Windows service release paketi: hazir
-- Windows GUI installer: hazir
-- Linux systemd release paketi: hazir
-- Windows GUI installer icinde opsiyonel kurulum modu / port / SSL sayfalari hazir
-- Windows GUI installer icinde public domain alani da hazir
+- tek node webcast, kurum ici TV, radyo ve beyaz etiketli yayin isleri icin kullanilabilir seviyeye geldi
+- ama enterprise seviye clusterli buyuk dagitim urunu demek icin henuz erken
 
-## Bu Turda Yapilanlar
+## 2. Bugun Production'a En Yakin Alanlar
 
-### 1. Startup Konsol Ciktisi
+### 2.1 Ingest ve Dagitim Omurgasi
 
-`fluxstream.exe` acildiginda bos siyah pencere yerine su bilgiler yeniden yazdiriliyor:
+Asagidaki alanlar bugun guclu gorunuyor:
 
-- `FluxStream v2.0.0`
-- `HTTP`, `RTMP`, `RTMPS`, `SRT`, `RTP`, `RTSP`, `WHIP`, `TS-UDP` endpoint listesi
-- `Sunucu hazir. Yayin bekleniyor...`
-- `Kapatmak icin Ctrl+C`
+- RTMP, RTMPS, SRT, RTP, RTSP, WebRTC/WHIP, MPEG-TS ingest
+- HLS, LL-HLS, DASH, HTTP-FLV, MP4, WebM ve ses output zinciri
+- stream lifecycle, subscriber fanout ve recording akisi
+- FFmpeg tabanli live transcode ve ABR omurgasi
 
-Bu bilgi dogrudan [main.go](C:/xampp/htdocs/stream/cmd/fluxstream/main.go) icinde console banner olarak yazdiriliyor.
+Karar:
 
-### 2. Ikon ve Logo Duzeltmeleri
+- tek node yayin alip dagitma cekirdegi kullanilabilir durumda
 
-- `bootstrap-icons.css` font yolu duzeltildi
-- local vendor font dosyalari `/static/fonts/...` altindan dogru servis ediliyor
-- player ust markasindaki bozuk karakterli logo metni kaldirildi
-- player artik local bootstrap icon ile `FluxStream` markasini gosteriyor
+### 2.2 Yonetim ve Urunlestirme
 
-Ilgili dosyalar:
+Bugun elde olanlar:
 
-- [bootstrap-icons.css](C:/xampp/htdocs/stream/internal/web/static/vendor/bootstrap-icons.css)
-- [player_html.go](C:/xampp/htdocs/stream/internal/web/player_html.go)
-- [static_assets.go](C:/xampp/htdocs/stream/internal/web/static_assets.go)
+- setup wizard
+- admin paneli
+- stream olusturma, duzenleme ve silme
+- embed ve player link uretimi
+- player template sistemi
+- runtime lisans modeli
+- backup omurgasi
+- Linux servis yonetimi
 
-### 3. Ust Bar Sunucu Kontrolleri
+Karar:
 
-Admin ust barina iki buton eklendi:
+- urunlestirme omurgasi var
+- tam kurumsal olgunluk icin daha fazla sertlestirme gerekiyor
 
-- `Yeniden Baslat`
-- `Durdur`
+### 2.3 OBS Uyumu
 
-Bu butonlar:
+Bu tur itibariyla:
 
-- [admin_html.go](C:/xampp/htdocs/stream/internal/web/admin_html.go) icindeki `restartServer()` ve `stopServer()` fonksiyonlarini cagirir
-- [server.go](C:/xampp/htdocs/stream/internal/web/server.go) uzerinden admin session kontroluyle korunur
-- [main.go](C:/xampp/htdocs/stream/cmd/fluxstream/main.go) icindeki process control kanalina baglidir
+- OBS normal RTMP baglantisi calisiyor
+- OBS `Cok kanalli Video` yayini ilk fazda kabul ediliyor
+- panelde kopyalanabilir `Config Override JSON` var
+- stream olusturma ve stream detay ekranlarinda adim adim OBS rehberi var
+
+Karar:
+
+- baglanti seviyesi destek var
+- ama OBS'ten gelen ek kalite izleri henuz gercek ABR varyantlarina bagli degil
+
+## 3. Bugun Beta veya Ilk Faz Saydigim Alanlar
+
+Asagidaki basliklar henuz tam production-ready degil:
+
+- OBS multitrack katmanlarini HLS master varyantlarina baglama
+- multi-node origin-edge cluster mimarisi
+- S3 veya MinIO archive ve restore akisi
+- Prometheus / OpenTelemetry / alarm omurgasi
+- RBAC, audit log ve SSO
+- DRM, SSAI ve monetizasyon
+- tam kapsamli otomatik test ve yuk testi
+
+Karar:
+
+- cekirdek urun guclu
+- enterprise fark yaratan katmanlar henuz eksik
+
+## 4. Son Turlarda Kapanan Kritik Isler
+
+### 4.1 OBS Cok Kanalli Video Ilk Faz
+
+Kapatilanlar:
+
+- Enhanced RTMP multitrack paketlerini okumak
+- birincil izi akisa almak
+- ek izleri baglantiyi bozmadan yoksaymak
+- panelde kullaniciya JSON ve rehber sunmak
+
+### 4.2 Player ve Embed Tarafi
+
+Kapatilanlar:
+
+- `play` ve `embed` linkleri
+- iframe icinde oynatma
+- template preview
+- `403`, framing ve sahte `offline` sorunlari
 
 Not:
 
-- butonlar admin oturumu gerektirir
-- restart sonrasi yeni surec `FLUXSTREAM_NO_BROWSER=1` ile acilir
+- canli kalite ve stall davranisi daha da olculmeli
 
-### 4. Ham DASH Zinciri
+### 4.3 Linux Urunlestirme
 
-Kok neden iki parcaydi:
+Kapatilanlar:
 
-1. canli `DASH` job'u publish aninda HLS manifest'i beklerken cok erken timeout oluyordu
-2. `ffmpeg` segmentleri job output klasorune degil calisma dizinine yaziyordu
-3. canli audio timeline live `DASH` manifest'te DTS uyarisina yol aciyordu
+- Linux systemd paketi
+- servis kullanicisi ile calisma
+- temiz kurulum akisi
+- `api/health` ile saglik kontrolu
+- `api/setup/status` ile setup sifirlama dogrulamasi
 
-Yapilan duzeltmeler:
+## 5. 24 Mart 2026 Teknik Dogrulama
 
-- `StartLiveDASH()` bloklayici degil, gecikmeli canli job modeline cevrildi
-- bekleme suresi artirildi
-- `ffmpeg` prosesinin `Dir` alani `jobOutputDir` olacak sekilde ayarlandi
-- `DASH` argumanlari testte calisan profile gecirildi:
-  - video `copy + tag:v avc1`
-  - audio `aac` yeniden encode
-  - `aresample=async=1:first_pts=0,asetpts=N/SR/TB`
-  - `use_timeline=0`
-  - `ldash=1`
-  - `init-$RepresentationID$.m4s`
-  - `chunk-$RepresentationID$-$Number%05d$.m4s`
+Yerelde:
 
-Ilgili dosya:
+- `go test ./...` gecti
+- `go build ./cmd/fluxstream/` gecti
+- `go build ./cmd/fluxstream-license/` gecti
 
-- [manager.go](C:/xampp/htdocs/stream/internal/transcode/manager.go)
+VPS:
 
-### 5. Ham HTTP-FLV Benchmark
-
-`HTTP-FLV` raw endpoint tekrar test edildi.
-
-Sonuc:
-
-- endpoint canli byte akisi veriyor
-- indirilen ornek `ffprobe` tarafinda `flv` olarak tanindi
-- video `h264`
-- audio `aac`
-
-### 6. MP4 / WebM Durumu
-
-Bu turdaki benchmark'ta `MP4` ve `WebM` ham endpoint'leri yeniden dogrulandi.
-
-Sonuc:
-
-- `MP4` -> gecerli `mov,mp4,m4a,3gp,3g2,mj2`
-- `WebM` -> gecerli `matroska,webm`
-
-### 7. FFmpeg Runtime Paketleme
-
-Transcode katmaninin sadece sistem `PATH` icindeki `ffmpeg`e bagimli kalmasi kaldirildi.
-
-Yeni mantik:
-
-- uygulama once config icindeki `ffmpeg_path` degerine bakar
-- sonra `FLUXSTREAM_FFMPEG_PATH` environment degiskenini kontrol eder
-- sonra `fluxstream.exe` yaninda ve alt klasorlerinde su adaylari arar:
-  - `ffmpeg.exe`
-  - `ffmpeg/ffmpeg.exe`
-  - `bin/ffmpeg.exe`
-  - `tools/ffmpeg.exe`
-  - `tools/ffmpeg/ffmpeg.exe`
-  - `data/tools/ffmpeg.exe`
-- ancak bunlar yoksa sistem `PATH` fallback olur
-
-Portable paketleme icin su script eklendi:
-
-- [package_windows_portable.ps1](C:/xampp/htdocs/stream/deployment/package_windows_portable.ps1)
-
-Bu script:
-
-- `fluxstream.exe` derler
-- sistemdeki `ffmpeg` runtime klasorunu bulur
-- `ffmpeg.exe` ile gerekli `*.dll` dosyalarini `dist/fluxstream-windows-amd64-portable/ffmpeg/` altina kopyalar
-- `README.txt` olusturur
-
-Gercek dogrulama:
-
-- `PATH` icinden `ffmpeg` kaldirilmis ortamda portable paket calistirildi
-- `/api/transcode/status` icinde su path goruldu:
-  - `C:\xampp\htdocs\stream\dist\fluxstream-windows-amd64-portable\ffmpeg\ffmpeg.exe`
-- `ffmpeg_version` dogru dondu
-
-### 8. Dagitim Paketleri
-
-Uretilen artefaktlar:
-
-- `dist/fluxstream-windows-amd64-portable`
-- `dist/fluxstream-windows-amd64-service`
-- `dist/FluxStream-Setup.exe`
-- `dist/fluxstream-linux-amd64-systemd`
-
-Windows service paketi:
-
-- `install_service.ps1`
-- `uninstall_service.ps1`
-- `ffmpeg/` runtime klasoru
-
-Linux systemd paketi:
-
-- `fluxstream` linux binary
-- `systemd/fluxstream.service`
-- `install.sh`
-- `uninstall.sh`
-
-Not:
-
-- Windows service komutlari gercek self-test ile dogrulandi
-- self-test log dosyasi:
-  - `dist/windows-service-selftest.log`
-- Inno Setup 6 ile GUI installer derlendi
-- installer icine opsiyonel su sayfalar eklendi:
-  - servis mi manuel mod mu
-  - custom HTTP / RTMP / HTTPS / RTMPS portlari
-  - public domain / IP alani
-  - CRT / KEY on yukleme ve SSL'yi aninda acma secenegi
-- bu sayfalarda aciklama metni eklendi; ayarlarin kurulumdan sonra admin panelinden degistirilebildigi belirtiliyor
-- installer secenekleri uygulama icinde `fluxstream.exe config set ...` ile yaziliyor
-- izole paket testinde `config set` uygulanip ozel `http_port=9911` ile sunucu kaldirildi ve `/api/health` -> `200` dogrulandi
-- admin paneline `Alan Adi / Embed` ayar sayfasi eklendi
-- kopyala butonlari guvensiz origin fallback ile duzeltildi
-- `localhost` kullanan embed/play URL'leri artik domain ayarina veya aktif request host'una gore uretiliyor
-- `mp3/aac/ogg/wav/flac` raw audio cikislari gercek ffmpeg transcode ile duzeltildi
-- Windows installer desktop icon varsayilani acik hale getirildi
-
-## Gercek Zamanli Dogrulama
-
-Canli benchmark 10 Mart 2026 tarihinde `live_f08222b9e8cbeceacf1a3296` key'i uzerinde yapildi.
-
-### Sunucu ve UI
-
-- `/api/health` -> `ok`
-- `/static/vendor/bootstrap-icons.css` -> `200`
-- `/static/fonts/bootstrap-icons.woff2` -> `200`
-- `/play/{key}` HTML'i icinde:
-  - `/static/vendor/bootstrap-icons.css`
-  - `bi-lightning-charge-fill`
-  - `Yayin cevrimdisi`
-- admin ana HTML icinde:
-  - `restartServer()`
-  - `stopServer()`
-  - `Yeniden Baslat`
-  - `Durdur`
-
-### DASH Raw Output
-
-Canli yayin sirasinda su dosyalar olustu:
-
-- `data/transcode/dash/live_f08222b9e8cbeceacf1a3296/init-0.m4s`
-- `data/transcode/dash/live_f08222b9e8cbeceacf1a3296/init-1.m4s`
-- `data/transcode/dash/live_f08222b9e8cbeceacf1a3296/chunk-0-00001.m4s`
-- `data/transcode/dash/live_f08222b9e8cbeceacf1a3296/chunk-1-00001.m4s`
-- `data/transcode/dash/live_f08222b9e8cbeceacf1a3296/manifest.mpd`
-
-Canli probe sonucu:
-
-- `/dash/live_f08222b9e8cbeceacf1a3296/manifest.mpd` -> `200`
-- `ffmpeg -t 8 -i http://localhost:8844/dash/live_f08222b9e8cbeceacf1a3296/manifest.mpd -f null -` -> exit code `0`
-
-Ek dogrulama:
-
-- lokal decode testinde `WARN_COUNT=0`
-- `non monotonically increasing dts` uyarisi yeniden uretilemedi
-- canli manifest low-latency dynamic DASH formuna gecti
+- host: `23.94.220.222`
+- systemd servis: `fluxstream`
+- servis durumu: `active`
+- health: `http://127.0.0.1:8844/api/health` -> `{"status":"ok","version":"2.0.0"}`
+- setup durumu: `http://127.0.0.1:8844/api/setup/status` -> `{"language":"tr","setup_completed":false}`
 
 Karar:
 
-- `DASH` ham output production-ready
+- temiz Linux kurulum senaryosu calisiyor
+- sistem sifirdan test edilmeye hazir durumda
 
-### HTTP-FLV Raw Output
+## 6. Rakiplere Gore Bugunku Konum
 
-10 saniyelik canli capture sonucu:
+FluxStream'in bugun guclu oldugu taraflar:
 
-- dosya boyutu: `909983` byte
-- `ffprobe`:
-  - container: `flv`
-  - video: `h264`
-  - audio: `aac`
+- tek binary ile kolay kurulum
+- ayni urunde admin paneli + stream CRUD + embed + template akisi
+- zengin output matrisi ve audio output cesitliligi
+- beyaz etiket kullanima uygun temel urunlestirme omurgasi
+- OBS cok kanalli video icin panel destekli kullanim rehberi
 
-Karar:
+FluxStream'in rakiplere gore zayif oldugu taraflar:
 
-- `HTTP-FLV` ham output production-ready
+- cluster ve autoscaling yok
+- object storage / cloud archive akisi yok
+- advanced monitoring ve telemetry yok
+- DRM ve SSAI yok
+- kurumsal guvenlik ve kimlik katmani dar
+- otomatik test ve performans benchmark kapsami dar
 
-### MP4 Raw Output
+## 7. Duz ve Duru Soz
 
-10 saniyelik canli capture sonucu:
+Benim gorusum su:
 
-- dosya boyutu: `1298054` byte
-- `ffprobe format_name`: `mov,mp4,m4a,3gp,3g2,mj2`
+Evet, FluxStream artik "iyi bir medya sunucusu" olmaya basladi.
+Hatta tek sunuculu canli yayin ihtiyacinda artik "oyuncak" seviyesinin ustunde.
 
-Karar:
+Ama bugun icin en dogru tanim su olur:
 
-- `MP4` ham output production-ready
+- iyi bir tek-node medya sunucusu
+- gelisen bir urun cekirdegi
+- enterprise yayincilik urunu olma yolunda ama henuz orada degil
 
-### WebM Raw Output
+Yani bugunku haliyle:
 
-10 saniyelik canli capture sonucu:
+- kurum ici yayin
+- yerel TV / radyo
+- webinar / webcast
+- markali player ve embed dagitimi
 
-- dosya boyutu: `3826824` byte
-- `ffprobe format_name`: `matroska,webm`
+icin ciddi bicimde kullanilabilir.
 
-Karar:
+Ama su alanlar kapanmadan "rakiplerin tam dengi oldu" demem:
 
-- `WebM` ham output production-ready
+- multi-node cluster
+- storage ve archive
+- telemetry
+- guvenlik ve audit
+- multitrack to ABR baglantisi
 
-## Production Karari
+## 8. En Kritik Sonraki Adimlar
 
-### Production'a Alinabilir
+Bana gore bir sonraki siralama su olmali:
 
-- HLS
-- LL-HLS
-- DASH raw output
-- HTTP-FLV raw output
-- MP4 raw output
-- WebM raw output
-- MP3
-- AAC
-- WAV
-- FLAC
-- Icecast
-- local vendor asset modeli
-- admin ust bar stop/restart kontrolleri
-
-### Izlenmesi Gereken Riskler
-
-1. `DASH` audio timeline:
-   - mevcut duzeltmeden sonra lokal decode testinde DTS uyarisi yok
-   - yine de uzun sureli production izleme tavsiye edilir
-
-2. `RTMPS`:
-   - sertifika yoksa acilis log'unda hata gorunur
-   - production'da `cert.pem` / `key.pem` saglanmadan kullanilmamali
-
-3. Uzun sureli soak test:
-   - `MP4`, `WebM`, `DASH`, `HTTP-FLV` icin 30-60 dakikalik yayin testi halen tavsiye edilir
-
-## Sonraki Teknik Adimlar
-
-1. `HTTP-FLV`, `MP4`, `WebM`, `DASH` icin otomatik self-test endpoint'i eklemek
-2. tek sunuculu opsiyonel cache katmanini devreye almak
-3. server metrics eklemek:
-   - aktif publisher
-   - aktif raw consumer
-   - ffmpeg child process sayisi
-   - segment olusum gecikmesi
-4. uzun sureli soak test scriptlerini repoya almak
-5. RTMPS sertifika kurulumu ve health check eklemek
-
-## Standalone Dagitim
-
-FluxStream tek basina calismaya devam eder. Harici cache veya CDN zorunlu degildir.
-
-Opsiyonel tek-sunuculu reverse proxy/cache konfigi eklendi:
-
-- [fluxstream-standalone.conf](C:/xampp/htdocs/stream/deployment/nginx/fluxstream-standalone.conf)
-- [standalone_delivery.md](C:/xampp/htdocs/stream/deployment/standalone_delivery.md)
-
-Bu modelde:
-
-- FluxStream dogrudan kullanilabilir
-- isteyen ayni makinede Nginx cache katmani acabilir
-- daha sonra ayni tek origin'in onune CDN tanimlanabilir
-
-## Kisa Sonuc
-
-Bu tur sonunda sistemin eksik kalan operasyonel kisimlari toparlandi:
-
-- startup CMD bilgileri geri geldi
-- ikon/font zinciri duzeldi
-- admin ust bar process kontrolu eklendi
-- ham `DASH` zinciri artik gercek canli repack ile calisiyor ve audio DTS uyarisi kapatildi
-- `HTTP-FLV`, `MP4` ve `WebM` ham output'lar yeniden benchmark edildi
-
-Su anki durumla sistem, tek origin uzerinde production denemesi yapabilecek seviyede. Bir sonraki teknik esik, uzun sureli soak test ve CDN/edge dagitim katmani.
+1. OBS multitrack katmanlarini gercek ABR varyantlarina bagla
+2. player QoE ve stall telemetry ekle
+3. Prometheus / OpenTelemetry / alarm ekle
+4. S3 / MinIO archive ve restore akisini getir
+5. origin-edge cluster mimarisi tasarla
+6. RBAC, audit log ve SSO katmanini ekle

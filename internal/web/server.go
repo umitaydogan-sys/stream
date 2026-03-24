@@ -44,6 +44,9 @@ type Server struct {
 	sessions        sync.Map // sessionToken -> *session
 	analytics       *analytics.Tracker
 	playbackAuth    func(r *http.Request, streamKey, format string) (bool, int, string)
+	settingsMutator func(section string, updates map[string]string)
+	streamMutator   func(st *storage.Stream)
+	templateMutator func(pt *storage.PlayerTemplate)
 }
 
 type session struct {
@@ -219,6 +222,21 @@ func (s *Server) SetPlaybackAuthorizer(fn func(r *http.Request, streamKey, forma
 	s.playbackAuth = fn
 }
 
+// SetSettingsMutator registers a server-side normalization hook for settings updates.
+func (s *Server) SetSettingsMutator(fn func(section string, updates map[string]string)) {
+	s.settingsMutator = fn
+}
+
+// SetStreamMutator registers a server-side normalization hook for stream create/update payloads.
+func (s *Server) SetStreamMutator(fn func(st *storage.Stream)) {
+	s.streamMutator = fn
+}
+
+// SetPlayerTemplateMutator registers a server-side normalization hook for player template payloads.
+func (s *Server) SetPlayerTemplateMutator(fn func(pt *storage.PlayerTemplate)) {
+	s.templateMutator = fn
+}
+
 // SetHLSOverrideDir registers a preferred directory for HLS assets.
 func (s *Server) SetHLSOverrideDir(dir string) {
 	s.hlsOverrideDir = dir
@@ -282,6 +300,10 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc("/", s.handleAdmin)
 }
 
+func allowsFraming(path string) bool {
+	return strings.HasPrefix(path, "/embed/") || strings.HasPrefix(path, "/play/")
+}
+
 // â”€â”€ CORS Middleware â”€â”€
 
 func (s *Server) corsMiddleware(next http.Handler) http.Handler {
@@ -290,7 +312,11 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("X-Frame-Options", "SAMEORIGIN")
+		if allowsFraming(r.URL.Path) {
+			w.Header().Del("X-Frame-Options")
+		} else {
+			w.Header().Set("X-Frame-Options", "SAMEORIGIN")
+		}
 		w.Header().Set("X-XSS-Protection", "1; mode=block")
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 
@@ -396,6 +422,7 @@ func (s *Server) handleSetupStatus(w http.ResponseWriter, r *http.Request) {
 	completed := s.cfg.GetBool("setup_completed", false)
 	jsonResponse(w, map[string]interface{}{
 		"setup_completed": completed,
+		"language":        s.cfg.Get("language", "tr"),
 	})
 }
 
@@ -412,6 +439,7 @@ func (s *Server) handleSetupComplete(w http.ResponseWriter, r *http.Request) {
 		HTTPSPort   int    `json:"https_port"`
 		RTMPPort    int    `json:"rtmp_port"`
 		EmbedDomain string `json:"embed_domain"`
+		Language    string `json:"language"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		jsonError(w, "Invalid request", 400)
@@ -438,6 +466,9 @@ func (s *Server) handleSetupComplete(w http.ResponseWriter, r *http.Request) {
 	}
 	if strings.TrimSpace(req.EmbedDomain) != "" {
 		s.cfg.Set("embed_domain", strings.TrimSpace(req.EmbedDomain), "embed")
+	}
+	if strings.TrimSpace(req.Language) != "" {
+		s.cfg.Set("language", strings.TrimSpace(req.Language), "general")
 	}
 
 	// Mark setup as completed
@@ -526,6 +557,9 @@ func (s *Server) handleStreams(w http.ResponseWriter, r *http.Request) {
 			DomainLock:    req.DomainLock,
 			IPWhitelist:   req.IPWhitelist,
 		}
+		if s.streamMutator != nil {
+			s.streamMutator(st)
+		}
 
 		id, err := s.db.CreateStream(st)
 		if err != nil {
@@ -593,6 +627,9 @@ func (s *Server) handleStreamByID(w http.ResponseWriter, r *http.Request) {
 			req.RecordFormat = "ts"
 		}
 		req.ID = id
+		if s.streamMutator != nil {
+			s.streamMutator(&req)
+		}
 		if err := s.db.UpdateStream(&req); err != nil {
 			jsonError(w, err.Error(), 500)
 			return
@@ -633,6 +670,9 @@ func (s *Server) handleSettingsSection(w http.ResponseWriter, r *http.Request) {
 		if err := json.NewDecoder(r.Body).Decode(&updates); err != nil {
 			jsonError(w, "Invalid request", 400)
 			return
+		}
+		if s.settingsMutator != nil {
+			s.settingsMutator(section, updates)
 		}
 		for key, value := range updates {
 			if err := s.cfg.Set(key, value, section); err != nil {
@@ -930,12 +970,15 @@ func (s *Server) handlePlayer(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Stream key gerekli", 400)
 		return
 	}
-	if !s.authorizePlayback(w, r, key, "hls") {
+	format := normalizePlayerFormat(r.URL.Query().Get("format"))
+	autoplay := r.URL.Query().Get("autoplay") != "0"
+	muted := r.URL.Query().Get("muted") != "0"
+	if !s.authorizePlayback(w, r, key, format) {
 		return
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	fmt.Fprintf(w, playerHTML, key, key, key)
+	fmt.Fprint(w, renderPlayerHTML(key, format, autoplay, muted))
 }
 
 // â”€â”€ Embed Page Handler â”€â”€
@@ -949,10 +992,7 @@ func (s *Server) handleEmbedPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	format := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("format")))
-	if format == "" || format == "player" || format == "iframe" || format == "jsapi" {
-		format = "hls"
-	}
+	format := normalizePlayerFormat(r.URL.Query().Get("format"))
 	autoplay := r.URL.Query().Get("autoplay") != "0"
 	muted := r.URL.Query().Get("muted") != "0"
 	if !s.authorizePlayback(w, r, key, format) {
@@ -1067,6 +1107,9 @@ func (s *Server) handlePlayerTemplates(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, "Template adÄ± gerekli", 400)
 			return
 		}
+		if s.templateMutator != nil {
+			s.templateMutator(&pt)
+		}
 		id, err := s.db.CreatePlayerTemplate(&pt)
 		if err != nil {
 			jsonError(w, err.Error(), 500)
@@ -1105,6 +1148,9 @@ func (s *Server) handlePlayerTemplateByID(w http.ResponseWriter, r *http.Request
 			return
 		}
 		pt.ID = id
+		if s.templateMutator != nil {
+			s.templateMutator(&pt)
+		}
 		if err := s.db.UpdatePlayerTemplate(&pt); err != nil {
 			jsonError(w, err.Error(), 500)
 			return

@@ -169,11 +169,46 @@ tr:hover td{background:rgba(37,99,235,.04)}
 .bar-item{display:grid;grid-template-columns:140px 1fr 56px;gap:12px;align-items:center}
 .bar-track{height:10px;background:var(--bg-primary);border-radius:999px;overflow:hidden;border:1px solid var(--border)}
 .bar-fill{height:100%;background:var(--gradient-2);border-radius:999px}
-.timeline-bars{display:grid;grid-template-columns:repeat(auto-fit,minmax(12px,1fr));align-items:end;gap:6px;height:150px}
-.timeline-col{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:8px}
-.timeline-bar{width:100%;border-radius:999px 999px 4px 4px;background:var(--gradient-3);min-height:6px;box-shadow:inset 0 -1px 0 rgba(255,255,255,.2)}
-.timeline-label{font-size:10px;color:var(--text-muted)}
-.timeline-value{font-size:10px;color:var(--text-secondary)}
+.timeline-meta{font-size:11px;color:var(--text-muted);margin-bottom:12px}
+.sparkline-shell{position:relative}
+.sparkline-frame{position:relative;border-radius:14px;background:linear-gradient(180deg,#f8fbff 0%,#eef4fb 100%);border:1px solid rgba(37,99,235,.08);padding:14px 14px 10px;min-height:178px;overflow:hidden}
+.sparkline-svg{display:block;width:100%;height:118px}
+.sparkline-grid line{stroke:rgba(37,99,235,.08);stroke-width:1}
+.sparkline-area{fill:url(#sparkline-fill)}
+.sparkline-line{fill:none;stroke:#14b8a6;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 8px 18px rgba(20,184,166,.18))}
+.sparkline-point{fill:#ffffff;stroke:#14b8a6;stroke-width:2}
+.sparkline-hitmap{position:absolute;left:14px;right:14px;top:14px;height:118px;display:grid;gap:0}
+.sparkline-hit{position:relative;height:100%;cursor:default}
+.sparkline-hit::after{content:attr(data-tooltip);position:absolute;left:50%;top:8px;transform:translate(-50%,-110%);background:rgba(15,23,42,.96);color:#fff;padding:7px 9px;border-radius:8px;font-size:11px;line-height:1.35;white-space:nowrap;box-shadow:var(--shadow-md);pointer-events:none;opacity:0;transition:opacity .15s ease;z-index:3}
+.sparkline-hit::before{content:'';position:absolute;left:50%;top:8px;transform:translate(-50%,-40%);border:6px solid transparent;border-top-color:rgba(15,23,42,.96);pointer-events:none;opacity:0;transition:opacity .15s ease;z-index:2}
+.sparkline-hit:hover::after,.sparkline-hit:hover::before{opacity:1}
+.sparkline-footer{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-top:12px}
+.sparkline-axis{display:grid;gap:8px;font-size:11px;color:var(--text-muted);flex:1}
+.sparkline-axis span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sparkline-summary{display:flex;gap:16px;flex-wrap:wrap;justify-content:flex-end}
+.sparkline-chip{min-width:82px}
+.sparkline-chip strong{display:block;font-size:15px;color:var(--text-primary)}
+.sparkline-chip span{display:block;font-size:11px;color:var(--text-muted)}
+.template-thumb{height:150px;border-radius:12px;display:flex;align-items:stretch;justify-content:center;position:relative;overflow:hidden;margin-bottom:12px;border:1px solid rgba(255,255,255,.1);box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+.template-thumb-shell{position:relative;display:flex;flex-direction:column;justify-content:space-between;width:100%;height:100%;padding:14px}
+.template-thumb-shell::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at top right,rgba(255,255,255,.12),transparent 35%)}
+.template-thumb-header,.template-thumb-footer,.template-thumb-center{position:relative;z-index:1}
+.template-thumb-header{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.template-thumb-title{font-size:13px;font-weight:700;color:#fff;max-width:70%;text-shadow:0 2px 10px rgba(0,0,0,.35)}
+.template-thumb-logo{font-size:11px;font-weight:700;padding:5px 8px;border-radius:999px;background:rgba(255,255,255,.18);color:#fff;backdrop-filter:blur(6px)}
+.template-thumb-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.14);font-size:10px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.08em}
+.template-thumb-badge::before{content:'';width:6px;height:6px;border-radius:50%;background:#fb7185;box-shadow:0 0 10px rgba(251,113,133,.7)}
+.template-thumb-center{display:flex;align-items:center;justify-content:center}
+.template-thumb-play{width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.18);backdrop-filter:blur(10px);color:#fff;font-size:26px;box-shadow:0 10px 22px rgba(2,6,23,.28)}
+.template-thumb-footer{display:flex;flex-direction:column;gap:10px}
+.template-thumb-progress{height:5px;border-radius:999px;background:rgba(255,255,255,.14);overflow:hidden}
+.template-thumb-progress span{display:block;height:100%;width:58%;border-radius:999px;background:linear-gradient(90deg,#60a5fa,#22d3ee)}
+.template-thumb-controls{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;color:#fff}
+.template-thumb-controls .left,.template-thumb-controls .right{display:flex;align-items:center;gap:10px;font-size:12px}
+.template-thumb-watermark{position:absolute;left:14px;bottom:56px;font-size:11px;letter-spacing:.08em;font-weight:700;color:rgba(255,255,255,.7)}
+.segment-control{display:inline-flex;gap:6px;padding:4px;background:var(--bg-primary);border:1px solid var(--border);border-radius:999px}
+.segment-btn{border:none;background:transparent;color:var(--text-muted);font-size:12px;font-weight:700;padding:7px 12px;border-radius:999px;cursor:pointer;transition:all .2s}
+.segment-btn.active{background:#fff;color:var(--text-primary);box-shadow:var(--shadow-sm)}
 .viewer-table td,.viewer-table th{font-size:12px}
 .mono-wrap{font-family:Consolas,monospace;font-size:12px;word-break:break-all;color:var(--text-secondary)}
 @media(max-width:980px){.quick-grid{grid-template-columns:1fr}}
@@ -191,6 +226,159 @@ let currentPage='dashboard';
 let setupCompleted=false;
 let authToken=sessionStorage.getItem('fluxstream_token')||'';
 let pageRefreshTimer=null;
+let currentLang=localStorage.getItem('fluxstream_lang')||'tr';
+let runtimeSettings={};
+const LANGUAGE_META={
+  tr:{label:'Turkce',locale:'tr-TR'},
+  en:{label:'English',locale:'en-US'},
+  de:{label:'Deutsch',locale:'de-DE'},
+  es:{label:'Espanol',locale:'es-ES'},
+  fr:{label:'Francais',locale:'fr-FR'}
+};
+const I18N={
+  en:{
+    'Ana Menu':'Main Menu','Yayin':'Streaming','Ayarlar':'Settings','Izleme':'Monitoring','Sistem':'System',
+    'Yayinlar':'Streams','Yeni Yayin':'New Stream','Embed Kodlari':'Embed Codes','Gelismis Embed':'Advanced Embed','Player Sablonlari':'Player Templates',
+    'Kolay Ayarlar':'Quick Settings','Genel':'General','Alan Adi / Embed':'Domain / Embed','Protokoller':'Protocols','Cikis Formatlari':'Output Formats','Teslimat / ABR':'Delivery / ABR','SSL/TLS':'SSL/TLS','Guvenlik':'Security','Depolama':'Storage','Saglik ve Uyari':'Health & Alerts','Transkod':'Transcode',
+    'Analitik':'Analytics','Kayitlar':'Recordings','Izleyiciler':'Viewers','Transcode Isleri':'Transcode Jobs','Teshis':'Diagnostics','Bakim ve Yedek':'Maintenance & Backups','Lisans':'License','Tokenlar':'Tokens','Kullanicilar':'Users','Loglar':'Logs',
+    'Yonetim paneline giris yapin':'Sign in to the admin panel','Kullanici Adi':'Username','Sifre':'Password','Sifreniz':'Your password','Giris Yap':'Sign In','Kullanici adi ve sifre gerekli':'Username and password are required','Giris basarili!':'Login successful!','Giris hatasi':'Login error',
+    'Live Streaming Media Server':'Live Streaming Media Server',"FluxStream'e hos geldiniz!":'Welcome to FluxStream!','Canli yayin sunucunuzu birkac adimda kuralim.':'Let’s set up your live streaming server in a few steps.','Baslayalim':'Let’s Start','Admin Hesabi':'Admin Account','Yonetim paneli icin giris bilgileri':'Sign-in details for the admin panel','Sifre Tekrar':'Repeat Password','En az 4 karakter':'At least 4 characters','Ileri':'Next','Geri':'Back','Port ve Domain':'Ports and Domain','Sunucu portlarini ve public alan adini yapilandirin':'Configure server ports and the public domain','HTTP Port (Web Arayuzu)':'HTTP Port (Web UI)','HTTPS Port (SSL aktifse)':'HTTPS Port (if SSL is enabled)','RTMP Port (OBS Yayin)':'RTMP Port (OBS ingest)','Public Domain / IP':'Public Domain / IP','Bos birakirsaniz panelin acildigi host kullanilir. HTTP ve HTTPS public portlari kurulumdan sonra Kolay Ayarlar veya Alan Adi / Embed ekranindan degistirilebilir.':'If left empty, the host used to open the panel is used. Public HTTP and HTTPS ports can be changed later from Quick Settings or the Domain / Embed page.','Kurulumu Tamamla':'Finish Setup','Kurulum tamamlandi!':'Setup completed!','Kurulum hatasi':'Setup error','Sifre en az 4 karakter olmali':'Password must be at least 4 characters','Sifreler eslesiyor!':'Passwords do not match!',
+    'Kaydet':'Save','Iptal':'Cancel','Guncelle':'Update','Olustur':'Create','Sil':'Delete','Duzenle':'Edit','Onizle':'Preview','Indir':'Download','Direkt Link':'Direct Link',
+    'Toplam Yayin':'Total Streams','Aktif Izleyici':'Active Viewers','Tepe Esz.':'Peak Concurrency','Toplam Bant':'Total Bandwidth','Izleyici Trendi':'Viewer Trend','Bant Trendi':'Bandwidth Trend','Format Dagilimi':'Format Distribution','Ulke Dagilimi':'Country Distribution','En Populer Yayinlar':'Top Streams','Secili periyot':'Selected period','Ayni periyotta toplam cikis':'Total output in the same period','Henuz timeline verisi yok':'No timeline data yet','Henuz bant snapshot yok':'No bandwidth snapshots yet','Henuz format verisi yok':'No format data yet','Henuz ulke verisi yok':'No country data yet','Aktif yayin yok':'No active stream','izleyici':'viewer',
+    'Sunucu Kontrol':'Server Control','Yeniden Baslat':'Restart','Durdur':'Stop','Kapat':'Close','Kopyalandi!':'Copied!','Kopyalama basarisiz':'Copy failed','Son':'Latest','Tepe':'Peak','Minimum':'Minimum','Ayarlar kaydedildi!':'Settings saved!','Kayit hatasi':'Save error',
+    'Genel Ayarlar':'General Settings','Kimlik ve Yerellesme':'Identity and Localization','Sunucu Adi':'Server Name','Sunucu goruntuleme adi':'Display name of the server','Dil':'Language','Kurulumda secilen dil burada degistirilebilir. Login, setup ve panel kabugu bu secime gore acilir.':'The installation language can be changed here. Login, setup, and the admin shell follow this choice.','Saat Dilimi':'Time Zone','Tarih ve saat gosterimleri bu timezone ile yorumlanir.':'Dates and times are interpreted using this time zone.','Tema':'Theme','Admin panelinin gorsel yonunu belirler. Su an acik tema varsayilandir.':'Defines the visual style of the admin panel. Light theme is the default for now.','Kolay mod acik':'Guided mode enabled','Yeni kurulumlarda rehber odakli ayarlari one cikarir.':'Highlights guidance-first settings during new installations.',
+    'Sunucu ve Panel Varsayilanlari':'Server and Panel Defaults','Web arayuzu portu':'Web interface port','SSL portu':'SSL port','Varsayilan Public Domain':'Default Public Domain','Link uretiminde kullanilan ilk alan adi. Bossa mevcut host kullanilir.':'Primary domain used while generating links. If empty, the current host is used.','Varsayilan Public HTTP Port':'Default Public HTTP Port','Embed ve player linkleri icin':'Used for player and embed links','Varsayilan Public HTTPS Port':'Default Public HTTPS Port','SSL ile uretilen linkler icin':'Used for SSL-generated links','Player kalite secici':'Player quality selector','ABR yayinlarda kullanici kaliteyi elle de secebilir.':'Lets viewers manually choose quality on ABR streams.','Otomatik bakim':'Automatic maintenance','Temizleme ve bakim islerini zamanli calistirir.':'Runs cleanup and maintenance tasks on schedule.','Kayit Saklama Suresi (gun)':'Recording Retention (days)','0 verilirse otomatik silme yapilmaz.':'Set to 0 to disable automatic deletion.',
+    'Baglanti Rehberi':'Connection Guide','OBS RTMP URL':'OBS RTMP URL','RTP URL':'RTP URL','HLS Izleme URL':'HLS Playback URL',
+    'Kurulu gelen hazir sablonlari temel alip duzenleyebilir veya sifirdan yeni sablon olusturabilirsiniz.':'Use the bundled starter templates as a base, or create a new one from scratch.','+ Yeni Sablon':'+ New Template','Onizleme Kaynagi':'Preview Source','Onizleme Formati':'Preview Format','Kaydedilen template icin bu formatta embed kodu ve preview olusur.':'Preview and embed code are generated in this format for the saved template.','Hazir baslangic sablonu':'Starter templates','Kullanim':'Usage','Duzenle -> Kaydet -> Embed tarafinda kullan':'Edit -> Save -> Use on the embed side','Amac':'Purpose','Canli TV, radyo, minimal player, cam tasarim ve parlak vitrini hizla baslatmak':'Quick-start templates for live TV, radio, minimal player, glass style, and showcase layouts.',
+    'Kaynak stream yok':'No source stream','Template preview icin en az bir stream olusturun.':'Create at least one stream to preview templates.','Kaydedin ve deneyin':'Save and try','Yeni bir template icin once kaydet, sonra secili stream ile player preview ve embed kodunu gor.':'For a new template, save it first, then review the player preview and embed code with the selected stream.','Secili kaynak:':'Selected source:','Sablon Duzenle':'Edit Template','Yeni Player Sablonu':'New Player Template','Sablon Adi *':'Template Name *','Logo URL':'Logo URL','Logo Konum':'Logo Position','Sag Ust':'Top Right','Sol Ust':'Top Left','Sag Alt':'Bottom Right','Sol Alt':'Bottom Left','Logo Seffaflik':'Logo Opacity','Watermark Yazi':'Watermark Text','Baslik Goster':'Show Title','CANLI Badge':'LIVE Badge','Arkaplan CSS':'Background CSS','Kontrol Cubugu CSS':'Control Bar CSS','Play Butonu CSS':'Play Button CSS','Ozel CSS':'Custom CSS','Kaynak stream':'Source stream','Format':'Format','Canli Player Onizleme':'Live Player Preview','Secili stream ve format ile':'Using the selected stream and format','Template + stream birlesik cikti':'Combined template + stream output','Sablon adi gerekli':'Template name is required','Sablon guncellendi!':'Template updated!','Sablon olusturuldu!':'Template created!','Sablon silindi':'Template deleted',
+    'Servis durumu, tek tikla yedek alma ve temiz geri donus komutlari burada toplanir.':'Service status, one-click backups, and clean recovery actions are gathered here.','Offline imzali lisans dosyasi burada saklanir. Internet baglantisi olmadan dogrulama yapilir.':'The offline signed license file is stored here. Validation works without internet access.','Mevcut Lisans Durumu':'Current License Status','Bekleniyor':'Pending','Lisans ID':'License ID','Lisans yuklenince aktif ozellikler burada gorunur.':'Active licensed features appear here after a license is loaded.','Lisans Dosyasi Yukle':'Upload License File','Lisans JSON':'License JSON','Imzali lisans JSONunu buraya yapistirin':'Paste the signed license JSON here','Lisansi Kaydet':'Save License','Ornek JSON Yukle':'Load Sample JSON','Lisans kaydedildi':'License saved','Lisans kaydedilemedi':'License could not be saved'
+  },
+  de:{
+    'Ana Menu':'Hauptmenu','Yayin':'Streaming','Ayarlar':'Einstellungen','Izleme':'Ueberwachung','Sistem':'System',
+    'Yayinlar':'Streams','Yeni Yayin':'Neuer Stream','Embed Kodlari':'Embed-Codes','Gelismis Embed':'Erweitertes Embed','Player Sablonlari':'Player-Vorlagen',
+    'Kolay Ayarlar':'Schnelleinstellungen','Genel':'Allgemein','Alan Adi / Embed':'Domain / Embed','Protokoller':'Protokolle','Cikis Formatlari':'Ausgabeformate','Teslimat / ABR':'Auslieferung / ABR','SSL/TLS':'SSL/TLS','Guvenlik':'Sicherheit','Depolama':'Speicher','Saglik ve Uyari':'Status und Warnungen','Transkod':'Transkodierung',
+    'Analitik':'Analytik','Kayitlar':'Aufnahmen','Izleyiciler':'Zuschauer','Transcode Isleri':'Transcode-Jobs','Teshis':'Diagnose','Bakim ve Yedek':'Wartung und Backups','Lisans':'Lizenz','Tokenlar':'Token','Kullanicilar':'Benutzer','Loglar':'Protokolle',
+    'Yonetim paneline giris yapin':'Am Admin-Panel anmelden','Kullanici Adi':'Benutzername','Sifre':'Passwort','Sifreniz':'Ihr Passwort','Giris Yap':'Anmelden','Kullanici adi ve sifre gerekli':'Benutzername und Passwort sind erforderlich','Giris basarili!':'Anmeldung erfolgreich!','Giris hatasi':'Anmeldefehler',
+    'Live Streaming Media Server':'Live-Streaming-Medienserver',"FluxStream'e hos geldiniz!":'Willkommen bei FluxStream!','Canli yayin sunucunuzu birkac adimda kuralim.':'Richten wir Ihren Live-Streaming-Server in wenigen Schritten ein.','Baslayalim':'Los geht’s','Admin Hesabi':'Admin-Konto','Yonetim paneli icin giris bilgileri':'Anmeldedaten fuer das Admin-Panel','Sifre Tekrar':'Passwort wiederholen','En az 4 karakter':'Mindestens 4 Zeichen','Ileri':'Weiter','Geri':'Zurueck','Port ve Domain':'Ports und Domain','Sunucu portlarini ve public alan adini yapilandirin':'Server-Ports und die oeffentliche Domain konfigurieren','HTTP Port (Web Arayuzu)':'HTTP-Port (Weboberflaeche)','HTTPS Port (SSL aktifse)':'HTTPS-Port (wenn SSL aktiv ist)','RTMP Port (OBS Yayin)':'RTMP-Port (OBS-Ingest)','Public Domain / IP':'Oeffentliche Domain / IP','Bos birakirsaniz panelin acildigi host kullanilir. HTTP ve HTTPS public portlari kurulumdan sonra Kolay Ayarlar veya Alan Adi / Embed ekranindan degistirilebilir.':'Wenn leer, wird der Host der aktuellen Panel-URL verwendet. Oeffentliche HTTP- und HTTPS-Ports koennen spaeter im Bereich Schnelleinstellungen oder Domain / Embed geaendert werden.','Kurulumu Tamamla':'Einrichtung abschliessen','Kurulum tamamlandi!':'Einrichtung abgeschlossen!','Kurulum hatasi':'Einrichtungsfehler','Sifre en az 4 karakter olmali':'Das Passwort muss mindestens 4 Zeichen lang sein','Sifreler eslesiyor!':'Die Passwoerter stimmen nicht ueberein!',
+    'Kaydet':'Speichern','Iptal':'Abbrechen','Guncelle':'Aktualisieren','Olustur':'Erstellen','Sil':'Loeschen','Duzenle':'Bearbeiten','Onizle':'Vorschau','Indir':'Herunterladen','Direkt Link':'Direktlink',
+    'Toplam Yayin':'Gesamtzahl Streams','Aktif Izleyici':'Aktive Zuschauer','Tepe Esz.':'Spitzenwert','Toplam Bant':'Gesamtbandbreite','Izleyici Trendi':'Zuschauertrend','Bant Trendi':'Bandbreitentrend','Format Dagilimi':'Formatverteilung','Ulke Dagilimi':'Laenderverteilung','En Populer Yayinlar':'Beliebteste Streams','Secili periyot':'Ausgewaehlter Zeitraum','Ayni periyotta toplam cikis':'Gesamtausgabe im selben Zeitraum','Henuz timeline verisi yok':'Noch keine Zeitreihendaten','Henuz bant snapshot yok':'Noch keine Bandbreiten-Snapshots','Henuz format verisi yok':'Noch keine Formatdaten','Henuz ulke verisi yok':'Noch keine Laenderdaten','Aktif yayin yok':'Kein aktiver Stream','izleyici':'Zuschauer',
+    'Sunucu Kontrol':'Serversteuerung','Yeniden Baslat':'Neu starten','Durdur':'Beenden','Kapat':'Schliessen','Kopyalandi!':'Kopiert!','Kopyalama basarisiz':'Kopieren fehlgeschlagen','Son':'Aktuell','Tepe':'Spitze','Minimum':'Minimum','Ayarlar kaydedildi!':'Einstellungen gespeichert!','Kayit hatasi':'Speicherfehler'
+  },
+  es:{
+    'Ana Menu':'Menu principal','Yayin':'Streaming','Ayarlar':'Configuracion','Izleme':'Monitoreo','Sistem':'Sistema',
+    'Yayinlar':'Streams','Yeni Yayin':'Nuevo stream','Embed Kodlari':'Codigos embed','Gelismis Embed':'Embed avanzado','Player Sablonlari':'Plantillas de reproductor',
+    'Kolay Ayarlar':'Ajustes rapidos','Genel':'General','Alan Adi / Embed':'Dominio / Embed','Protokoller':'Protocolos','Cikis Formatlari':'Formatos de salida','Teslimat / ABR':'Entrega / ABR','SSL/TLS':'SSL/TLS','Guvenlik':'Seguridad','Depolama':'Almacenamiento','Saglik ve Uyari':'Salud y alertas','Transkod':'Transcodificacion',
+    'Analitik':'Analitica','Kayitlar':'Grabaciones','Izleyiciler':'Espectadores','Transcode Isleri':'Tareas de transcodificacion','Teshis':'Diagnostico','Bakim ve Yedek':'Mantenimiento y copias','Lisans':'Licencia','Tokenlar':'Tokens','Kullanicilar':'Usuarios','Loglar':'Registros',
+    'Yonetim paneline giris yapin':'Inicia sesion en el panel de administracion','Kullanici Adi':'Usuario','Sifre':'Contrasena','Sifreniz':'Tu contrasena','Giris Yap':'Entrar','Kullanici adi ve sifre gerekli':'Se requieren usuario y contrasena','Giris basarili!':'Inicio de sesion correcto','Giris hatasi':'Error de inicio de sesion',
+    'Live Streaming Media Server':'Servidor de streaming en vivo',"FluxStream'e hos geldiniz!":'Bienvenido a FluxStream!','Canli yayin sunucunuzu birkac adimda kuralim.':'Configuremos tu servidor de streaming en pocos pasos.','Baslayalim':'Empecemos','Admin Hesabi':'Cuenta de administrador','Yonetim paneli icin giris bilgileri':'Credenciales para el panel de administracion','Sifre Tekrar':'Repetir contrasena','En az 4 karakter':'Al menos 4 caracteres','Ileri':'Siguiente','Geri':'Atras','Port ve Domain':'Puertos y dominio','Sunucu portlarini ve public alan adini yapilandirin':'Configura los puertos del servidor y el dominio publico','HTTP Port (Web Arayuzu)':'Puerto HTTP (interfaz web)','HTTPS Port (SSL aktifse)':'Puerto HTTPS (si SSL esta activo)','RTMP Port (OBS Yayin)':'Puerto RTMP (ingesta OBS)','Public Domain / IP':'Dominio publico / IP','Bos birakirsaniz panelin acildigi host kullanilir. HTTP ve HTTPS public portlari kurulumdan sonra Kolay Ayarlar veya Alan Adi / Embed ekranindan degistirilebilir.':'Si se deja vacio, se usa el host con el que se abre el panel. Los puertos publicos HTTP y HTTPS pueden cambiarse despues desde Ajustes rapidos o Dominio / Embed.','Kurulumu Tamamla':'Finalizar instalacion','Kurulum tamamlandi!':'Instalacion completada!','Kurulum hatasi':'Error de instalacion','Sifre en az 4 karakter olmali':'La contrasena debe tener al menos 4 caracteres','Sifreler eslesiyor!':'Las contrasenas no coinciden!',
+    'Kaydet':'Guardar','Iptal':'Cancelar','Guncelle':'Actualizar','Olustur':'Crear','Sil':'Eliminar','Duzenle':'Editar','Onizle':'Vista previa','Indir':'Descargar','Direkt Link':'Enlace directo',
+    'Toplam Yayin':'Streams totales','Aktif Izleyici':'Espectadores activos','Tepe Esz.':'Pico concurrente','Toplam Bant':'Ancho de banda total','Izleyici Trendi':'Tendencia de audiencia','Bant Trendi':'Tendencia de ancho de banda','Format Dagilimi':'Distribucion por formato','Ulke Dagilimi':'Distribucion por pais','En Populer Yayinlar':'Streams mas populares','Secili periyot':'Periodo seleccionado','Ayni periyotta toplam cikis':'Salida total del mismo periodo','Henuz timeline verisi yok':'Aun no hay datos de la linea temporal','Henuz bant snapshot yok':'Aun no hay capturas de ancho de banda','Henuz format verisi yok':'Aun no hay datos por formato','Henuz ulke verisi yok':'Aun no hay datos por pais','Aktif yayin yok':'No hay stream activo','izleyici':'espectador',
+    'Sunucu Kontrol':'Control del servidor','Yeniden Baslat':'Reiniciar','Durdur':'Detener','Kapat':'Cerrar','Kopyalandi!':'Copiado!','Kopyalama basarisiz':'Error al copiar','Son':'Actual','Tepe':'Pico','Minimum':'Minimo','Ayarlar kaydedildi!':'Configuracion guardada!','Kayit hatasi':'Error al guardar'
+  },
+  fr:{
+    'Ana Menu':'Menu principal','Yayin':'Streaming','Ayarlar':'Parametres','Izleme':'Supervision','Sistem':'Systeme',
+    'Yayinlar':'Streams','Yeni Yayin':'Nouveau stream','Embed Kodlari':'Codes embed','Gelismis Embed':'Embed avance','Player Sablonlari':'Modeles de lecteur',
+    'Kolay Ayarlar':'Reglages rapides','Genel':'General','Alan Adi / Embed':'Domaine / Embed','Protokoller':'Protocoles','Cikis Formatlari':'Formats de sortie','Teslimat / ABR':'Distribution / ABR','SSL/TLS':'SSL/TLS','Guvenlik':'Securite','Depolama':'Stockage','Saglik ve Uyari':'Sante et alertes','Transkod':'Transcodage',
+    'Analitik':'Analytique','Kayitlar':'Enregistrements','Izleyiciler':'Spectateurs','Transcode Isleri':'Taches de transcodage','Teshis':'Diagnostic','Bakim ve Yedek':'Maintenance et sauvegardes','Lisans':'Licence','Tokenlar':'Jetons','Kullanicilar':'Utilisateurs','Loglar':'Journaux',
+    'Yonetim paneline giris yapin':'Connectez-vous au panneau d’administration','Kullanici Adi':'Nom d’utilisateur','Sifre':'Mot de passe','Sifreniz':'Votre mot de passe','Giris Yap':'Connexion','Kullanici adi ve sifre gerekli':'Nom d’utilisateur et mot de passe requis','Giris basarili!':'Connexion reussie !','Giris hatasi':'Erreur de connexion',
+    'Live Streaming Media Server':'Serveur multimedia de streaming en direct',"FluxStream'e hos geldiniz!":'Bienvenue sur FluxStream !','Canli yayin sunucunuzu birkac adimda kuralim.':'Configurons votre serveur de streaming en quelques etapes.','Baslayalim':'Commencons','Admin Hesabi':'Compte administrateur','Yonetim paneli icin giris bilgileri':'Identifiants du panneau d’administration','Sifre Tekrar':'Repeter le mot de passe','En az 4 karakter':'Au moins 4 caracteres','Ileri':'Suivant','Geri':'Retour','Port ve Domain':'Ports et domaine','Sunucu portlarini ve public alan adini yapilandirin':'Configurez les ports du serveur et le domaine public','HTTP Port (Web Arayuzu)':'Port HTTP (interface web)','HTTPS Port (SSL aktifse)':'Port HTTPS (si SSL est actif)','RTMP Port (OBS Yayin)':'Port RTMP (ingest OBS)','Public Domain / IP':'Domaine public / IP','Bos birakirsaniz panelin acildigi host kullanilir. HTTP ve HTTPS public portlari kurulumdan sonra Kolay Ayarlar veya Alan Adi / Embed ekranindan degistirilebilir.':'Si ce champ est vide, l’hote utilise pour ouvrir le panneau sera repris. Les ports publics HTTP et HTTPS peuvent etre modifies apres l’installation depuis Reglages rapides ou Domaine / Embed.','Kurulumu Tamamla':'Terminer l’installation','Kurulum tamamlandi!':'Installation terminee !','Kurulum hatasi':'Erreur d’installation','Sifre en az 4 karakter olmali':'Le mot de passe doit contenir au moins 4 caracteres','Sifreler eslesiyor!':'Les mots de passe ne correspondent pas !',
+    'Kaydet':'Enregistrer','Iptal':'Annuler','Guncelle':'Mettre a jour','Olustur':'Creer','Sil':'Supprimer','Duzenle':'Modifier','Onizle':'Apercu','Indir':'Telecharger','Direkt Link':'Lien direct',
+    'Toplam Yayin':'Total des streams','Aktif Izleyici':'Spectateurs actifs','Tepe Esz.':'Pic de simultaneite','Toplam Bant':'Bande passante totale','Izleyici Trendi':'Tendance des spectateurs','Bant Trendi':'Tendance de bande passante','Format Dagilimi':'Repartition par format','Ulke Dagilimi':'Repartition par pays','En Populer Yayinlar':'Streams les plus populaires','Secili periyot':'Periode selectionnee','Ayni periyotta toplam cikis':'Sortie totale sur la meme periode','Henuz timeline verisi yok':'Pas encore de donnees de chronologie','Henuz bant snapshot yok':'Aucun instantane de bande passante','Henuz format verisi yok':'Pas encore de donnees de format','Henuz ulke verisi yok':'Pas encore de donnees par pays','Aktif yayin yok':'Aucun stream actif','izleyici':'spectateur',
+    'Sunucu Kontrol':'Controle du serveur','Yeniden Baslat':'Redemarrer','Durdur':'Arreter','Kapat':'Fermer','Kopyalandi!':'Copie !','Kopyalama basarisiz':'La copie a echoue','Son':'Actuel','Tepe':'Pic','Minimum':'Minimum','Ayarlar kaydedildi!':'Parametres enregistres !','Kayit hatasi':'Erreur d’enregistrement'
+  }
+};
+
+Object.assign(I18N.en,{
+  'Runtime Modu':'Runtime Mode',
+  'Feature enforcement':'Feature Enforcement',
+  'Gelistirme':'Development',
+  'Servisi Yeniden Baslat':'Restart Service',
+  'Servisi Baslat':'Start Service',
+  'Servisi Durdur':'Stop Service',
+  'Kurulum Dizini':'Install Directory',
+  'Atomic Upgrade Komutu':'Atomic Upgrade Command',
+  'Servis aksiyonu gonderildi':'Service action sent',
+  'Servis aksiyonu basarisiz':'Service action failed',
+  'Embedded development key aktif; production icin imzali lisans yukleyin.':'Embedded development key is active; upload a signed license for production.',
+  'Yeni binary once *.next olarak yuklenir, servis durdurulur, atomik rename yapilip servis yeniden baslatilir.':'Upload the new binary as *.next, stop the service, perform an atomic rename, then start the service again.'
+});
+
+function normalizeLang(lang){
+  return LANGUAGE_META[lang]?lang:'tr';
+}
+function localeForLang(){
+  return (LANGUAGE_META[normalizeLang(currentLang)]||LANGUAGE_META.tr).locale;
+}
+function fmtLocaleDateTime(value){
+  if(!value)return '-';
+  const d=new Date(value);
+  return Number.isNaN(d.getTime())?'-':d.toLocaleString(localeForLang());
+}
+function fmtLocaleDate(value){
+  if(!value)return '-';
+  const d=new Date(value);
+  return Number.isNaN(d.getTime())?'-':d.toLocaleDateString(localeForLang());
+}
+function fmtLocaleTime(value){
+  if(!value)return '-';
+  const d=new Date(value);
+  return Number.isNaN(d.getTime())?'-':d.toLocaleTimeString(localeForLang());
+}
+function languageOptions(selected){
+  selected=normalizeLang(selected||currentLang);
+  return Object.keys(LANGUAGE_META).map(function(code){
+    return '<option value="'+code+'" '+(code===selected?'selected':'')+'>'+LANGUAGE_META[code].label+'</option>';
+  }).join('');
+}
+function t(key,fallback,vars){
+  const lang=normalizeLang(currentLang);
+  let text=(I18N[lang]||{})[key];
+  if((text===undefined||text===null) && lang!=='en') text=(I18N.en||{})[key];
+  if(text===undefined||text===null) text=fallback||key;
+  if(vars){
+    Object.keys(vars).forEach(function(name){
+      text=text.replace(new RegExp('\\{'+name+'\\}','g'),String(vars[name]));
+    });
+  }
+  return text;
+}
+function translateLiteral(value){
+  if(currentLang==='tr'||value==null)return value;
+  const raw=String(value);
+  const trimmed=raw.trim();
+  if(!trimmed)return raw;
+  const translated=t(trimmed,trimmed);
+  return translated===trimmed?raw:raw.replace(trimmed,translated);
+}
+function applyTranslations(root){
+  if(!root||currentLang==='tr')return;
+  root.querySelectorAll('[placeholder],[title],[aria-label]').forEach(function(el){
+    ['placeholder','title','aria-label'].forEach(function(attr){
+      const val=el.getAttribute(attr);
+      if(val)el.setAttribute(attr,translateLiteral(val));
+    });
+  });
+  const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{
+    acceptNode:function(node){
+      if(!node.parentElement)return NodeFilter.FILTER_REJECT;
+      const tag=node.parentElement.tagName;
+      if(['SCRIPT','STYLE','TEXTAREA','CODE','PRE'].indexOf(tag)!==-1)return NodeFilter.FILTER_REJECT;
+      return String(node.nodeValue||'').trim()?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_REJECT;
+    }
+  });
+  const nodes=[];
+  while(walker.nextNode())nodes.push(walker.currentNode);
+  nodes.forEach(function(node){
+    node.nodeValue=translateLiteral(node.nodeValue);
+  });
+}
+function setCurrentLanguage(lang,silent){
+  currentLang=normalizeLang(lang);
+  document.documentElement.lang=currentLang;
+  localStorage.setItem('fluxstream_lang',currentLang);
+  if(typeof wizardData!=='undefined'&&wizardData)wizardData.language=currentLang;
+  if(!silent)applyTranslations(document.getElementById('app'));
+}
 
 async function api(path,opts={}){
   try{
@@ -243,7 +431,9 @@ function formatBytes(b){if(!b||b===0)return '0 B';const k=1024,s=['B','KB','MB',
 function formatUptime(sec){if(!sec)return '0s';const d=Math.floor(sec/86400),h=Math.floor((sec%86400)/3600),m=Math.floor((sec%3600)/60);if(d>0)return d+'g '+h+'s '+m+'dk';if(h>0)return h+'s '+m+'dk';return m+'dk'}
 
 async function init(){
-  const status=await api('/api/setup/status');
+  const [status,settings]=await Promise.all([api('/api/setup/status'),api('/api/settings')]);
+  if(settings&&!settings.error)runtimeSettings=settings;
+  setCurrentLanguage((runtimeSettings&&runtimeSettings.language)||currentLang,true);
   setupCompleted=status.setup_completed;
   if(!setupCompleted){renderWizard();return}
   if(authToken){
@@ -257,32 +447,34 @@ async function init(){
 function renderLogin(){
   document.getElementById('app').innerHTML=
   '<div class="wizard-container"><div class="wizard-card"><div style="text-align:center;font-size:48px;margin-bottom:16px;color:var(--accent)"><i class="bi bi-lightning-charge-fill"></i></div>'+
-  '<h1 class="wizard-title">FluxStream</h1><p class="wizard-subtitle">Yonetim paneline giris yapin</p>'+
-  '<div class="form-group"><label class="form-label">Kullanici Adi</label><input class="form-input" id="login-user" value="admin"></div>'+
-  '<div class="form-group"><label class="form-label">Sifre</label><input class="form-input" id="login-pass" type="password" placeholder="Sifreniz"></div>'+
-  '<button class="btn btn-primary" style="width:100%" onclick="doLogin()">Giris Yap</button></div></div>';
+  '<h1 class="wizard-title">FluxStream</h1><p class="wizard-subtitle">'+t('Yonetim paneline giris yapin')+'</p>'+
+  '<div class="form-group"><label class="form-label">'+t('Kullanici Adi')+'</label><input class="form-input" id="login-user" value="admin"></div>'+
+  '<div class="form-group"><label class="form-label">'+t('Sifre')+'</label><input class="form-input" id="login-pass" type="password" placeholder="'+t('Sifreniz')+'"></div>'+
+  '<button class="btn btn-primary" style="width:100%" onclick="doLogin()">'+t('Giris Yap')+'</button></div></div>';
+  applyTranslations(document.getElementById('app'));
 }
 async function doLogin(){
   const u=document.getElementById('login-user').value;
   const p=document.getElementById('login-pass').value;
-  if(!u||!p){toast('Kullanici adi ve sifre gerekli','error');return}
+  if(!u||!p){toast(t('Kullanici adi ve sifre gerekli'),'error');return}
   const res=await api('/api/auth/login',{method:'POST',body:{username:u,password:p}});
-  if(res.success){authToken=res.token;sessionStorage.setItem('fluxstream_token',authToken);toast('Giris basarili!');renderApp()}
-  else{toast(res.message||'Giris hatasi','error')}
+  if(res.success){authToken=res.token;sessionStorage.setItem('fluxstream_token',authToken);toast(t('Giris basarili!'));renderApp()}
+  else{toast(res.message||t('Giris hatasi'),'error')}
 }
 
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â SETUP WIZARD Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â SETUP WIZARD ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â
 let wizardStep=1;
-const wizardData={username:'admin',password:'',http_port:8844,https_port:443,rtmp_port:1935,embed_domain:''};
+const wizardData={username:'admin',password:'',http_port:8844,https_port:443,rtmp_port:1935,embed_domain:'',language:'tr'};
 
 function renderWizard(){
   document.getElementById('app').innerHTML='<div class="wizard-container">'+getWizardContent()+'</div>';
+  applyTranslations(document.getElementById('app'));
 }
 function getWizardContent(){
   const steps=[
-    '<div class="wizard-card"><div style="text-align:center;font-size:48px;margin-bottom:16px;color:var(--accent)"><i class="bi bi-lightning-charge-fill"></i></div><h1 class="wizard-title">FluxStream</h1><p class="wizard-subtitle">Live Streaming Media Server</p><div style="text-align:center;margin-bottom:24px">'+stepDots(1)+'</div><p style="text-align:center;color:var(--text-secondary);margin-bottom:32px;line-height:1.7">FluxStream\'e hos geldiniz!<br>Canli yayin sunucunuzu birkac adimda kuralim.</p><button class="btn btn-primary" style="width:100%" onclick="wizardNext()">Baslayalim <i class="bi bi-arrow-right"></i></button></div>',
-    '<div class="wizard-card"><h1 class="wizard-title">Admin Hesabi</h1><p class="wizard-subtitle">Yonetim paneli icin giris bilgileri</p><div style="text-align:center;margin-bottom:24px">'+stepDots(2)+'</div><div class="form-group"><label class="form-label">Kullanici Adi</label><input class="form-input" id="w-username" value="admin"></div><div class="form-group"><label class="form-label">Sifre</label><input class="form-input" id="w-password" type="password" placeholder="En az 4 karakter"></div><div class="form-group"><label class="form-label">Sifre Tekrar</label><input class="form-input" id="w-password2" type="password"></div><div style="display:flex;gap:12px"><button class="btn btn-secondary" style="flex:1" onclick="wizardPrev()"><i class="bi bi-arrow-left"></i> Geri</button><button class="btn btn-primary" style="flex:1" onclick="wizardNext()">Ileri <i class="bi bi-arrow-right"></i></button></div></div>',
-    '<div class="wizard-card"><h1 class="wizard-title">Port ve Domain</h1><p class="wizard-subtitle">Sunucu portlarini ve public alan adini yapilandirin</p><div style="text-align:center;margin-bottom:24px">'+stepDots(3)+'</div><div class="form-group"><label class="form-label">HTTP Port (Web Arayuzu)</label><input class="form-input" id="w-http-port" type="number" value="8844"></div><div class="form-group"><label class="form-label">HTTPS Port (SSL aktifse)</label><input class="form-input" id="w-https-port" type="number" value="443"></div><div class="form-group"><label class="form-label">RTMP Port (OBS Yayin)</label><input class="form-input" id="w-rtmp-port" type="number" value="1935"></div><div class="form-group"><label class="form-label">Public Domain / IP</label><input class="form-input" id="w-embed-domain" placeholder="Orn: stream.ornek.com veya 203.0.113.10"></div><div style="background:var(--bg-primary);border-radius:var(--radius-sm);padding:14px;margin-bottom:20px"><div style="font-size:13px;color:var(--text-muted)">Bos birakirsaniz panelin acildigi host kullanilir. HTTP ve HTTPS public portlari kurulumdan sonra Kolay Ayarlar veya Alan Adi / Embed ekranindan degistirilebilir.</div></div><div style="display:flex;gap:12px"><button class="btn btn-secondary" style="flex:1" onclick="wizardPrev()"><i class="bi bi-arrow-left"></i> Geri</button><button class="btn btn-primary" style="flex:1" onclick="wizardFinish()">Kurulumu Tamamla</button></div></div>'
+    '<div class="wizard-card"><div style="display:flex;justify-content:flex-end;margin-bottom:12px"><select class="form-select" style="max-width:150px" onchange="setCurrentLanguage(this.value,true);wizardData.language=this.value;renderWizard()">'+languageOptions(wizardData.language||currentLang)+'</select></div><div style="text-align:center;font-size:48px;margin-bottom:16px;color:var(--accent)"><i class="bi bi-lightning-charge-fill"></i></div><h1 class="wizard-title">FluxStream</h1><p class="wizard-subtitle">'+t('Live Streaming Media Server')+'</p><div style="text-align:center;margin-bottom:24px">'+stepDots(1)+'</div><p style="text-align:center;color:var(--text-secondary);margin-bottom:32px;line-height:1.7">'+t("FluxStream'e hos geldiniz!")+'<br>'+t('Canli yayin sunucunuzu birkac adimda kuralim.')+'</p><button class="btn btn-primary" style="width:100%" onclick="wizardNext()">'+t('Baslayalim')+' <i class="bi bi-arrow-right"></i></button></div>',
+    '<div class="wizard-card"><h1 class="wizard-title">'+t('Admin Hesabi')+'</h1><p class="wizard-subtitle">'+t('Yonetim paneli icin giris bilgileri')+'</p><div style="text-align:center;margin-bottom:24px">'+stepDots(2)+'</div><div class="form-group"><label class="form-label">'+t('Kullanici Adi')+'</label><input class="form-input" id="w-username" value="'+escHtml(wizardData.username||'admin')+'"></div><div class="form-group"><label class="form-label">'+t('Sifre')+'</label><input class="form-input" id="w-password" type="password" placeholder="'+t('En az 4 karakter')+'"></div><div class="form-group"><label class="form-label">'+t('Sifre Tekrar')+'</label><input class="form-input" id="w-password2" type="password"></div><div style="display:flex;gap:12px"><button class="btn btn-secondary" style="flex:1" onclick="wizardPrev()"><i class="bi bi-arrow-left"></i> '+t('Geri')+'</button><button class="btn btn-primary" style="flex:1" onclick="wizardNext()">'+t('Ileri')+' <i class="bi bi-arrow-right"></i></button></div></div>',
+    '<div class="wizard-card"><h1 class="wizard-title">'+t('Port ve Domain')+'</h1><p class="wizard-subtitle">'+t('Sunucu portlarini ve public alan adini yapilandirin')+'</p><div style="text-align:center;margin-bottom:24px">'+stepDots(3)+'</div><div class="form-group"><label class="form-label">'+t('HTTP Port (Web Arayuzu)')+'</label><input class="form-input" id="w-http-port" type="number" value="'+wizardData.http_port+'"></div><div class="form-group"><label class="form-label">'+t('HTTPS Port (SSL aktifse)')+'</label><input class="form-input" id="w-https-port" type="number" value="'+wizardData.https_port+'"></div><div class="form-group"><label class="form-label">'+t('RTMP Port (OBS Yayin)')+'</label><input class="form-input" id="w-rtmp-port" type="number" value="'+wizardData.rtmp_port+'"></div><div class="form-group"><label class="form-label">'+t('Public Domain / IP')+'</label><input class="form-input" id="w-embed-domain" placeholder="Orn: stream.ornek.com veya 203.0.113.10" value="'+escHtml(wizardData.embed_domain||'')+'"></div><div style="background:var(--bg-primary);border-radius:var(--radius-sm);padding:14px;margin-bottom:20px"><div style="font-size:13px;color:var(--text-muted)">'+t('Bos birakirsaniz panelin acildigi host kullanilir. HTTP ve HTTPS public portlari kurulumdan sonra Kolay Ayarlar veya Alan Adi / Embed ekranindan degistirilebilir.')+'</div></div><div style="display:flex;gap:12px"><button class="btn btn-secondary" style="flex:1" onclick="wizardPrev()"><i class="bi bi-arrow-left"></i> '+t('Geri')+'</button><button class="btn btn-primary" style="flex:1" onclick="wizardFinish()">'+t('Kurulumu Tamamla')+'</button></div></div>'
   ];
   return steps[wizardStep-1]||steps[0];
 }
@@ -292,8 +484,8 @@ function wizardNext(){
     const pw=document.getElementById('w-password').value;
     const pw2=document.getElementById('w-password2').value;
     const user=document.getElementById('w-username').value;
-    if(!pw||pw.length<4){toast('Sifre en az 4 karakter olmali','error');return}
-    if(pw!==pw2){toast('Sifreler eslesiyor!','error');return}
+    if(!pw||pw.length<4){toast(t('Sifre en az 4 karakter olmali'),'error');return}
+    if(pw!==pw2){toast(t('Sifreler eslesiyor!'),'error');return}
     wizardData.username=user||'admin';wizardData.password=pw;
   }
   wizardStep++;renderWizard();
@@ -306,56 +498,58 @@ async function wizardFinish(){
   wizardData.embed_domain=(document.getElementById('w-embed-domain').value||'').trim();
   const res=await api('/api/setup/complete',{method:'POST',body:wizardData});
   if(res.success){
-    setupCompleted=true;toast('Kurulum tamamlandi!');
+    setupCompleted=true;toast(t('Kurulum tamamlandi!'));
     // Auto-login after setup
     const lr=await api('/api/auth/login',{method:'POST',body:{username:wizardData.username,password:wizardData.password}});
     if(lr.success){authToken=lr.token;sessionStorage.setItem('fluxstream_token',authToken)}
     setTimeout(()=>renderApp(),500);
   }
-  else{toast(res.message||'Kurulum hatasi','error')}
+  else{toast(res.message||t('Kurulum hatasi'),'error')}
 }
 
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â MAIN APP Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â MAIN APP ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â
 function renderApp(){
   document.getElementById('app').innerHTML=
   '<div class="app">'+
     '<nav class="sidebar" id="sidebar">'+
       '<div class="logo"><div class="logo-icon"><i class="bi bi-lightning-charge-fill"></i></div><div><div class="logo-text">FluxStream</div><div class="logo-version">v2.0.0</div></div></div>'+
       '<div class="nav">'+
-        '<div class="nav-section"><div class="nav-section-title">Ana Menu</div>'+
-          navItem('dashboard','bi-bar-chart-fill','Dashboard')+
+        '<div class="nav-section"><div class="nav-section-title">'+t('Ana Menu')+'</div>'+
+          navItem('dashboard','bi-bar-chart-fill',t('Dashboard','Dashboard'))+
         '</div>'+
-        '<div class="nav-section"><div class="nav-section-title">Yayin</div>'+
-          navItem('streams','bi-collection-play-fill','Yayinlar')+
-          navItem('create-stream','bi-plus-circle-fill','Yeni Yayin')+
-          navItem('embed-codes','bi-code-slash','Embed Kodlari')+
-          navItem('embed-advanced','bi-sliders','Gelismis Embed')+
-          navItem('player-templates','bi-pc-display','Player Sablonlari')+
+        '<div class="nav-section"><div class="nav-section-title">'+t('Yayin')+'</div>'+
+          navItem('streams','bi-collection-play-fill',t('Yayinlar'))+
+          navItem('create-stream','bi-plus-circle-fill',t('Yeni Yayin'))+
+          navItem('embed-codes','bi-code-slash',t('Embed Kodlari'))+
+          navItem('embed-advanced','bi-sliders',t('Gelismis Embed'))+
+          navItem('player-templates','bi-pc-display',t('Player Sablonlari'))+
         '</div>'+
-        '<div class="nav-section"><div class="nav-section-title">Ayarlar</div>'+
-          navItem('guided-settings','bi-magic','Kolay Ayarlar')+
-          navItem('settings-general','bi-gear-fill','Genel')+
-          navItem('settings-embed','bi-globe2','Alan Adi / Embed')+
-          navItem('settings-protocols','bi-diagram-3-fill','Protokoller')+
-          navItem('settings-outputs','bi-boxes','Cikis Formatlari')+
-          navItem('settings-abr','bi-badge-hd','Teslimat / ABR')+
-          navItem('settings-ssl','bi-shield-lock-fill','SSL/TLS')+
-          navItem('settings-security','bi-shield-shaded','Guvenlik')+
-          navItem('settings-storage','bi-hdd-fill','Depolama')+
-          navItem('settings-health','bi-heart-pulse-fill','Saglik ve Uyari')+
-          navItem('settings-transcode','bi-cpu-fill','Transkod')+
+        '<div class="nav-section"><div class="nav-section-title">'+t('Ayarlar')+'</div>'+
+          navItem('guided-settings','bi-magic',t('Kolay Ayarlar'))+
+          navItem('settings-general','bi-gear-fill',t('Genel'))+
+          navItem('settings-embed','bi-globe2',t('Alan Adi / Embed'))+
+          navItem('settings-protocols','bi-diagram-3-fill',t('Protokoller'))+
+          navItem('settings-outputs','bi-boxes',t('Cikis Formatlari'))+
+          navItem('settings-abr','bi-badge-hd',t('Teslimat / ABR'))+
+          navItem('settings-ssl','bi-shield-lock-fill',t('SSL/TLS'))+
+          navItem('settings-security','bi-shield-shaded',t('Guvenlik'))+
+          navItem('settings-storage','bi-hdd-fill',t('Depolama'))+
+          navItem('settings-health','bi-heart-pulse-fill',t('Saglik ve Uyari'))+
+          navItem('settings-transcode','bi-cpu-fill',t('Transkod'))+
         '</div>'+
-        '<div class="nav-section"><div class="nav-section-title">Izleme</div>'+
-          navItem('analytics','bi-graph-up','Analitik')+
-          navItem('recordings','bi-camera-reels-fill','Kayitlar')+
-          navItem('viewers','bi-people-fill','Izleyiciler')+
-          navItem('transcode-jobs','bi-cpu','Transcode Isleri')+
-          navItem('diagnostics','bi-activity','Teshis')+
+        '<div class="nav-section"><div class="nav-section-title">'+t('Izleme')+'</div>'+
+          navItem('analytics','bi-graph-up',t('Analitik'))+
+          navItem('recordings','bi-camera-reels-fill',t('Kayitlar'))+
+          navItem('viewers','bi-people-fill',t('Izleyiciler'))+
+          navItem('transcode-jobs','bi-cpu',t('Transcode Isleri'))+
+          navItem('diagnostics','bi-activity',t('Teshis'))+
         '</div>'+
-        '<div class="nav-section"><div class="nav-section-title">Sistem</div>'+
-          navItem('security-tokens','bi-key-fill','Tokenlar')+
-          navItem('users','bi-person-fill','Kullanicilar')+
-          navItem('logs','bi-journal-text','Loglar')+
+        '<div class="nav-section"><div class="nav-section-title">'+t('Sistem')+'</div>'+
+          navItem('maintenance-center','bi-safe2-fill',t('Bakim ve Yedek'))+
+          navItem('license','bi-patch-check-fill',t('Lisans'))+
+          navItem('security-tokens','bi-key-fill',t('Tokenlar'))+
+          navItem('users','bi-person-fill',t('Kullanicilar'))+
+          navItem('logs','bi-journal-text',t('Loglar'))+
         '</div>'+
       '</div>'+
     '</nav>'+
@@ -363,13 +557,14 @@ function renderApp(){
       '<div class="topbar">'+
         '<div id="proto-status" class="proto-status"></div>'+
         '<div class="topbar-actions">'+
-          '<button class="btn btn-secondary btn-sm" onclick="openSystemControl()"><i class="bi bi-power"></i> Sunucu Kontrol</button>'+
+          '<button class="btn btn-secondary btn-sm" onclick="openSystemControl()"><i class="bi bi-power"></i> '+t('Sunucu Kontrol')+'</button>'+
           '<span style="font-size:13px;color:var(--text-muted)" id="clock"></span>'+
         '</div>'+
       '</div>'+
       '<div class="content" id="page-content"></div>'+
     '</div>'+
   '</div>';
+  applyTranslations(document.getElementById('app'));
   navigate('dashboard');startClock();loadProtoStatus();
 }
 
@@ -388,7 +583,7 @@ function navigate(page){
   }
   loadPage(page);
 }
-function startClock(){setInterval(()=>{const el=document.getElementById('clock');if(el)el.textContent=new Date().toLocaleTimeString('tr-TR')},1000)}
+function startClock(){setInterval(()=>{const el=document.getElementById('clock');if(el)el.textContent=new Date().toLocaleTimeString(localeForLang())},1000)}
 function schedulePageRefresh(page,ms){
   if(currentPage!==page)return;
   if(pageRefreshTimer)clearTimeout(pageRefreshTimer);
@@ -441,6 +636,7 @@ function openSystemControl(){
       '</div>'+
     '</div>';
   document.body.insertAdjacentHTML('beforeend',html);
+  applyTranslations(document.getElementById('system-control-modal'));
 }
 
 function closeModal(id){
@@ -485,13 +681,16 @@ async function loadPage(page){
   else if(page==='analytics')await renderAnalytics(c);
   else if(page==='recordings')await renderRecordings(c);
   else if(page==='viewers')await renderViewers(c);
+  else if(page==='maintenance-center')await renderMaintenanceCenter(c);
+  else if(page==='license')await renderLicensePage(c);
   else if(page==='security-tokens')await renderSecurityTokens(c);
   else if(page==='transcode-jobs')await renderTranscodeJobs(c);
   else if(page==='diagnostics')await renderDiagnostics(c);
   else c.innerHTML='<div class="empty-state"><div class="icon"><i class="bi bi-cone-striped"></i></div><h3>Yakinda</h3></div>';
+  applyTranslations(c);
 }
 
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â DASHBOARD Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â DASHBOARD ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â
 async function renderDashboard(c){
   const [stats,streams,analytics,health]=await Promise.all([api('/api/stats'),api('/api/streams'),api('/api/analytics'),api('/api/health/report')]);
   const live=(streams||[]).filter(s=>s.status==='live');
@@ -548,7 +747,7 @@ function statCard(color,iconClass,value,label,route,subtext){
   const action=route?' onclick="navigate(\''+route+'\')"':'';
   return '<div class="stat-card '+color+clickable+'"'+action+'><div class="stat-icon"><i class="bi '+iconClass+'"></i></div><div class="stat-value">'+value+'</div><div class="stat-label">'+label+'</div>'+(subtext?'<div class="stat-subtext">'+subtext+'</div>':'')+'</div>';
 }
-function fmtInt(n){return Number(n||0).toLocaleString('tr-TR')}
+function fmtInt(n){return Number(n||0).toLocaleString(localeForLang())}
 function shortKey(value){value=String(value||'');return value.length>18?value.slice(0,8)+'...'+value.slice(-6):value}
 function renderBarList(items,emptyText,formatter){
   const list=Array.isArray(items)?items:[];
@@ -560,17 +759,81 @@ function renderBarList(items,emptyText,formatter){
     return '<div class="bar-item"><div>'+escHtml(item.label||'-')+'</div><div class="bar-track"><div class="bar-fill" style="width:'+width+'%"></div></div><div style="text-align:right;font-weight:600">'+escHtml(formatter?formatter(value):String(value))+'</div></div>';
   }).join('')+'</div>';
 }
-function renderTimelineChart(points,emptyText,formatter){
-  const list=Array.isArray(points)?points:[];
-  if(!list.length)return '<div style="color:var(--text-muted)">'+(emptyText||'Henuz veri yok')+'</div>';
+function renderTimelineChart(points,emptyText,formatter,options){
+  options=options||{};
+  const source=Array.isArray(points)?points:[];
+  if(!source.length)return '<div style="color:var(--text-muted)">'+(emptyText||'Henuz veri yok')+'</div>';
+  const maxPoints=parseInt(options.maxPoints||20,10)||20;
+  const list=source.slice(-maxPoints);
   const max=Math.max.apply(null,list.map(function(p){return Number(p.value||0)}).concat([1]));
-  return '<div class="timeline-bars">'+list.map(function(point){
+  const min=Math.min.apply(null,list.map(function(p){return Number(p.value||0)}).concat([0]));
+  const lastIndex=list.length-1;
+  let meta=options.meta||('Son '+list.length+' nokta gosteriliyor');
+  const firstDate=list[0]&&list[0].timestamp?new Date(list[0].timestamp):null;
+  const lastDate=list[lastIndex]&&list[lastIndex].timestamp?new Date(list[lastIndex].timestamp):null;
+  if(!options.meta&&firstDate&&lastDate&&!Number.isNaN(firstDate.getTime())&&!Number.isNaN(lastDate.getTime())){
+    meta+=' • '+firstDate.toLocaleTimeString(localeForLang(),{hour:'2-digit',minute:'2-digit'})+' - '+lastDate.toLocaleTimeString(localeForLang(),{hour:'2-digit',minute:'2-digit'});
+  }
+  const width=640;
+  const height=118;
+  const baseY=height-8;
+  const step=list.length===1?width:(width/(list.length-1));
+  const pointToCoord=function(point,index){
     const value=Number(point.value||0);
-    const date=point.timestamp?new Date(point.timestamp):null;
-    const label=date?date.toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}):'';
-    const height=Math.max(6,Math.round((value/max)*100));
-    return '<div class="timeline-col"><div class="timeline-value">'+escHtml(formatter?formatter(value):String(value))+'</div><div class="timeline-bar" style="height:'+height+'%"></div><div class="timeline-label">'+escHtml(label)+'</div></div>';
-  }).join('')+'</div>';
+    const normalized=max<=0?0:(value/max);
+    const x=Math.round(index*step*100)/100;
+    const y=Math.round((baseY-(normalized*(height-26)))*100)/100;
+    return {x:x,y:y,value:value};
+  };
+  const coords=list.map(pointToCoord);
+  const linePath=coords.map(function(coord,index){
+    return (index===0?'M':'L')+coord.x+' '+coord.y;
+  }).join(' ');
+  const areaPath=linePath+' L '+coords[lastIndex].x+' '+baseY+' L 0 '+baseY+' Z';
+  const labelIndices=[];
+  const labelSlots=Math.max(3,Number(options.labelSlots||4));
+  const stepSize=Math.max(1,Math.floor((list.length-1)/Math.max(1,labelSlots-1)));
+  for(let i=0;i<list.length;i+=stepSize)labelIndices.push(i);
+  if(labelIndices[labelIndices.length-1]!==lastIndex)labelIndices.push(lastIndex);
+  const axisLabels=labelIndices.map(function(index){
+    const point=list[index];
+    const date=point&&point.timestamp?new Date(point.timestamp):null;
+    const label=date?(options.labelFormatter?options.labelFormatter(date,index,list.length):date.toLocaleTimeString(localeForLang(),{hour:'2-digit',minute:'2-digit'})):'';
+    return '<span title="'+escHtml(label)+'">'+escHtml(label||' ')+'</span>';
+  }).join('');
+  const currentValue=Number(list[lastIndex].value||0);
+  const currentText=formatter?formatter(currentValue):String(currentValue);
+  const peakText=formatter?formatter(max):String(max);
+  const minText=formatter?formatter(min):String(min);
+  const showPoints=list.length<=14;
+  return '<div class="timeline-meta">'+escHtml(meta)+'</div>'+
+    '<div class="sparkline-shell">'+
+      '<div class="sparkline-frame">'+
+        '<svg class="sparkline-svg" viewBox="0 0 '+width+' '+height+'" preserveAspectRatio="none" aria-hidden="true">'+
+          '<defs><linearGradient id="sparkline-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(20,184,166,.30)"></stop><stop offset="100%" stop-color="rgba(20,184,166,0)"></stop></linearGradient></defs>'+
+          '<g class="sparkline-grid"><line x1="0" y1="'+(height*0.2).toFixed(1)+'" x2="'+width+'" y2="'+(height*0.2).toFixed(1)+'"></line><line x1="0" y1="'+(height*0.5).toFixed(1)+'" x2="'+width+'" y2="'+(height*0.5).toFixed(1)+'"></line><line x1="0" y1="'+(height*0.8).toFixed(1)+'" x2="'+width+'" y2="'+(height*0.8).toFixed(1)+'"></line></g>'+
+          '<path class="sparkline-area" d="'+areaPath+'"></path>'+
+          '<path class="sparkline-line" d="'+linePath+'"></path>'+
+          (showPoints?coords.map(function(coord,index){
+            const point=list[index];
+            const date=point.timestamp?new Date(point.timestamp):null;
+            const label=date?(options.labelFormatter?options.labelFormatter(date,index,list.length):date.toLocaleTimeString(localeForLang(),{hour:'2-digit',minute:'2-digit'})):'';
+            const valueText=formatter?formatter(coord.value):String(coord.value);
+            const tooltip=(date&&!Number.isNaN(date.getTime())?date.toLocaleString(localeForLang())+' • ':'')+valueText;
+            return '<circle class="sparkline-point" cx="'+coord.x+'" cy="'+coord.y+'" r="4"><title>'+escHtml(tooltip)+' - '+escHtml(label)+'</title></circle>';
+          }).join(''):'')+
+        '</svg>'+
+        '<div class="sparkline-hitmap" style="grid-template-columns:repeat('+list.length+',1fr)">'+list.map(function(point,index){
+          const date=point.timestamp?new Date(point.timestamp):null;
+          const label=date?(options.labelFormatter?options.labelFormatter(date,index,list.length):date.toLocaleTimeString(localeForLang(),{hour:'2-digit',minute:'2-digit'})):'';
+          const value=Number(point.value||0);
+          const valueText=formatter?formatter(value):String(value);
+          const tooltip=(label?label+' • ':'')+valueText;
+          return '<span class="sparkline-hit" title="'+escHtml(tooltip)+'" data-tooltip="'+escHtml(tooltip)+'"></span>';
+        }).join('')+'</div>'+
+      '</div>'+
+      '<div class="sparkline-footer"><div class="sparkline-axis" style="grid-template-columns:repeat('+labelIndices.length+',minmax(0,1fr))">'+axisLabels+'</div><div class="sparkline-summary"><div class="sparkline-chip"><strong>'+escHtml(currentText)+'</strong><span>Son</span></div><div class="sparkline-chip"><strong>'+escHtml(peakText)+'</strong><span>Tepe</span></div><div class="sparkline-chip"><strong>'+escHtml(minText)+'</strong><span>Minimum</span></div></div></div>'+
+    '</div>';
 }
 function streamCard(s){
   return '<div class="card" style="padding:16px;cursor:pointer" onclick="navigate(\'stream-detail-'+s.id+'\')">'+
@@ -587,7 +850,7 @@ function findStreamIdByKey(streams,key){
   return match?match.id:0;
 }
 
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â STREAMS LIST Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â STREAMS LIST ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â
 async function renderStreams(c){
   const streams=await api('/api/streams')||[];
   c.innerHTML=
@@ -612,29 +875,46 @@ async function deleteStream(id){
   await api('/api/streams/'+id,{method:'DELETE'});toast('Yayin silindi');navigate('streams');
 }
 
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â CREATE STREAM Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â CREATE STREAM ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â
 function renderCreateStream(c){
   c.innerHTML=
     '<div class="page-header"><h1 class="page-title">Yeni Yayin Olustur</h1></div>'+
-    '<div class="card" style="max-width:640px">'+
-      '<div class="form-group"><label class="form-label">Yayin Adi *</label><input class="form-input" id="cs-name" placeholder="Orn: Konser Canli Yayin"></div>'+
-      '<div class="form-group"><label class="form-label">Aciklama</label><input class="form-input" id="cs-desc" placeholder="Kisa aciklama"></div>'+
-      '<div class="form-group"><label class="form-label">Yayin Modu</label><select class="form-select" id="cs-mode"><option value="balanced">TV / Dengeli</option><option value="mobile">Mobil / Hafif</option><option value="radio">Radyo / Audio</option></select><div class="form-hint">Bu secim ABR, cikis ve kaynak kullanimini belirleyen baslangic davranisini tanimlar.</div></div>'+
-      '<div class="setting-row"><div><div class="setting-label">Adaptif Bitrate</div><div class="setting-desc">Acilirsa izleyicinin baglantisina gore kalite otomatik degisir.</div></div>'+
-        '<label class="toggle"><input type="checkbox" id="cs-abr-enabled"><span class="toggle-slider"></span></label></div>'+
-      '<div class="form-group" style="margin-top:16px"><label class="form-label">ABR Profil Seti</label><select class="form-select" id="cs-profile-set"><option value="balanced">Dengeli</option><option value="mobile">Mobil</option><option value="radio">Radyo</option></select></div>'+
-      '<div class="setting-row"><div><div class="setting-label">Playback Token Gerekli</div><div class="setting-desc">Bu yayini izlemek icin token aranir.</div></div>'+
-        '<label class="toggle"><input type="checkbox" id="cs-token-required"><span class="toggle-slider"></span></label></div>'+
-      '<div class="form-group" style="margin-top:16px"><label class="form-label">Domain Kilidi</label><input class="form-input" id="cs-domain-lock" placeholder="Orn: mysite.com, embed.partner.com"><div class="form-hint">Bossa her yerde acilir. Doluysa sadece bu domainlerden gelen embed/referer kabul edilir.</div></div>'+
-      '<div class="form-group"><label class="form-label">IP Beyaz Liste</label><input class="form-input" id="cs-ip-whitelist" placeholder="Orn: 203.0.113.20, 10.0.0.0/24"></div>'+
-      '<div class="form-group"><label class="form-label">Maks Izleyici</label><input class="form-input" id="cs-max-viewers" type="number" value="0"><div class="form-hint">0 sinirsiz anlamina gelir.</div></div>'+
-      '<div class="form-group"><label class="form-label">Maks Bitrate (kbps)</label><input class="form-input" id="cs-max-bitrate" type="number" value="0"><div class="form-hint">Kaynak kontrolu icin opsiyoneldir.</div></div>'+
-      '<div class="form-group"><label class="form-label">Acik Cikis Formatlari</label><div class="form-hint" style="margin-bottom:10px">Bu yayinin disariya hangi formatlarda servis edilecegini secin.</div>'+renderOutputSelector(defaultStreamOutputs(),'cs')+'</div>'+
-      '<div class="setting-row"><div><div class="setting-label">Yayin kaydedilsin mi?</div><div class="setting-desc">Varsayilan olarak kapali. Kalici kayitlar data/recordings altina yazilir.</div></div>'+
-        '<label class="toggle"><input type="checkbox" id="cs-record-enabled" onchange="toggleCreateRecordFormat()"><span class="toggle-slider"></span></label></div>'+
-      '<div class="form-group" style="margin-top:16px"><label class="form-label">Kayit Formati</label><select class="form-select" id="cs-record-format" disabled>'+recordingFormatOptions('ts')+'</select></div>'+
-      '<button class="btn btn-primary" onclick="createStream()">Yayin Olustur</button>'+
-    '</div><div id="cs-result" class="hidden"></div>';
+    '<div class="card-grid card-grid-2">'+
+      '<div class="card">'+
+        '<div class="form-group"><label class="form-label">Yayin Adi *</label><input class="form-input" id="cs-name" placeholder="Orn: Konser Canli Yayin"></div>'+
+        '<div class="form-group"><label class="form-label">Aciklama</label><input class="form-input" id="cs-desc" placeholder="Kisa aciklama"></div>'+
+        '<div class="form-group"><label class="form-label">Yayin Modu</label><select class="form-select" id="cs-mode" onchange="updateCreateStreamGuide()"><option value="balanced">TV / Dengeli</option><option value="mobile">Mobil / Hafif</option><option value="radio">Radyo / Audio</option></select><div class="form-hint">Bu secim ABR, cikis ve kaynak kullanimini belirleyen baslangic davranisini tanimlar.</div></div>'+
+        '<div class="setting-row"><div><div class="setting-label">Adaptif Bitrate</div><div class="setting-desc">Acilirsa izleyicinin baglantisina gore kalite otomatik degisir.</div></div>'+
+          '<label class="toggle"><input type="checkbox" id="cs-abr-enabled"><span class="toggle-slider"></span></label></div>'+
+        '<div class="form-group" style="margin-top:16px"><label class="form-label">ABR Profil Seti</label><select class="form-select" id="cs-profile-set"><option value="balanced">Dengeli</option><option value="mobile">Mobil</option><option value="radio">Radyo</option></select></div>'+
+        '<div class="setting-row"><div><div class="setting-label">Playback Token Gerekli</div><div class="setting-desc">Bu yayini izlemek icin token aranir.</div></div>'+
+          '<label class="toggle"><input type="checkbox" id="cs-token-required"><span class="toggle-slider"></span></label></div>'+
+        '<div class="form-group" style="margin-top:16px"><label class="form-label">Domain Kilidi</label><input class="form-input" id="cs-domain-lock" placeholder="Orn: mysite.com, embed.partner.com"><div class="form-hint">Bossa her yerde acilir. Doluysa sadece bu domainlerden gelen embed/referer kabul edilir.</div></div>'+
+        '<div class="form-group"><label class="form-label">IP Beyaz Liste</label><input class="form-input" id="cs-ip-whitelist" placeholder="Orn: 203.0.113.20, 10.0.0.0/24"></div>'+
+        '<div class="card-grid card-grid-2">'+
+          '<div class="form-group"><label class="form-label">Maks Izleyici</label><input class="form-input" id="cs-max-viewers" type="number" value="0"><div class="form-hint">0 sinirsiz anlamina gelir.</div></div>'+
+          '<div class="form-group"><label class="form-label">Maks Bitrate (kbps)</label><input class="form-input" id="cs-max-bitrate" type="number" value="0"><div class="form-hint">Kaynak kontrolu icin opsiyoneldir.</div></div>'+
+        '</div>'+
+        '<div class="form-group"><label class="form-label">Acik Cikis Formatlari</label><div class="form-hint" style="margin-bottom:10px">Bu yayinin disariya hangi formatlarda servis edilecegini secin.</div>'+renderOutputSelector(defaultStreamOutputs(),'cs')+'</div>'+
+        '<div class="setting-row"><div><div class="setting-label">Yayin kaydedilsin mi?</div><div class="setting-desc">Varsayilan olarak kapali. Kalici kayitlar data/recordings altina yazilir.</div></div>'+
+          '<label class="toggle"><input type="checkbox" id="cs-record-enabled" onchange="toggleCreateRecordFormat()"><span class="toggle-slider"></span></label></div>'+
+        '<div class="form-group" style="margin-top:16px"><label class="form-label">Kayit Formati</label><select class="form-select" id="cs-record-format" disabled>'+recordingFormatOptions('ts')+'</select></div>'+
+        '<button class="btn btn-primary" onclick="createStream()">Yayin Olustur</button>'+
+      '</div>'+
+      '<div class="card" id="cs-side-panel">'+
+        '<div class="card-title" style="margin-bottom:12px">Baglanti Rehberi</div>'+
+        '<div class="metric-list">'+
+          '<div class="metric-row"><span>1. Kaynagi hazirla</span><strong>OBS / encoder</strong></div>'+
+          '<div class="metric-row"><span>2. Yayin olustur</span><strong>Bu formdan</strong></div>'+
+          '<div class="metric-row"><span>3. RTMP veya RTP ile baglan</span><strong>Bilgiler sag panelde kalir</strong></div>'+
+          '<div class="metric-row"><span>4. Player ve embed kontrol et</span><strong>Olusur olusmaz kopyalanir</strong></div>'+
+        '</div>'+
+        '<div class="form-hint" style="margin-top:14px">Yayin olusturulduktan sonra OBS, RTP ve izleme baglanti bilgileri burada sabit kalir. Ekranin altina kaymaz.</div>'+
+        '<div id="cs-guide" style="margin-top:18px"></div>'+
+        '<div id="cs-result" style="margin-top:18px"></div>'+
+      '</div>'+
+    '</div>';
+  updateCreateStreamGuide();
 }
 async function createStream(){
   const name=document.getElementById('cs-name').value;
@@ -666,16 +946,22 @@ async function createStream(){
     const settings=await api('/api/settings');
     const access=await getPlaybackAccess(res.stream.stream_key,settings,JSON.stringify(policy));
     const urls=getAllURLs(res.stream.stream_key,settings,name,access);
-    const r=document.getElementById('cs-result');r.classList.remove('hidden');
-    r.innerHTML='<div class="card" style="max-width:640px;margin-top:20px">'+
+    updateCreateStreamGuide({mode:policy.mode,rtmp_url:res.rtmp_url,stream_key:res.stream.stream_key,stream_name:name});
+    const r=document.getElementById('cs-result');
+    r.innerHTML='<div class="card" style="padding:18px;background:var(--bg-primary)">'+
       '<div class="card-title" style="margin-bottom:16px">Yayin Hazir!</div>'+
       copyField('Stream Key',res.stream.stream_key)+
       copyField('OBS RTMP URL',res.rtmp_url)+
+      copyField('RTP URL',urls.rtp)+
       copyField('HLS Izleme URL',urls.hls)+
       (access&&access.needs_token?'<div class="form-hint" style="margin-bottom:10px;color:var(--warning)">Bu yayinda playback token gerekli. Izleme linkine gecici token eklendi.</div>':'')+
       '<div style="margin-top:12px"><button class="btn btn-sm btn-primary" onclick="navigate(\'stream-detail-'+res.stream.id+'\')">Yayin Detaylarina Git <i class="bi bi-arrow-right"></i></button></div>'+
       '<div style="background:var(--bg-primary);border-radius:var(--radius-sm);padding:16px;margin-top:12px">'+
         '<div style="font-size:13px;color:var(--text-muted);line-height:1.6">OBS Studio\'da:<br>1. Ayarlar -> Yayin -> Hizmet: Ozel<br>2. Sunucu: <strong>'+escHtml(res.rtmp_url||'')+'</strong><br>3. Yayin Anahtari: <strong>'+res.stream.stream_key+'</strong><br>4. Yayina Baslat butonuna basin</div>'+
+      '</div>'+
+      '<div class="form-hint" style="margin-top:12px">Cok kanalli video kullanacaksaniz sagdaki rehberdeki JSON alanini tek tusla kopyalayabilirsiniz.</div>'+
+      '<div style="background:var(--bg-primary);border-radius:var(--radius-sm);padding:16px;margin-top:12px">'+
+        '<div style="font-size:13px;color:var(--text-muted);line-height:1.6">RTP push kullaniyorsaniz encoder hedefini <strong>'+escHtml(urls.rtp||'')+'</strong> olarak girebilirsiniz. MPEG-TS ve diger cikislar stream detay ekraninda hazirdir.</div>'+
       '</div></div>';
   }else{toast(res.message||'Hata','error')}
 }
@@ -683,6 +969,84 @@ function toggleCreateRecordFormat(){
   const enabled=document.getElementById('cs-record-enabled')?.checked;
   const format=document.getElementById('cs-record-format');
   if(format)format.disabled=!enabled;
+}
+function getCreateStreamMode(){
+  return document.getElementById('cs-mode')?.value||'balanced';
+}
+function getOBSMultitrackOverrideObject(mode){
+  const presets={
+    balanced:[
+      {type:'obs_x264',width:1920,height:1080,framerate:{numerator:30,denominator:1},settings:{rate_control:'CBR',bitrate:6000,keyint_sec:2,preset:'veryfast',profile:'high',tune:'zerolatency'},canvas_index:0},
+      {type:'obs_x264',width:854,height:480,framerate:{numerator:30,denominator:1},settings:{rate_control:'CBR',bitrate:1800,keyint_sec:2,preset:'veryfast',profile:'main',tune:'zerolatency'},canvas_index:0}
+    ],
+    mobile:[
+      {type:'obs_x264',width:1280,height:720,framerate:{numerator:30,denominator:1},settings:{rate_control:'CBR',bitrate:2800,keyint_sec:2,preset:'veryfast',profile:'high',tune:'zerolatency'},canvas_index:0},
+      {type:'obs_x264',width:640,height:360,framerate:{numerator:30,denominator:1},settings:{rate_control:'CBR',bitrate:900,keyint_sec:2,preset:'veryfast',profile:'main',tune:'zerolatency'},canvas_index:0}
+    ],
+    radio:[
+      {type:'obs_x264',width:1280,height:720,framerate:{numerator:25,denominator:1},settings:{rate_control:'CBR',bitrate:1800,keyint_sec:2,preset:'veryfast',profile:'main',tune:'zerolatency'},canvas_index:0},
+      {type:'obs_x264',width:640,height:360,framerate:{numerator:25,denominator:1},settings:{rate_control:'CBR',bitrate:700,keyint_sec:2,preset:'veryfast',profile:'main',tune:'zerolatency'},canvas_index:0}
+    ]
+  };
+  return {
+    encoder_configurations:(presets[mode]||presets.balanced),
+    audio_configurations:{
+      live:[
+        {codec:'ffmpeg_aac',track_id:1,channels:2,settings:{bitrate:160}}
+      ]
+    }
+  };
+}
+function getOBSMultitrackOverrideJSON(mode){
+  return JSON.stringify(getOBSMultitrackOverrideObject(mode),null,2);
+}
+function copyCodeField(label,value,rows){
+  var raw=String(value==null?'':value);
+  var id='copy_'+(++copyFieldSeq);
+  copyValues[id]=raw;
+  var minHeight=Math.max((rows||12)*18,120);
+  return '<div class="form-group"><label class="form-label">'+label+'</label><div style="display:grid;gap:8px"><textarea class="form-textarea" readonly spellcheck="false" style="min-height:'+minHeight+'px;font-size:12px;line-height:1.55;font-family:Consolas,monospace;white-space:pre">'+escHtml(raw)+'</textarea><button type="button" class="copy-btn" style="justify-self:start" onclick="copyStoredValue(\''+id+'\')"><i class="bi bi-clipboard"></i> JSON Kopyala</button></div></div>';
+}
+function renderCreateStreamGuide(data){
+  data=data||{};
+  const settings=runtimeSettings||{};
+  const mode=data.mode||getCreateStreamMode();
+  const rtmpURL=String(data.rtmp_url||getOBSRTMPServerURL(settings));
+  const streamKey=String(data.stream_key||'Yayin olusturunca burada gorunecek');
+  const hasRealStream=!!data.stream_key;
+  const json=getOBSMultitrackOverrideJSON(mode);
+  const intro=hasRealStream
+    ?'Bu yayin icin gerekli alanlar hazir. Asagidaki URL, stream key ve JSON\'u kopyalayip OBS\'e yapistirabilirsiniz.'
+    :'Cok kanalli video normal RTMP gibi sadece URL ve key ile calismaz. Bu ozellikte Config Override JSON zorunludur. Once yayini olusturun, sonra bu alandaki bilgiler gercek degerlerle dolar.';
+  return '<div class="card" style="padding:18px;background:var(--bg-primary)">'+
+    '<div class="card-title" style="margin-bottom:12px">OBS Cok Kanalli Video Rehberi</div>'+
+    '<div class="form-hint" style="margin-bottom:14px;line-height:1.7">'+intro+'</div>'+
+    (hasRealStream?copyField('OBS RTMP URL',rtmpURL)+copyField('OBS Yayin Anahtari',streamKey):'')+
+    copyCodeField('Config Override JSON',json,18)+
+    '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px">'+
+      '<div style="font-size:13px;font-weight:700;margin-bottom:10px">Aptala anlatir gibi adim adim yap:</div>'+
+      '<ol style="margin:0;padding-left:18px;font-size:13px;line-height:1.85;color:var(--text-secondary)">'+
+        '<li>OBS programini ac.</li>'+
+        '<li>Alttaki bu sayfadan once yayini olustur. Yayin olusturunca burada <strong>OBS RTMP URL</strong> ve <strong>OBS Yayin Anahtari</strong> gorunur.</li>'+
+        '<li>OBS icinde <strong>Ayarlar</strong> menusu ac.</li>'+
+        '<li><strong>Yayin</strong> sekmesine gir.</li>'+
+        '<li><strong>Service / Hizmet</strong> alanini <strong>Custom / Ozel</strong> yap.</li>'+
+        '<li><strong>Server / Sunucu</strong> alanina burada gordugun <strong>OBS RTMP URL</strong> degerini yapistir.</li>'+
+        '<li><strong>Stream Key / Yayin Anahtari</strong> alanina burada gordugun <strong>OBS Yayin Anahtari</strong> degerini yapistir.</li>'+
+        '<li><strong>Enable Multitrack Video / Cok Kanalli Video</strong> secenegini ac.</li>'+
+        '<li><strong>Enable Config Override</strong> secenegini ac.</li>'+
+        '<li>Bu sayfadaki <strong>Config Override JSON</strong> alanini kopyala ve OBS icindeki kutuya komple yapistir.</li>'+
+        '<li>OBS\'i tamamen kapatip tekrar ac. Bu adim onemli; bazi OBS surumlerinde yeniden acmadan multitrack baslamaz.</li>'+
+        '<li>Son olarak <strong>Yayina Baslat</strong> dugmesine bas.</li>'+
+      '</ol>'+
+    '</div>'+
+    '<div class="form-hint" style="margin-top:12px;line-height:1.7">Not: Normal baglanti calisip cok kanalli video calismiyorsa sebep genelde bu JSON\'un yapistirilmamasi veya OBS\'in yeniden acilmamasidir.</div>'+
+  '</div>';
+}
+function updateCreateStreamGuide(data){
+  const el=document.getElementById('cs-guide');
+  if(!el)return;
+  el.innerHTML=renderCreateStreamGuide(data||{mode:getCreateStreamMode()});
 }
 const copyValues={};
 let copyFieldSeq=0;
@@ -752,6 +1116,9 @@ function getPublicBase(s){
   var defaultPort=useHTTPS?'443':'80';
   var portPart=port&&String(port)!==defaultPort?':'+port:'';
   return {domain:domain,useHTTPS:useHTTPS,scheme:scheme,port:String(port||''),base:scheme+'://'+domain+portPart};
+}
+function getOBSRTMPServerURL(s){
+  return 'rtmp://'+getConfiguredDomain(s||{})+':'+(((s||{}).rtmp_port)||'1935')+'/live';
 }
 function recordingFormatOptions(selected){
   selected=selected||'ts';
@@ -842,7 +1209,7 @@ function urlSection(title,pairs){
     pairs.map(function(p){return copyField(p[0],p[1])}).join('')+'</div>';
 }
 
-// â•â•â• STREAM DETAIL â•â•â•
+// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â STREAM DETAIL Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
 async function renderStreamDetail(c,id){
   const st=await api('/api/streams/'+id);
   if(!st||st.error){c.innerHTML='<div class="empty-state"><h3>Yayin bulunamadi</h3></div>';return}
@@ -875,6 +1242,8 @@ async function renderStreamDetail(c,id){
         '</div>'+
       '</div>'+
     '</div>'+
+
+    renderCreateStreamGuide({mode:policy.mode||'balanced',rtmp_url:getOBSRTMPServerURL(settings),stream_key:st.stream_key,stream_name:st.name})+
 
     urlSection('Video Akis URL\'leri',[
       ['HLS',u.hls],['LL-HLS',u.ll_hls],['DASH',u.dash],['HTTP-FLV',u.http_flv],
@@ -918,6 +1287,7 @@ async function renderStreamDetail(c,id){
       (access&&access.needs_token?'<div class="form-hint" style="margin-bottom:10px;color:var(--warning)">Bu yayinda playback token gerekli. Aasagidaki preview ve linkler gecici token ile uretildi.</div>':'')+
       copyField('iframe','<iframe src="'+u.embed+'" width="1280" height="720" frameborder="0" allowfullscreen></iframe>')+
       copyField('Player URL',u.play)+
+      copyField('Audio Player URL',playerURLForFormat(u.play,'aac'))+
       copyField('Embed URL',u.embed)+
     '</div>'+
 
@@ -929,7 +1299,7 @@ async function renderStreamDetail(c,id){
 
 }
 
-// â•â•â• EMBED CODES â•â•â•
+// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â EMBED CODES Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
 async function saveStreamRecordSettings(id){
   const st=window._streamDetailData;
   if(!st)return;
@@ -939,8 +1309,8 @@ async function saveStreamRecordSettings(id){
   });
   const res=await api('/api/streams/'+id,{method:'PUT',body:payload});
   if(res&&res.success){
-    window._streamDetailData=payload;
     toast('Kayit ayarlari kaydedildi');
+    navigate('stream-detail-'+id);
   }else{
     toast((res&&res.message)||'Kaydedilemedi','error');
   }
@@ -964,8 +1334,8 @@ async function saveStreamPolicySettings(id){
   });
   const res=await api('/api/streams/'+id,{method:'PUT',body:payload});
   if(res&&res.success){
-    window._streamDetailData=payload;
     toast('Politika kaydedildi');
+    navigate('stream-detail-'+id);
   }else{
     toast((res&&res.message)||'Kaydedilemedi','error');
   }
@@ -1002,8 +1372,8 @@ async function renderEmbedCodes(c){
             copyField('MP3',u.mp3)+copyField('AAC',u.aac)+copyField('OGG',u.ogg)+
             copyField('WAV',u.wav)+copyField('FLAC',u.flac)+copyField('HLS Ses',u.hls_audio)+copyField('DASH Ses',u.dash_audio)+copyField('Icecast',u.icecast)+
           '</details>'+
-          '<details style="margin-top:4px"><summary style="cursor:pointer;font-weight:600;padding:8px 0;color:var(--text-secondary)">Player & Embed (2)</summary>'+
-            copyField('Player URL',u.play)+copyField('Embed URL',u.embed)+
+          '<details style="margin-top:4px"><summary style="cursor:pointer;font-weight:600;padding:8px 0;color:var(--text-secondary)">Player & Embed (3)</summary>'+
+            copyField('Player URL',u.play)+copyField('Audio Player URL',playerURLForFormat(u.play,'aac'))+copyField('Embed URL',u.embed)+
           '</details>'+
         '</div>';
       }).join(''));
@@ -1011,22 +1381,36 @@ async function renderEmbedCodes(c){
     c.innerHTML='<div class="card"><div class="empty-state"><h3>Embed kodlari yuklenemedi</h3><p style="color:var(--text-muted)">'+escHtml(e.message||'Bilinmeyen hata')+'</p></div></div>';
   }
 }
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â SETTINGS - GENERAL Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â SETTINGS - GENERAL ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â
 async function renderSettingsGeneral(c){
   const s=await api('/api/settings');
   c.innerHTML=
     '<div class="page-header"><h1 class="page-title">Genel Ayarlar</h1></div>'+
-    '<div class="card" style="max-width:700px">'+
-      settingInput('server_name','Sunucu Adi',s.server_name||'FluxStream','text','Sunucu goruntuleme adi')+
-      settingInput('http_port','HTTP Port',s.http_port||'8844','number','Web arayuzu portu')+
-      settingInput('https_port','HTTPS Port',s.https_port||'443','number','SSL portu')+
-      settingInput('language','Dil',s.language||'tr','text','Arayuz dili')+
-      settingInput('timezone','Saat Dilimi',s.timezone||'Europe/Istanbul','text','')+
-      '<button class="btn btn-primary" style="margin-top:8px" onclick="saveSettingsCategory(\'general\')">Kaydet</button>'+
-    '</div>';
+    '<div class="card-grid card-grid-2">'+
+      '<div class="card">'+
+        '<div class="card-title" style="margin-bottom:16px">Kimlik ve Yerellesme</div>'+
+        settingInput('server_name','Sunucu Adi',s.server_name||'FluxStream','text','Sunucu goruntuleme adi')+
+        settingSelect('language','Dil',s.language||'tr',[{value:'tr',label:'Turkce'},{value:'en',label:'English'},{value:'de',label:'Deutsch'},{value:'es',label:'Espanol'},{value:'fr',label:'Francais'}],'Kurulumda secilen dil burada degistirilebilir. Login, setup ve panel kabugu bu secime gore acilir.')+
+        settingInput('timezone','Saat Dilimi',s.timezone||'Europe/Istanbul','text','Tarih ve saat gosterimleri bu timezone ile yorumlanir.')+
+        '<div class="form-group"><label class="form-label">Tema</label><select class="form-select setting-input" data-key="theme"><option value="light" '+((s.theme||'light')==='light'?'selected':'')+'>Light</option><option value="dark" '+((s.theme||'')==='dark'?'selected':'')+'>Dark</option><option value="minimal" '+((s.theme||'')==='minimal'?'selected':'')+'>Minimal</option></select><div class="form-hint">Admin panelinin gorsel yonunu belirler. Su an acik tema varsayilandir.</div></div>'+
+        '<div class="setting-row"><div><div class="setting-label">Kolay mod acik</div><div class="setting-desc">Yeni kurulumlarda rehber odakli ayarlari one cikarir.</div></div><label class="toggle"><input type="checkbox" class="setting-input" data-key="guided_mode_enabled" '+(s.guided_mode_enabled!=='false'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+      '</div>'+
+      '<div class="card">'+
+        '<div class="card-title" style="margin-bottom:16px">Sunucu ve Panel Varsayilanlari</div>'+
+        settingInput('http_port','HTTP Port',s.http_port||'8844','number','Web arayuzu portu')+
+        settingInput('https_port','HTTPS Port',s.https_port||'443','number','SSL portu')+
+        settingInput('embed_domain','Varsayilan Public Domain',s.embed_domain||'','text','Link uretiminde kullanilan ilk alan adi. Bossa mevcut host kullanilir.')+
+        settingInput('embed_http_port','Varsayilan Public HTTP Port',s.embed_http_port||s.http_port||'8844','number','Embed ve player linkleri icin')+
+        settingInput('embed_https_port','Varsayilan Public HTTPS Port',s.embed_https_port||s.https_port||'443','number','SSL ile uretilen linkler icin')+
+        '<div class="setting-row"><div><div class="setting-label">Player kalite secici</div><div class="setting-desc">ABR yayinlarda kullanici kaliteyi elle de secebilir.</div></div><label class="toggle"><input type="checkbox" class="setting-input" data-key="player_quality_selector" '+(s.player_quality_selector!=='false'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+        '<div class="setting-row"><div><div class="setting-label">Otomatik bakim</div><div class="setting-desc">Temizleme ve bakim islerini zamanli calistirir.</div></div><label class="toggle"><input type="checkbox" class="setting-input" data-key="maintenance_auto_cleanup" '+(s.maintenance_auto_cleanup!=='false'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+        settingInput('recordings_retention_days','Kayit Saklama Suresi (gun)',s.recordings_retention_days||'30','number','0 verilirse otomatik silme yapilmaz.')+
+      '</div>'+
+    '</div>'+
+    '<div style="margin-top:16px"><button class="btn btn-primary" onclick="saveGeneralSettingsExtended()">Kaydet</button></div>';
 }
 
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â SETTINGS - PROTOCOLS Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â SETTINGS - PROTOCOLS ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â
 async function renderSettingsEmbed(c){
   const s=await api('/api/settings');
   const publicConfig=getPublicBase(s);
@@ -1082,7 +1466,7 @@ function protoCard(name,desc,enableKey,s,portKey,portVal,extra){
     '</div></div>';
 }
 
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â SETTINGS - OUTPUTS Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â SETTINGS - OUTPUTS ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â
 async function renderSettingsOutputs(c){
   const s=await api('/api/settings');
   c.innerHTML=
@@ -1117,7 +1501,7 @@ function outputCard(name,desc,enableKey,s,extra){
   '</div>';
 }
 
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â SETTINGS - SSL Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â SETTINGS - SSL ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â
 async function renderSettingsSSL(c){
   const s=await api('/api/settings');
   const sslStatus=await api('/api/ssl/status');
@@ -1127,7 +1511,7 @@ async function renderSettingsSSL(c){
     '<div class="page-header"><h1 class="page-title">SSL/TLS Sertifika</h1></div>'+
     '<div class="card" style="max-width:920px;margin-bottom:16px">'+
       '<div class="card-title" style="margin-bottom:12px">Kullanim Mantigi</div>'+
-      '<div class="form-hint" style="line-height:1.8">Web HTTPS sertifikasi admin paneli ve embed/player sayfalari icin kullanilir. Stream SSL ise yalnizca RTMPS ingest tarafini korur. Isterseniz ayni domaini, isterseniz ayri domain ve ayri sertifika kullanabilirsiniz. Let\\'s Encrypt icin alan adlarinin bu VPS\\'e yonlenmis olmasi ve 80/443 portlarinin acik olmasi gerekir.</div>'+
+      '<div class="form-hint" style="line-height:1.8">Web HTTPS sertifikasi admin paneli ve embed/player sayfalari icin kullanilir. Stream SSL ise yalnizca RTMPS ingest tarafini korur. Isterseniz ayni domaini, isterseniz ayri domain ve ayri sertifika kullanabilirsiniz. Let\' Encrypt icin alan adlarinin bu VPS\'e yonlenmis olmasi ve 80/443 portlarinin acik olmasi gerekir.</div>'+
     '</div>'+
     '<div class="card-grid card-grid-2">'+
       renderSSLProfileCard('web','Web HTTPS',webSSL,s,'ssl_enabled','https_port','ssl_mode','ssl_cert_path','ssl_key_path','ssl_le_domain','ssl_le_email','Admin paneli, embed ve player linkleri bu sertifikayi kullanir.')+
@@ -1151,14 +1535,14 @@ function renderSSLProfileCard(target,title,status,s,enableKey,portKey,modeKey,ce
         ?'<div class="form-hint" style="margin-top:6px">Domain: <b>'+escHtml(String((s&&s[domainKey])||(status&&status.domain)||'-'))+'</b></div>'
         :'<div class="form-hint" style="margin-top:6px">CRT: <code>'+escHtml(String((status&&status.cert_path)||(s&&s[certKey])||'-'))+'</code></div><div class="form-hint">KEY: <code>'+escHtml(String((status&&status.key_path)||(s&&s[keyKey])||'-'))+'</code></div>')+
     '</div>'+
-    '<div class="form-group"><label class="form-label">Sertifika Modu</label><select class="form-select setting-input" data-key="'+modeKey+'"><option value="file" '+(mode==='file'?'selected':'')+'>Manuel CRT/KEY</option><option value="letsencrypt" '+(mode==='letsencrypt'?'selected':'')+'>Let\\'s Encrypt</option></select><div class="form-hint">Manuel modda dosya yuklersiniz. Let\\'s Encrypt modunda domain ve e-posta yeterlidir.</div></div>'+
+    '<div class="form-group"><label class="form-label">Sertifika Modu</label><select class="form-select setting-input" data-key="'+modeKey+'"><option value="file" '+(mode==='file'?'selected':'')+'>Manuel CRT/KEY</option><option value="letsencrypt" '+(mode==='letsencrypt'?'selected':'')+'>Let\' Encrypt</option></select><div class="form-hint">Manuel modda dosya yuklersiniz. Let\' Encrypt modunda domain ve e-posta yeterlidir.</div></div>'+
     '<div class="form-group"><label class="form-label">CRT / PEM Yukle</label><input type="file" id="ssl-cert-file-'+target+'" accept=".crt,.pem,.cert" class="form-input" style="padding:8px"></div>'+
     '<div class="form-group"><label class="form-label">KEY / PEM Yukle</label><input type="file" id="ssl-key-file-'+target+'" accept=".key,.pem" class="form-input" style="padding:8px"></div>'+
     '<div style="margin-bottom:16px"><button class="btn btn-secondary" onclick="uploadSSL(\''+target+'\')">Bu Profil Icin Sertifika Yukle</button></div>'+
     settingInput(certKey,'Sertifika Dosyasi (.crt)',s[certKey]||'','text','Orn: /opt/fluxstream/data/certs/'+target+'/server.crt')+
     settingInput(keyKey,'Ozel Anahtar (.key)',s[keyKey]||'','text','Orn: /opt/fluxstream/data/certs/'+target+'/server.key')+
-    settingInput(domainKey,'Let\\'s Encrypt Domain',s[domainKey]||'','text','Orn: '+(target==='web'?'panel.example.com':'stream.example.com'))+
-    settingInput(emailKey,'Let\\'s Encrypt E-posta',s[emailKey]||'','text','Bildirim ve yenileme icin kullanilir.')+
+    settingInput(domainKey,'Let\' Encrypt Domain',s[domainKey]||'','text','Orn: '+(target==='web'?'panel.example.com':'stream.example.com'))+
+    settingInput(emailKey,'Let\' Encrypt E-posta',s[emailKey]||'','text','Bildirim ve yenileme icin kullanilir.')+
   '</div>';
 }
 async function uploadSSL(target){
@@ -1176,7 +1560,7 @@ async function uploadSSL(target){
     else{toast(data.message||'Yukleme hatasi','error')}
   }catch(e){toast('Yukleme hatasi: '+e.message,'error')}
 }
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â SETTINGS - SECURITY Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â SETTINGS - SECURITY ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â
 async function renderSettingsSecurity(c){
   const s=await api('/api/settings');
   c.innerHTML=
@@ -1192,7 +1576,7 @@ async function renderSettingsSecurity(c){
     '</div>';
 }
 
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â SETTINGS - STORAGE Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â SETTINGS - STORAGE ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â
 async function renderSettingsStorage(c){
   const s=await api('/api/settings');
   c.innerHTML=
@@ -1204,7 +1588,7 @@ async function renderSettingsStorage(c){
     '</div>';
 }
 
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â SETTINGS - TRANSCODE Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â SETTINGS - TRANSCODE ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â
 async function renderSettingsTranscode(c){
   const s=await api('/api/settings');
   c.innerHTML=
@@ -1354,7 +1738,7 @@ async function renderDiagnostics(c){
     '</div>';
 }
 
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â SETTINGS HELPERS Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â SETTINGS HELPERS ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â
 function settingInput(key,label,value,type,hint){
   return '<div class="form-group"><label class="form-label">'+label+'</label>'+
     '<input class="form-input setting-input" data-key="'+key+'" type="'+(type||'text')+'" value="'+escHtml(String(value||''))+'">'+
@@ -1363,9 +1747,22 @@ function settingInput(key,label,value,type,hint){
 }
 async function saveSettingsValues(category,updates,silent){
   const res=await api('/api/settings/'+category,{method:'PUT',body:updates});
+  if(res&&res.success!==false&&updates&&updates.language){
+    runtimeSettings=runtimeSettings||{};
+    runtimeSettings.language=updates.language;
+    setCurrentLanguage(updates.language,true);
+    if(setupCompleted&&authToken){
+      renderApp();
+      navigate(currentPage);
+    }else if(!setupCompleted){
+      renderWizard();
+    }else{
+      renderLogin();
+    }
+  }
   if(!silent){
-    if(res&&res.success!==false)toast('Ayarlar kaydedildi!');
-    else toast((res&&res.message)||'Kayit hatasi','error');
+    if(res&&res.success!==false)toast(t('Ayarlar kaydedildi!'));
+    else toast((res&&res.message)||t('Kayit hatasi'),'error');
   }
   loadProtoStatus();
   return res;
@@ -1405,6 +1802,29 @@ async function saveGuidedPublic(){
     embed_http_port:document.querySelector('.setting-input[data-key="embed_http_port"]')?.value||'',
     embed_https_port:document.querySelector('.setting-input[data-key="embed_https_port"]')?.value||'',
     embed_use_https:httpsToggle&&httpsToggle.checked?'true':'false'
+  },false);
+}
+async function saveGeneralSettingsExtended(){
+  await saveSettingsValues('general',{
+    server_name:document.querySelector('.setting-input[data-key="server_name"]')?.value||'FluxStream',
+    language:document.querySelector('.setting-input[data-key="language"]')?.value||'tr',
+    timezone:document.querySelector('.setting-input[data-key="timezone"]')?.value||'Europe/Istanbul',
+    theme:document.querySelector('.setting-input[data-key="theme"]')?.value||'light',
+    guided_mode_enabled:document.querySelector('.setting-input[data-key="guided_mode_enabled"]')?.checked?'true':'false',
+    http_port:document.querySelector('.setting-input[data-key="http_port"]')?.value||'8844',
+    https_port:document.querySelector('.setting-input[data-key="https_port"]')?.value||'443'
+  },true);
+  await saveSettingsValues('embed',{
+    embed_domain:document.querySelector('.setting-input[data-key="embed_domain"]')?.value||'',
+    embed_http_port:document.querySelector('.setting-input[data-key="embed_http_port"]')?.value||'8844',
+    embed_https_port:document.querySelector('.setting-input[data-key="embed_https_port"]')?.value||'443'
+  },true);
+  await saveSettingsValues('outputs',{
+    player_quality_selector:document.querySelector('.setting-input[data-key="player_quality_selector"]')?.checked?'true':'false'
+  },true);
+  await saveSettingsValues('storage',{
+    maintenance_auto_cleanup:document.querySelector('.setting-input[data-key="maintenance_auto_cleanup"]')?.checked?'true':'false',
+    recordings_retention_days:document.querySelector('.setting-input[data-key="recordings_retention_days"]')?.value||'30'
   },false);
 }
 async function saveGuidedStorage(){
@@ -1459,7 +1879,7 @@ async function loadDiagnostics(){
     }).join('')+'</div>';
 }
 
-// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â LOGS Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+// ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â LOGS ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â
 async function renderLogs(c){
   const logs=await api('/api/logs')||[];
   c.innerHTML=
@@ -1470,7 +1890,7 @@ async function renderLogs(c){
       :'<div style="max-height:600px;overflow-y:auto"><table><thead><tr><th>Zaman</th><th>Seviye</th><th>Bilesen</th><th>Mesaj</th></tr></thead><tbody>'+
         logs.map(l=>{
           const colors={INFO:'var(--accent)',WARN:'var(--warning)',ERROR:'var(--danger)'};
-          const time=new Date(l.created_at).toLocaleString('tr-TR');
+          const time=fmtLocaleDateTime(l.created_at);
           return '<tr><td style="font-size:12px;color:var(--text-muted);white-space:nowrap">'+time+'</td>'+
             '<td><span style="color:'+(colors[l.level]||'var(--text-secondary)')+';font-weight:600;font-size:12px">'+l.level+'</span></td>'+
             '<td style="font-size:13px">'+escHtml(l.component)+'</td>'+
@@ -1483,7 +1903,7 @@ async function clearLogs(){
   await api('/api/logs',{method:'DELETE'});toast('Loglar temizlendi');navigate('logs');
 }
 
-// Ã¢â€¢Ã¢â€¢Ã¢â€¢ USERS Ã¢â€¢Ã¢â€¢Ã¢â€¢
+// ÃƒÂ¢Ã¢â‚¬Â¢ÃƒÂ¢Ã¢â‚¬Â¢ÃƒÂ¢Ã¢â‚¬Â¢ USERS ÃƒÂ¢Ã¢â‚¬Â¢ÃƒÂ¢Ã¢â‚¬Â¢ÃƒÂ¢Ã¢â‚¬Â¢
 async function renderUsers(c){
   const users=await api('/api/users')||[];
   c.innerHTML=
@@ -1496,7 +1916,7 @@ async function renderUsers(c){
           '<td>'+u.id+'</td>'+
           '<td><strong>'+escHtml(u.username)+'</strong></td>'+
           '<td><span class="tag '+(u.role==='admin'?'tag-blue':'tag-green')+'">'+escHtml(u.role)+'</span></td>'+
-          '<td style="font-size:12px;color:var(--text-muted)">'+new Date(u.created_at).toLocaleDateString('tr-TR')+'</td>'+
+          '<td style="font-size:12px;color:var(--text-muted)">'+fmtLocaleDate(u.created_at)+'</td>'+
           '<td><button class="btn btn-sm btn-secondary" onclick="showEditUserModal('+u.id+',\''+escHtml(u.username)+'\',\''+escHtml(u.role)+'\')">Duzenle</button> '+
             '<button class="btn btn-sm btn-danger" onclick="deleteUser('+u.id+')">Sil</button></td>'+
         '</tr>').join('')+
@@ -1505,7 +1925,7 @@ async function renderUsers(c){
 }
 function showAddUserModal(){
   document.getElementById('user-modal').innerHTML=
-    '<div class="modal-overlay" onclick="if(event.target===this)this.innerHTML=\'\'">'+
+    '<div class="modal-overlay" onclick="if(event.target===this)this.remove()">'+
       '<div class="modal"><div class="modal-title">Yeni Kullanici</div>'+
         '<div class="form-group"><label class="form-label">Kullanici Adi</label><input class="form-input" id="mu-username"></div>'+
         '<div class="form-group"><label class="form-label">Sifre</label><input class="form-input" id="mu-password" type="password"></div>'+
@@ -1527,7 +1947,7 @@ async function addUser(){
 }
 function showEditUserModal(id,username,role){
   document.getElementById('user-modal').innerHTML=
-    '<div class="modal-overlay" onclick="if(event.target===this)this.innerHTML=\'\'">'+
+    '<div class="modal-overlay" onclick="if(event.target===this)this.remove()">'+
       '<div class="modal"><div class="modal-title">Kullanici Duzenle</div>'+
         '<div class="form-group"><label class="form-label">Kullanici Adi</label><input class="form-input" id="eu-username" value="'+escHtml(username)+'"></div>'+
         '<div class="form-group"><label class="form-label">Yeni Sifre (bos birakin degistirmemek icin)</label><input class="form-input" id="eu-password" type="password"></div>'+
@@ -1553,14 +1973,216 @@ async function deleteUser(id){
   await api('/api/users/'+id,{method:'DELETE'});toast('Kullanici silindi');navigate('users');
 }
 
-// Ã¢â€¢Ã¢â€¢Ã¢â€¢ PLAYER TEMPLATES Ã¢â€¢Ã¢â€¢Ã¢â€¢
+// ÃƒÂ¢Ã¢â‚¬Â¢ÃƒÂ¢Ã¢â‚¬Â¢ÃƒÂ¢Ã¢â‚¬Â¢ PLAYER TEMPLATES ÃƒÂ¢Ã¢â‚¬Â¢ÃƒÂ¢Ã¢â‚¬Â¢ÃƒÂ¢Ã¢â‚¬Â¢
+function templateBackgroundStyle(t){
+  if(t&&t.background_css)return t.background_css;
+  if(t&&t.theme==='light')return 'background:linear-gradient(180deg,#f8fbff 0%,#dbeafe 100%);';
+  if(t&&t.theme==='minimal')return 'background:#0f172a;';
+  return 'background:linear-gradient(135deg,#030712 0%,#1d4ed8 100%);';
+}
+function templateControlStyle(t){
+  return (t&&t.control_bar_css)||'background:rgba(15,23,42,.72);backdrop-filter:blur(10px);';
+}
+function templatePlayStyle(t){
+  return (t&&t.play_button_css)||'color:#ffffff;';
+}
+function templateLogoPositionStyle(position){
+  switch(position){
+    case 'top-left': return 'top:14px;left:14px;';
+    case 'bottom-left': return 'left:14px;bottom:14px;';
+    case 'bottom-right': return 'right:14px;bottom:14px;';
+    default: return 'top:14px;right:14px;';
+  }
+}
+function renderPlayerTemplateThumbnail(t){
+  const logoStyle=templateLogoPositionStyle(t&&t.logo_position);
+  const logo=t&&t.logo_url?'<img src="'+escHtml(t.logo_url)+'" alt="" style="position:absolute;'+logoStyle+'height:26px;max-width:96px;object-fit:contain;opacity:'+(Number(t.logo_opacity||1))+';z-index:2">':'';
+  const fallbackLogo=!logo?'<span class="template-thumb-logo" style="position:absolute;'+logoStyle+'">'+escHtml(((t&&t.watermark_text)||'FluxStream').slice(0,14))+'</span>':'';
+  const title=(t&&t.show_title!==false)?'<div class="template-thumb-title">'+escHtml((t&&t.name)||'Player')+'</div>':'<div></div>';
+  const badge=(t&&t.show_live_badge!==false)?'<span class="template-thumb-badge">Live</span>':'<span></span>';
+  const watermark=(t&&t.watermark_text)?'<div class="template-thumb-watermark">'+escHtml(t.watermark_text)+'</div>':'';
+  return '<div class="template-thumb" style="'+escHtml(templateBackgroundStyle(t))+'">'+
+    '<div class="template-thumb-shell">'+
+      logo+fallbackLogo+watermark+
+      '<div class="template-thumb-header">'+title+badge+'</div>'+
+      '<div class="template-thumb-center"><div class="template-thumb-play" style="'+escHtml(templatePlayStyle(t))+'"><i class="bi bi-play-fill"></i></div></div>'+
+      '<div class="template-thumb-footer">'+
+        '<div class="template-thumb-progress"><span></span></div>'+
+        '<div class="template-thumb-controls" style="'+escHtml(templateControlStyle(t))+'">'+
+          '<div class="left"><i class="bi bi-play-fill"></i><span>00:18</span></div>'+
+          '<div class="right"><i class="bi bi-volume-up"></i><i class="bi bi-badge-hd"></i><i class="bi bi-fullscreen"></i></div>'+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+}
+let playerTemplateStudioState={streamKey:'',streamName:'',streamPolicy:'',format:'player'};
+function getTemplateStudioStreams(){
+  return Array.isArray(window._playerTemplateStreams)?window._playerTemplateStreams:[];
+}
+function templateStudioCurrentStream(){
+  const streams=getTemplateStudioStreams();
+  return streams.find(function(s){return s.stream_key===playerTemplateStudioState.streamKey;})||streams[0]||null;
+}
+function ensureTemplateStudioState(){
+  const streams=getTemplateStudioStreams();
+  if(!streams.length){
+    playerTemplateStudioState.streamKey='';
+    playerTemplateStudioState.streamName='';
+    playerTemplateStudioState.streamPolicy='';
+    return null;
+  }
+  let current=streams.find(function(s){return s.stream_key===playerTemplateStudioState.streamKey;});
+  if(!current){
+    current=streams.find(function(s){return s.status==='live';})||streams[0];
+    playerTemplateStudioState.streamKey=current.stream_key;
+  }
+  playerTemplateStudioState.streamName=current.name||current.stream_key;
+  playerTemplateStudioState.streamPolicy=current.policy_json||'';
+  if(!playerTemplateStudioState.format)playerTemplateStudioState.format='player';
+  return current;
+}
+function templateStudioStreamOptions(){
+  const streams=getTemplateStudioStreams();
+  if(!streams.length)return '<option value="">-- Stream yok --</option>';
+  return streams.map(function(s){
+    return '<option value="'+escHtml(s.stream_key)+'" '+(s.stream_key===playerTemplateStudioState.streamKey?'selected':'')+'>'+escHtml(s.name)+' ('+escHtml(s.stream_key)+')</option>';
+  }).join('');
+}
+function templateStudioFormatOptions(){
+  const formats=[
+    {value:'player',label:'Player'},
+    {value:'iframe',label:'iframe'},
+    {value:'hls',label:'HLS'},
+    {value:'ll_hls',label:'LL-HLS'},
+    {value:'dash',label:'DASH'},
+    {value:'flv',label:'HTTP-FLV'},
+    {value:'mp4',label:'MP4'},
+    {value:'webm',label:'WebM'},
+    {value:'mp3',label:'MP3'},
+    {value:'aac',label:'AAC'},
+    {value:'ogg',label:'OGG'},
+    {value:'wav',label:'WAV'},
+    {value:'flac',label:'FLAC'},
+    {value:'icecast',label:'Icecast'}
+  ];
+  return formats.map(function(item){
+    return '<option value="'+item.value+'" '+(item.value===playerTemplateStudioState.format?'selected':'')+'>'+item.label+'</option>';
+  }).join('');
+}
+function buildTemplateQuery(t,streamName){
+  const params=new URLSearchParams();
+  params.set('player_title',streamName||t.name||'FluxStream');
+  params.set('player_theme',t.theme||'dark');
+  params.set('player_bg',t.background_css||'');
+  params.set('player_controls',t.control_bar_css||'');
+  params.set('player_play',t.play_button_css||'');
+  params.set('player_logo',t.logo_url||'');
+  params.set('player_logo_position',t.logo_position||'top-right');
+  params.set('player_logo_opacity',String(Number(t.logo_opacity||1)));
+  params.set('player_watermark',t.watermark_text||'');
+  params.set('player_show_title',t.show_title===false?'0':'1');
+  params.set('player_show_badge',t.show_live_badge===false?'0':'1');
+  params.set('player_custom_css',t.custom_css||'');
+  return params.toString();
+}
+function appendTemplateQuery(url,t,streamName){
+  if(!url)return url;
+  const query=buildTemplateQuery(t,streamName);
+  if(!query)return url;
+  return url+(url.indexOf('?')===-1?'?':'&')+query;
+}
+function templateAwareURLs(urls,t,streamName){
+  const next=Object.assign({},urls||{});
+  next.play=appendTemplateQuery(next.play,t,streamName);
+  next.embed=appendTemplateQuery(next.embed,t,streamName);
+  return next;
+}
+function playerURLForFormat(url,format){
+  if(!url)return url;
+  format=String(format||'').toLowerCase();
+  if(!format || format==='player' || format==='iframe' || format==='jsapi')return url;
+  return appendURLQuery(url,'format',format);
+}
+function updatePlayerTemplateStudioControls(){
+  const stream=ensureTemplateStudioState();
+  const streamSelect=document.getElementById('pt-stream-select');
+  const formatSelect=document.getElementById('pt-format-select');
+  if(streamSelect)streamSelect.innerHTML=templateStudioStreamOptions();
+  if(formatSelect)formatSelect.innerHTML=templateStudioFormatOptions();
+  const hint=document.getElementById('pt-stream-hint');
+  if(hint){
+    hint.innerHTML=stream?('Secili kaynak: <strong>'+escHtml(stream.name)+'</strong> • '+escHtml(stream.stream_key)):'Kaynak stream secilmedi';
+  }
+  const modalStream=document.getElementById('pt-modal-stream');
+  const modalFormat=document.getElementById('pt-modal-format');
+  if(modalStream)modalStream.innerHTML=templateStudioStreamOptions();
+  if(modalFormat)modalFormat.innerHTML=templateStudioFormatOptions();
+}
+function updatePlayerTemplateModalPreview(){
+  const holder=document.getElementById('pt-current-template-id');
+  if(!holder)return;
+  const id=parseInt(holder.value||'0',10)||0;
+  updatePlayerTemplatePreview(id);
+}
+function buildTemplatePreviewSrc(previewURLs,format){
+  var src=(previewURLs&&previewURLs.embed)||'';
+  if(!src)return '';
+  src=playerURLForFormat(src,format);
+  src=appendURLQuery(src,'autoplay','1');
+  src=appendURLQuery(src,'muted','1');
+  return src;
+}
+async function updatePlayerTemplatePreview(id){
+  const prev=document.getElementById('pt-live-preview');
+  const code=document.getElementById('pt-live-embed-code');
+  if(!prev||!code)return;
+  const stream=ensureTemplateStudioState();
+  if(!stream){
+    prev.innerHTML='<div class="empty-state"><div class="icon"><i class="bi bi-broadcast"></i></div><h3>Kaynak stream yok</h3><p style="color:var(--text-muted)">Template preview icin en az bir stream olusturun.</p></div>';
+    code.innerHTML='';
+    return;
+  }
+  if(!id){
+    prev.innerHTML='<div class="empty-state"><div class="icon"><i class="bi bi-palette"></i></div><h3>Kaydedin ve deneyin</h3><p style="color:var(--text-muted)">Yeni bir template icin once kaydet, sonra secili stream ile player preview ve embed kodunu gor.</p></div>';
+    code.innerHTML='';
+    return;
+  }
+  const template=await api('/api/players/'+id);
+  const settings=await api('/api/settings');
+  const access=await getPlaybackAccess(stream.stream_key,settings,stream.policy_json||'');
+  const previewRawURLs=getPreviewURLs(stream.stream_key,settings,stream.name,access);
+  const publicRawURLs=getAllURLs(stream.stream_key,settings,stream.name,access);
+  const previewURLs=templateAwareURLs(previewRawURLs,template,stream.name);
+  const urls=templateAwareURLs(publicRawURLs,template,stream.name);
+  const isAudioPreview=playerTemplateStudioState.format==='mp3'||playerTemplateStudioState.format==='aac'||playerTemplateStudioState.format==='ogg'||playerTemplateStudioState.format==='wav'||playerTemplateStudioState.format==='flac'||playerTemplateStudioState.format==='icecast';
+  const previewSrc=buildTemplatePreviewSrc(previewURLs,playerTemplateStudioState.format);
+  const previewBundle=buildEmbedBundle(playerTemplateStudioState.format,stream.stream_key,previewURLs,960,playerTemplateStudioState.format==='mp3'||playerTemplateStudioState.format==='aac'||playerTemplateStudioState.format==='ogg'||playerTemplateStudioState.format==='wav'||playerTemplateStudioState.format==='flac'||playerTemplateStudioState.format==='icecast'?120:540,true,true);
+  const bundle=buildEmbedBundle(playerTemplateStudioState.format,stream.stream_key,urls,960,playerTemplateStudioState.format==='mp3'||playerTemplateStudioState.format==='aac'||playerTemplateStudioState.format==='ogg'||playerTemplateStudioState.format==='wav'||playerTemplateStudioState.format==='flac'||playerTemplateStudioState.format==='icecast'?120:540,true,true);
+  prev.innerHTML='<div style="position:relative;'+(isAudioPreview?'height:140px;':'padding-top:56.25%;')+'background:#05070b;border-radius:12px;overflow:hidden">'+
+    (previewSrc?'<iframe src="'+previewSrc+'" style="position:absolute;inset:0;width:100%;height:100%;border:none;background:#000" allow="autoplay;fullscreen" allowfullscreen></iframe>':'')+
+    '</div>';
+  code.innerHTML=
+    '<div class="metric-row"><div><div class="setting-label">'+escHtml(stream.name)+'</div><div class="setting-desc">'+escHtml(playerTemplateStudioState.format.toUpperCase())+' • Template preview</div></div><span class="tag tag-blue">'+escHtml((template.name||'Template'))+'</span></div>'+
+    copyField(bundle.primaryLabel||'Embed',bundle.primary||'')+
+    (bundle.direct?copyField(bundle.directLabel||'URL',bundle.direct):'')+
+    copyField('Player URL',playerURLForFormat(urls.play||'',playerTemplateStudioState.format))+
+    copyField('Embed URL',urls.embed||'')+
+    (bundle.note?'<div class="form-hint" style="margin-top:10px">'+escHtml(bundle.note)+'</div>':'');
+}
 async function renderPlayerTemplates(c){
-  const templates=await api('/api/players')||[];
+  const [templates,streams]=await Promise.all([api('/api/players'),api('/api/streams')]);
+  window._playerTemplateStreams=Array.isArray(streams)?streams:[];
+  ensureTemplateStudioState();
   c.innerHTML=
     '<div class="page-header"><div><h1 class="page-title">Player Sablonlari</h1><div style="color:var(--text-muted);font-size:13px;margin-top:6px">Kurulu gelen hazir sablonlari temel alip duzenleyebilir veya sifirdan yeni sablon olusturabilirsiniz.</div></div>'+
       '<button class="btn btn-primary" onclick="showPlayerModal()">+ Yeni Sablon</button></div>'+
+    '<div class="card" style="margin-bottom:16px"><div class="card-grid card-grid-2">'+
+      '<div class="form-group"><label class="form-label">Onizleme Kaynagi</label><select class="form-select" id="pt-stream-select" onchange="playerTemplateStudioState.streamKey=this.value;updatePlayerTemplateStudioControls();updatePlayerTemplateModalPreview()">'+templateStudioStreamOptions()+'</select><div class="form-hint" id="pt-stream-hint"></div></div>'+
+      '<div class="form-group"><label class="form-label">Onizleme Formati</label><select class="form-select" id="pt-format-select" onchange="playerTemplateStudioState.format=this.value;updatePlayerTemplateModalPreview()">'+templateStudioFormatOptions()+'</select><div class="form-hint">Kaydedilen template icin bu formatta embed kodu ve preview olusur.</div></div>'+
+    '</div></div>'+
     '<div class="card" style="margin-bottom:16px"><div class="metric-list">'+
-      '<div class="metric-row"><span>Hazir baslangic sablonu</span><strong>6+</strong></div>'+
+      '<div class="metric-row"><span>Hazir baslangic sablonu</span><strong>12+</strong></div>'+
       '<div class="metric-row"><span>Kullanim</span><strong>Duzenle -> Kaydet -> Embed tarafinda kullan</strong></div>'+
       '<div class="metric-row"><span>Amac</span><strong>Canli TV, radyo, minimal player, cam tasarim ve parlak vitrini hizla baslatmak</strong></div>'+
     '</div></div>'+
@@ -1572,57 +2194,66 @@ async function renderPlayerTemplates(c){
             '<div class="card-title">'+escHtml(t.name)+'</div>'+
             '<span class="tag tag-blue">'+escHtml(t.theme||'dark')+'</span>'+
           '</div>'+
-          '<div style="height:120px;background:#000;border-radius:8px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;margin-bottom:12px">'+
-            (t.logo_url?'<img src="'+escHtml(t.logo_url)+'" style="position:absolute;'+
-              (t.logo_position==='top-left'?'top:8px;left:8px':t.logo_position==='top-right'?'top:8px;right:8px':t.logo_position==='bottom-left'?'bottom:8px;left:8px':'bottom:8px;right:8px')+
-              ';height:24px;opacity:'+(t.logo_opacity||1)+'">':'')+
-            '<div style="font-size:32px;opacity:.35"><i class="bi bi-play-circle-fill"></i></div>'+
-            (t.watermark_text?'<div style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);font-size:11px;opacity:.4;color:#fff">'+escHtml(t.watermark_text)+'</div>':'')+
-          '</div>'+
+          renderPlayerTemplateThumbnail(t)+
+          '<div class="form-hint" style="margin:-2px 0 12px">Kaynak: '+escHtml(playerTemplateStudioState.streamName||'Stream secin')+'</div>'+
           '<div style="display:flex;gap:8px">'+
             '<button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();showPlayerModal('+t.id+')">Duzenle</button>'+
+            '<button class="btn btn-sm btn-primary" onclick="event.stopPropagation();showPlayerModal('+t.id+')">Onizle ve Kodlar</button>'+
             '<button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deletePlayerTemplate('+t.id+')">Sil</button>'+
           '</div>'+
         '</div>'
       ).join('')+'</div>')+
     '<div id="player-modal"></div>';
+  updatePlayerTemplateStudioControls();
 }
 async function showPlayerModal(id){
   let pt={name:'',theme:'dark',background_css:'',control_bar_css:'',play_button_css:'',logo_url:'',logo_position:'top-right',logo_opacity:1,watermark_text:'',show_title:true,show_live_badge:true,custom_css:''};
   if(id){const data=await api('/api/players/'+id);if(data&&!data.error)pt=data}
   const isEdit=!!id;
   document.getElementById('player-modal').innerHTML=
-    '<div class="modal-overlay" onclick="if(event.target===this)this.innerHTML=\'\'">'+
-      '<div class="modal" style="max-width:700px">'+
+    '<div class="modal-overlay" onclick="if(event.target===this)this.remove()">'+
+      '<div class="modal" style="max-width:1080px">'+
         '<div class="modal-title">'+(isEdit?'Sablon Duzenle':'Yeni Player Sablonu')+'</div>'+
-        '<div class="card-grid card-grid-2">'+
+        '<div class="card-grid card-grid-2" style="align-items:start">'+
+          '<div>'+
+            '<div style="margin-bottom:18px">'+renderPlayerTemplateThumbnail(pt)+'</div>'+
+            '<div class="card-grid card-grid-2">'+
           '<div class="form-group"><label class="form-label">Sablon Adi *</label><input class="form-input" id="pt-name" value="'+escHtml(pt.name)+'"></div>'+
           '<div class="form-group"><label class="form-label">Tema</label>'+
             '<select class="form-select" id="pt-theme"><option value="dark" '+(pt.theme==='dark'?'selected':'')+'>Dark</option><option value="light" '+(pt.theme==='light'?'selected':'')+'>Light</option><option value="minimal" '+(pt.theme==='minimal'?'selected':'')+'>Minimal</option><option value="custom" '+(pt.theme==='custom'?'selected':'')+'>Custom</option></select></div>'+
-        '</div>'+
-        '<div class="card-grid card-grid-2">'+
+            '</div>'+
+            '<div class="card-grid card-grid-2">'+
           '<div class="form-group"><label class="form-label">Logo URL</label><input class="form-input" id="pt-logo-url" value="'+escHtml(pt.logo_url)+'" placeholder="https://..."></div>'+
           '<div class="form-group"><label class="form-label">Logo Konum</label>'+
             '<select class="form-select" id="pt-logo-pos"><option value="top-right" '+(pt.logo_position==='top-right'?'selected':'')+'>Sag Ust</option><option value="top-left" '+(pt.logo_position==='top-left'?'selected':'')+'>Sol Ust</option><option value="bottom-right" '+(pt.logo_position==='bottom-right'?'selected':'')+'>Sag Alt</option><option value="bottom-left" '+(pt.logo_position==='bottom-left'?'selected':'')+'>Sol Alt</option></select></div>'+
-        '</div>'+
-        '<div class="card-grid card-grid-2">'+
+            '</div>'+
+            '<div class="card-grid card-grid-2">'+
           '<div class="form-group"><label class="form-label">Logo Seffaflik</label><input class="form-input" id="pt-logo-opacity" type="number" min="0" max="1" step="0.1" value="'+(pt.logo_opacity||1)+'"></div>'+
           '<div class="form-group"><label class="form-label">Watermark Yazi</label><input class="form-input" id="pt-watermark" value="'+escHtml(pt.watermark_text)+'"></div>'+
-        '</div>'+
-        '<div class="card-grid card-grid-2">'+
+            '</div>'+
+            '<div class="card-grid card-grid-2">'+
           '<div class="setting-row" style="border:none"><div><div class="setting-label">Baslik Goster</div></div>'+
             '<label class="toggle"><input type="checkbox" id="pt-show-title" '+(pt.show_title?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
           '<div class="setting-row" style="border:none"><div><div class="setting-label">CANLI Badge</div></div>'+
             '<label class="toggle"><input type="checkbox" id="pt-show-badge" '+(pt.show_live_badge?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+            '</div>'+
+            '<div class="form-group"><label class="form-label">Arkaplan CSS</label><input class="form-input" id="pt-bg-css" value="'+escHtml(pt.background_css)+'" placeholder="background: #000;"></div>'+
+            '<div class="form-group"><label class="form-label">Kontrol Cubugu CSS</label><input class="form-input" id="pt-ctrl-css" value="'+escHtml(pt.control_bar_css)+'"></div>'+
+            '<div class="form-group"><label class="form-label">Play Butonu CSS</label><input class="form-input" id="pt-play-css" value="'+escHtml(pt.play_button_css)+'"></div>'+
+            '<div class="form-group"><label class="form-label">Ozel CSS</label><textarea class="form-textarea" id="pt-custom-css" rows="4">'+escHtml(pt.custom_css)+'</textarea></div>'+
+            '<div style="display:flex;gap:12px;margin-top:20px">'+
+              '<button class="btn btn-secondary" onclick="document.getElementById(\'player-modal\').innerHTML=\'\'">Iptal</button>'+
+              '<button class="btn btn-primary" onclick="savePlayerTemplate('+(id||'null')+')">'+(isEdit?'Guncelle':'Olustur')+'</button></div>'+
+          '</div>'+
+          '<div>'+
+            '<div class="card" style="padding:18px;margin-bottom:16px"><div class="card-grid card-grid-2"><div class="form-group"><label class="form-label">Kaynak stream</label><select class="form-select" id="pt-modal-stream" onchange="playerTemplateStudioState.streamKey=this.value;updatePlayerTemplateStudioControls();updatePlayerTemplateModalPreview()">'+templateStudioStreamOptions()+'</select></div><div class="form-group"><label class="form-label">Format</label><select class="form-select" id="pt-modal-format" onchange="playerTemplateStudioState.format=this.value;updatePlayerTemplateModalPreview()">'+templateStudioFormatOptions()+'</select></div></div><input type="hidden" id="pt-current-template-id" value="'+(id||0)+'"></div>'+
+            '<div class="card" style="padding:18px;margin-bottom:16px"><div class="card-header"><div class="card-title">Canli Player Onizleme</div><span class="form-hint">Secili stream ve format ile</span></div><div class="card-body"><div id="pt-live-preview"></div></div></div>'+
+            '<div class="card" style="padding:18px"><div class="card-header"><div class="card-title">Embed Kodlari</div><span class="form-hint">Template + stream birlesik cikti</span></div><div class="card-body" id="pt-live-embed-code"></div></div>'+
+          '</div>'+
         '</div>'+
-        '<div class="form-group"><label class="form-label">Arkaplan CSS</label><input class="form-input" id="pt-bg-css" value="'+escHtml(pt.background_css)+'" placeholder="background: #000;"></div>'+
-        '<div class="form-group"><label class="form-label">Kontrol Cubugu CSS</label><input class="form-input" id="pt-ctrl-css" value="'+escHtml(pt.control_bar_css)+'"></div>'+
-        '<div class="form-group"><label class="form-label">Play Butonu CSS</label><input class="form-input" id="pt-play-css" value="'+escHtml(pt.play_button_css)+'"></div>'+
-        '<div class="form-group"><label class="form-label">Ozel CSS</label><textarea class="form-textarea" id="pt-custom-css" rows="4">'+escHtml(pt.custom_css)+'</textarea></div>'+
-        '<div style="display:flex;gap:12px;margin-top:20px">'+
-          '<button class="btn btn-secondary" onclick="document.getElementById(\'player-modal\').innerHTML=\'\'">Iptal</button>'+
-          '<button class="btn btn-primary" onclick="savePlayerTemplate('+(id||'null')+')">'+(isEdit?'Guncelle':'Olustur')+'</button></div>'+
       '</div></div>';
+  applyTranslations(document.getElementById('player-modal'));
+  updatePlayerTemplatePreview(id);
 }
 async function savePlayerTemplate(id){
   const body={
@@ -1656,7 +2287,7 @@ async function deletePlayerTemplate(id){
   await api('/api/players/'+id,{method:'DELETE'});toast('Sablon silindi');navigate('player-templates');
 }
 
-// Ã¢â€¢Ã¢â€¢Ã¢â€¢ ADVANCED EMBED GENERATOR Ã¢â€¢Ã¢â€¢Ã¢â€¢
+// ÃƒÂ¢Ã¢â‚¬Â¢ÃƒÂ¢Ã¢â‚¬Â¢ÃƒÂ¢Ã¢â‚¬Â¢ ADVANCED EMBED GENERATOR ÃƒÂ¢Ã¢â‚¬Â¢ÃƒÂ¢Ã¢â‚¬Â¢ÃƒÂ¢Ã¢â‚¬Â¢
 let embedTab='iframe';
 async function renderAdvancedEmbed(c){
   embedTab='iframe';
@@ -1950,7 +2581,13 @@ function buildEmbedBundle(tab,key,urls,w,h,autoplay,muted){
     case 'webm':
       return {primaryLabel:'Tarayici Embed Kodu',primary:buildFormatEmbedFrame(key,'webm',w,h,autoplay,muted,urls.embed),directLabel:'WebM URL',direct:urls.webm,note:'Tarayici uyumlu iframe player stabil DASH/HLS onizleme kullanir. Ham WebM cikisi alttaki URL alanindadir.'};
     case 'player':
-      return {primaryLabel:'Tarayici Embed Kodu',primary:'<iframe src="'+urls.play+'" width="'+w+'" height="'+h+'" frameborder="0" allow="autoplay;fullscreen" allowfullscreen></iframe>',directLabel:'Player URL',direct:urls.play};
+      return {
+        primaryLabel:'Tarayici Embed Kodu',
+        primary:fallbackFrame,
+        directLabel:'Player URL',
+        direct:urls.play,
+        note:'Gomulu kullanimda tam sayfa player yerine iframe dostu embed gorunumu kullanilir. Direkt link yine Player URL alanindadir.'
+      };
     case 'jsapi':
       return {
         primaryLabel:'JS API Kodu',
@@ -2002,11 +2639,11 @@ function renderAdvancedPreview(prev,key,autoplay,muted,urls){
       setPreviewFrame(prev,defaultFrame);
       break;
     case 'player':
-      setPreviewFrame(prev,previewURLs.play||('/play/'+key));
+      setPreviewFrame(prev,defaultFrame);
       break;
     case 'hls':
     case 'jsapi':{
-      setPreviewFrame(prev,previewURLs.play||('/play/'+key));
+      setPreviewFrame(prev,formatFrame('hls'));
       break;
     }
     case 'll_hls':{
@@ -2087,15 +2724,51 @@ async function updateEmbedPreview(){
   }
 }
 
-// â•â•â• ANALYTICS â•â•â•
+// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â ANALYTICS Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+let analyticsPeriod='24h';
+function analyticsLabelFormatter(period){
+  return function(date,index,total){
+    if(!(date instanceof Date)||Number.isNaN(date.getTime()))return '';
+    if(period==='30d')return date.toLocaleDateString(localeForLang(),{day:'2-digit',month:'2-digit'});
+    if(period==='7d')return date.toLocaleDateString(localeForLang(),{day:'2-digit',month:'2-digit'})+' '+date.toLocaleTimeString(localeForLang(),{hour:'2-digit',minute:'2-digit'});
+    return date.toLocaleTimeString(localeForLang(),{hour:'2-digit',minute:'2-digit'});
+  };
+}
+function analyticsMeta(period,history){
+  if(history&&history.label){
+    const points=history.points||((history.viewers&&history.viewers.length)||0);
+    return history.label+(points?(' - '+points+' nokta'):'');
+  }
+  if(period==='30d')return 'Son 30 gun';
+  if(period==='7d')return 'Son 7 gun';
+  return 'Son 24 saat';
+}
+async function fetchAnalyticsHistory(period){
+  return api('/api/analytics/history?period='+encodeURIComponent(period||'24h'));
+}
+function renderAnalyticsPeriodSelector(){
+  return '<div class="segment-control">'+['24h','7d','30d'].map(function(period){
+    const label=period==='24h'?'24 Saat':(period==='7d'?'7 Gun':'30 Gun');
+    return '<button class="segment-btn '+(analyticsPeriod===period?'active':'')+'" onclick="setAnalyticsPeriod(\''+period+'\')">'+label+'</button>';
+  }).join('')+'</div>';
+}
+function setAnalyticsPeriod(period){
+  if(!period||analyticsPeriod===period)return;
+  analyticsPeriod=period;
+  navigate('analytics');
+}
 async function renderAnalytics(c){
-  const [data,history]=await Promise.all([api('/api/analytics'),api('/api/analytics/history')]);
+  const [data,history]=await Promise.all([api('/api/analytics'),fetchAnalyticsHistory(analyticsPeriod)]);
   if(!data){c.innerHTML='<div class="empty-state"><div class="icon"><i class="bi bi-bar-chart-line"></i></div><h3>Analitik verisi yok</h3></div>';return}
   const fmtItems=Object.entries(data.viewers_by_format||{}).sort((a,b)=>b[1]-a[1]).map(([label,value])=>({label:label,value:value}));
   const countryItems=Object.entries(data.viewers_by_country||{}).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([label,value])=>({label:label,value:value}));
-  const persistedTimeline=(Array.isArray(history)?history:[]).slice().reverse().map(function(item){return {timestamp:item.timestamp,value:item.current_viewers||0}});
+  const historyViewers=(history&&Array.isArray(history.viewers)?history.viewers:[]);
+  const historyBandwidth=(history&&Array.isArray(history.bandwidth)?history.bandwidth:[]);
+  const viewerTimeline=historyViewers.length?historyViewers:(data.viewers_timeline||[]);
+  const labelFormatter=analyticsLabelFormatter(analyticsPeriod);
+  const maxPoints=analyticsPeriod==='30d'?30:(analyticsPeriod==='7d'?28:24);
   c.innerHTML=
-    '<div class="page-header"><h1 class="page-title">Analitik</h1></div>'+
+    '<div class="page-header"><h1 class="page-title">Analitik</h1><div>'+renderAnalyticsPeriodSelector()+'</div></div>'+
     '<div class="card-grid card-grid-4" style="margin-bottom:24px">'+
       statCard('purple','bi-collection-play',fmtInt(data.total_streams||0),'Toplam Yayin','streams','Olusturulan tum streamler')+
       statCard('green','bi-people-fill',fmtInt(data.current_viewers||0),'Aktif Izleyici','viewers','Su an acik oturumlar')+
@@ -2103,8 +2776,8 @@ async function renderAnalytics(c){
       statCard('blue','bi-diagram-3',fmtBytes(data.total_bandwidth||0),'Toplam Bant','transcode-jobs','Sunucudan cikan toplam trafik')+
     '</div>'+
     '<div class="insight-grid">'+
-      '<div class="card"><div class="card-header"><h3 class="card-title">24 Saat Izleyici Trendi</h3></div><div class="card-body">'+renderTimelineChart(data.viewers_timeline||[],'Henuz timeline verisi yok',function(v){return String(v)})+'</div></div>'+
-      '<div class="card"><div class="card-header"><h3 class="card-title">Kalici Snapshot Trendi</h3></div><div class="card-body">'+renderTimelineChart(persistedTimeline,'Henuz kalici snapshot yok',function(v){return String(v)})+'</div></div>'+
+      '<div class="card"><div class="card-header"><h3 class="card-title">Izleyici Trendi</h3><span class="form-hint">'+escHtml((history&&history.label)||'Secili periyot')+'</span></div><div class="card-body">'+renderTimelineChart(viewerTimeline,'Henuz timeline verisi yok',function(v){return String(v)},{meta:analyticsMeta(analyticsPeriod,history),labelFormatter:labelFormatter,maxPoints:maxPoints,labelSlots:6,valueSlots:6})+'</div></div>'+
+      '<div class="card"><div class="card-header"><h3 class="card-title">Bant Trendi</h3><span class="form-hint">Ayni periyotta toplam cikis</span></div><div class="card-body">'+renderTimelineChart(historyBandwidth,'Henuz bant snapshot yok',function(v){return fmtBytes(v)},{meta:analyticsMeta(analyticsPeriod,history),labelFormatter:labelFormatter,maxPoints:maxPoints,labelSlots:6,valueSlots:5})+'</div></div>'+
       '<div class="card"><div class="card-header"><h3 class="card-title">Format Dagilimi</h3></div><div class="card-body">'+renderBarList(fmtItems,'Henuz format verisi yok',function(v){return String(v)})+'</div></div>'+
       '<div class="card"><div class="card-header"><h3 class="card-title">Ulke Dagilimi</h3></div><div class="card-body">'+renderBarList(countryItems,'Henuz ulke verisi yok',function(v){return String(v)})+'</div></div>'+
       '<div class="card"><div class="card-header"><h3 class="card-title">En Populer Yayinlar</h3></div><div class="card-body">'+
@@ -2113,11 +2786,11 @@ async function renderAnalytics(c){
         }).join(''):'<div style="color:var(--text-muted)">Aktif yayin yok</div>')+
       '</div></div>'+
     '</div>';
-  schedulePageRefresh('analytics',5000);
+  schedulePageRefresh('analytics',15000);
 }
 function fmtBytes(b){if(!b||b===0)return '0 B';const k=1024,s=['B','KB','MB','GB','TB'];const i=Math.floor(Math.log(b)/Math.log(k));return (b/Math.pow(k,i)).toFixed(1)+' '+s[i]}
 
-// â•â•â• RECORDINGS â•â•â•
+// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â RECORDINGS Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
 async function renderRecordings(c){
   const recsRes=await api('/api/recordings');
   const streamsRes=await api('/api/streams');
@@ -2126,38 +2799,46 @@ async function renderRecordings(c){
   const streams=Array.isArray(streamsRes)?streamsRes:[];
   const saved=Array.isArray(savedRes)?savedRes:[];
   c.innerHTML=
-    '<div class="page-header"><h1 class="page-title">Kayitlar</h1>'+
-    '<button class="btn btn-primary" onclick="showRecordModal()">Kayit Baslat</button></div>'+
-    '<div class="card" style="margin-bottom:16px"><div class="card-title" style="margin-bottom:8px">Depolama Notu</div>'+
-      '<div class="form-hint">Kalici kayitlar <code>data/recordings</code> altindadir. <code>data/hls</code> ve <code>data/transcode/hls</code> dizinleri canli yayin cache alanidir; kayit olarak listelenmez.</div>'+
-    '</div>'+
-    '<div class="card" style="margin-bottom:16px"><div class="card-header"><h3 class="card-title">Aktif Kayitlar</h3></div>'+
-    '<div class="card-body"><table class="table"><thead><tr><th>ID</th><th>Yayin</th><th>Format</th><th>Durum</th><th>Boyut</th><th>Islem</th></tr></thead><tbody id="rec-list"></tbody></table></div></div>'+
-    '<div class="card"><div class="card-header"><h3 class="card-title">Kayit Kutuphanesi</h3></div>'+
-    '<div class="card-body"><table class="table"><thead><tr><th>Yayin</th><th>Dosya</th><th>Format</th><th>Tarih</th><th>Boyut</th><th>Islem</th></tr></thead><tbody id="saved-rec-list"></tbody></table></div></div>'+
-    '<div id="rec-modal" style="display:none"></div><div id="rec-preview-modal" style="display:none"></div>';
+    '<div class="page-header"><h1 class="page-title">Kayitlar</h1>'+ 
+    '<button class="btn btn-primary" onclick="showRecordModal()">Kayit Baslat</button></div>'+ 
+    '<div class="card" style="margin-bottom:16px"><div class="card-title" style="margin-bottom:8px">Depolama Notu</div>'+ 
+      '<div class="form-hint">Kalici kayitlar <code>data/recordings</code> altindadir. <code>data/hls</code> ve <code>data/transcode/hls</code> dizinleri canli yayin cache alanidir; kayit olarak listelenmez.</div>'+ 
+    '</div>'+ 
+    '<div class="card" style="margin-bottom:16px"><div class="card-header"><h3 class="card-title">Aktif Kayitlar</h3></div>'+ 
+    '<div class="card-body"><table class="table"><thead><tr><th>ID</th><th>Yayin</th><th>Format</th><th>Durum</th><th>Boyut</th><th>Islem</th></tr></thead><tbody id="rec-list"></tbody></table></div></div>'+ 
+    '<div class="quick-grid">'+ 
+      '<div class="card"><div class="card-header"><h3 class="card-title">Kayit Kutuphanesi</h3></div>'+ 
+      '<div class="card-body"><table class="table"><thead><tr><th>Yayin</th><th>Dosya</th><th>Format</th><th>Tarih</th><th>Boyut</th><th>Islem</th></tr></thead><tbody id="saved-rec-list"></tbody></table></div></div>'+ 
+      '<div class="card"><div class="card-header"><h3 class="card-title">Secili Kayit Onizleme</h3><span class="form-hint">Listeden bir kayit secin</span></div>'+ 
+      '<div class="card-body"><div id="recording-preview-panel"><div class="empty-state"><div class="icon"><i class="bi bi-film"></i></div><h3>Kayit secin</h3><p style="color:var(--text-muted)">Panel ayni sayfada secili kaydi oynatir.</p></div></div></div></div>'+ 
+    '</div>'+ 
+    '<div id="rec-modal" style="display:none"></div>';
   const rl=document.getElementById('rec-list');
   if(rl){
     rl.innerHTML=recs.length?recs.map(r=>'<tr><td style="font-size:12px">'+r.ID+'</td><td>'+r.StreamKey+'</td><td>'+r.Format+'</td><td><span class="badge badge-'+(r.Status==='recording'?'green':'gray')+'">'+r.Status+'</span></td><td>'+fmtBytes(r.Size||0)+'</td><td>'+(r.Status==='recording'?'<button class="btn btn-sm btn-danger" onclick="stopRec(\''+r.ID+'\')">Durdur</button>':'\u2014')+'</td></tr>').join(''):'<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">Aktif kayit yok</td></tr>';
   }
   const srl=document.getElementById('saved-rec-list');
   if(srl){
-    srl.innerHTML=saved.length?saved.map(function(r){
-      return '<tr>'+
-        '<td><code>'+escHtml(r.stream_key)+'</code></td>'+
-        '<td>'+escHtml(r.name)+'</td>'+
-        '<td>'+(r.format||'-').toUpperCase()+'</td>'+
-        '<td>'+(r.mod_time?new Date(r.mod_time).toLocaleString('tr-TR'):'-')+'</td>'+
-        '<td>'+fmtBytes(r.size||0)+'</td>'+
-        '<td style="display:flex;gap:8px;flex-wrap:wrap">'+
-          '<button class="btn btn-sm btn-secondary" onclick=\'previewRecording('+JSON.stringify(r.stream_key)+','+JSON.stringify(r.name)+')\'>Onizle</button>'+
-          '<button class="btn btn-sm btn-secondary" onclick=\'downloadRecordingFile('+JSON.stringify(r.stream_key)+','+JSON.stringify(r.name)+')\'>Indir</button>'+
-          '<button class="btn btn-sm btn-danger" onclick=\'deleteRecordingFile('+JSON.stringify(r.stream_key)+','+JSON.stringify(r.name)+')\'>Sil</button>'+
-        '</td>'+
+    srl.innerHTML=saved.length?saved.map(function(r,i){
+      return '<tr>'+ 
+        '<td><code>'+escHtml(r.stream_key)+'</code></td>'+ 
+        '<td>'+escHtml(r.name)+'</td>'+ 
+        '<td>'+(r.format||'-').toUpperCase()+'</td>'+ 
+        '<td>'+fmtLocaleDateTime(r.mod_time)+'</td>'+ 
+        '<td>'+fmtBytes(r.size||0)+'</td>'+ 
+        '<td style="display:flex;gap:8px;flex-wrap:wrap">'+ 
+          '<button class="btn btn-sm btn-secondary" onclick=\'previewRecordingPanel('+JSON.stringify(r.stream_key)+','+JSON.stringify(r.name)+','+JSON.stringify(r.format||'')+','+JSON.stringify(r.mod_time||'')+','+(r.size||0)+')\'>Onizle</button>'+ 
+          '<button class="btn btn-sm btn-secondary" onclick=\'downloadRecordingFile('+JSON.stringify(r.stream_key)+','+JSON.stringify(r.name)+')\'>Indir</button>'+ 
+          '<button class="btn btn-sm btn-danger" onclick=\'deleteRecordingFile('+JSON.stringify(r.stream_key)+','+JSON.stringify(r.name)+')\'>Sil</button>'+ 
+        '</td>'+ 
       '</tr>';
     }).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">Kaydedilmis dosya yok</td></tr>';
   }
   window._recStreams=streams;
+  window._savedRecordings=saved;
+  if(saved.length){
+    previewRecordingPanel(saved[0].stream_key,saved[0].name,saved[0].format||'',saved[0].mod_time||'',saved[0].size||0);
+  }
 }
 let recordingPreviewPlayer=null;
 function recordingFileURL(streamKey,name,download){
@@ -2181,9 +2862,9 @@ function showRecordModal(){
     '<div class="card" style="width:400px"><div class="card-header"><h3 class="card-title">Kayit Baslat</h3></div><div class="card-body">'+
     '<div class="form-group"><label class="form-label">Yayin</label><select class="form-select" id="rec-key">'+
     (streams.length?streams.map(s=>'<option value="'+s.stream_key+'">'+s.name+'</option>').join(''):'<option>Canli yayin yok</option>')+
-    '</select></div>'+
-    '<div class="form-group"><label class="form-label">Format</label><select class="form-select" id="rec-fmt">'+recordingFormatOptions('ts')+'</select></div>'+
-    '<button class="btn btn-primary" onclick="startNewRec()" style="width:100%">Kaydi Baslat</button>'+
+    '</select></div>'+ 
+    '<div class="form-group"><label class="form-label">Format</label><select class="form-select" id="rec-fmt">'+recordingFormatOptions('ts')+'</select></div>'+ 
+    '<button class="btn btn-primary" onclick="startNewRec()" style="width:100%">Kaydi Baslat</button>'+ 
     '</div></div></div>';
 }
 async function startNewRec(){
@@ -2194,20 +2875,17 @@ async function startNewRec(){
   document.getElementById('rec-modal').style.display='none';
   navigate('recordings');
 }
-async function previewRecording(streamKey,name){
+// Yeni: Kayıt önizlemesini panelde gösteren fonksiyon
+async function previewRecordingPanel(streamKey,name,format,mod_time,size){
   destroyRecordingPreviewPlayer();
-  const modal=document.getElementById('rec-preview-modal');
-  if(!modal)return;
+  const panel=document.getElementById('recording-preview-panel');
+  if(!panel)return;
   const url=recordingFileURL(streamKey,name,false);
   const ext=(name.split('.').pop()||'').toLowerCase();
-  modal.style.display='block';
-  modal.innerHTML='<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)closeRecordingPreview()">'+
-    '<div class="card" style="width:min(960px,96vw);max-height:92vh;overflow:auto"><div class="card-header"><h3 class="card-title">'+escHtml(name)+'</h3><button class="btn btn-sm btn-secondary" onclick="closeRecordingPreview()">Kapat</button></div>'+
-    '<div id="rec-preview-body"></div></div></div>';
-  const body=document.getElementById('rec-preview-body');
-  if(!body)return;
+  let html='';
+  html+='<div style="margin-bottom:10px"><strong>'+escHtml(name)+'</strong> ('+fmtBytes(size||0)+')</div>';
   if(ext==='flv'||ext==='ts'){
-    body.innerHTML='<video id="rec-preview-video" controls playsinline style="width:100%;max-height:70vh;background:#000"></video>';
+    html+='<video id="rec-preview-video" controls playsinline style="width:100%;max-height:60vh;background:#000"></video>';
     try{
       await loadEmbedScript('/static/vendor/mpegts.min.js');
       if(window.mpegts&&window.mpegts.isSupported&&window.mpegts.isSupported()){
@@ -2215,29 +2893,24 @@ async function previewRecording(streamKey,name){
         recordingPreviewPlayer.attachMediaElement(document.getElementById('rec-preview-video'));
         recordingPreviewPlayer.load();
       }else{
-        body.innerHTML='<div class="empty-state"><h3>Onizleme desteklenmiyor</h3><p style="color:var(--text-muted)">Bu tarayici kaydi dogrudan oynatamiyor.</p></div>';
+        html+='<div class="empty-state"><h3>Onizleme desteklenmiyor</h3><p style="color:var(--text-muted)">Bu tarayici kaydi dogrudan oynatamiyor.</p></div>';
       }
     }catch(e){
-      body.innerHTML='<div class="empty-state"><h3>Onizleme hazirlanamadi</h3><p style="color:var(--text-muted)">'+escHtml(e.message||'Bilinmeyen hata')+'</p></div>';
+      html+='<div class="empty-state"><h3>Onizleme hazirlanamadi</h3><p style="color:var(--text-muted)">'+escHtml(e.message||'Bilinmeyen hata')+'</p></div>';
     }
-    return;
+  }else if(ext==='mp4'||ext==='webm'||ext==='ogg'){
+    html+='<video controls playsinline src="'+url+'" style="width:100%;max-height:60vh;background:#000"></video>';
+  }else if(ext==='mp3'||ext==='aac'||ext==='wav'||ext==='flac'){
+    html+='<div style="padding:24px"><audio controls src="'+url+'" style="width:100%"></audio></div>';
+  }else{
+    html+='<div class="empty-state"><h3>Onizleme yok</h3><p style="color:var(--text-muted)">Bu format panelde dogrudan oynatilamiyor. Dosyayi indirebilirsiniz.</p></div>';
   }
-  if(ext==='mp4'||ext==='webm'||ext==='ogg'){
-    body.innerHTML='<video controls playsinline src="'+url+'" style="width:100%;max-height:70vh;background:#000"></video>';
-    return;
-  }
-  if(ext==='mp3'||ext==='aac'||ext==='wav'||ext==='flac'){
-    body.innerHTML='<div style="padding:24px"><audio controls src="'+url+'" style="width:100%"></audio></div>';
-    return;
-  }
-  body.innerHTML='<div class="empty-state"><h3>Onizleme yok</h3><p style="color:var(--text-muted)">Bu format panelde dogrudan oynatilamiyor. Dosyayi indirebilirsiniz.</p></div>';
-}
-function closeRecordingPreview(){
-  destroyRecordingPreviewPlayer();
-  const modal=document.getElementById('rec-preview-modal');
-  if(!modal)return;
-  modal.style.display='none';
-  modal.innerHTML='';
+  // Direkt link ve indir butonu
+  html+='<div style="margin-top:12px;display:flex;gap:12px;flex-wrap:wrap">'+
+    '<a class="btn btn-sm btn-secondary" href="'+url+'" target="_blank">Direkt Link</a>'+ 
+    '<a class="btn btn-sm btn-secondary" href="'+recordingFileURL(streamKey,name,true)+'" target="_blank">Indir</a>'+ 
+  '</div>';
+  panel.innerHTML=html;
 }
 function downloadRecordingFile(streamKey,name){
   window.open(recordingFileURL(streamKey,name,true),'_blank');
@@ -2253,7 +2926,7 @@ async function deleteRecordingFile(streamKey,name){
   }
 }
 
-// â•â•â• VIEWERS â•â•â•
+// Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â VIEWERS Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
 async function renderViewers(c){
   const data=await api('/api/viewers');
   const sessions=Array.isArray(data&&data.sessions)?data.sessions:[];
@@ -2279,14 +2952,14 @@ async function renderViewers(c){
         '<td>'+escHtml(sess.country||'-')+'</td>'+
         '<td>'+formatDurationSeconds(sess.duration_seconds||0)+'</td>'+
         '<td>'+fmtBytes(sess.bytes_sent||0)+'</td>'+
-        '<td>'+(sess.last_seen?new Date(sess.last_seen).toLocaleTimeString('tr-TR'):'-')+'</td>'+
+        '<td>'+fmtLocaleTime(sess.last_seen)+'</td>'+
       '</tr>';
     }).join(''):'<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px">Aktif izleyici oturumu yok</td></tr>';
   }
   const bans=await api('/api/security/bans');
   const bl=document.getElementById('ban-list');
   if(bl&&bans){
-    bl.innerHTML=bans.length?bans.map(b=>'<tr><td><code>'+b.IP+'</code></td><td>'+b.Reason+'</td><td>'+(b.BannedAt?new Date(b.BannedAt).toLocaleString('tr-TR'):'\u2014')+'</td><td><button onclick="unbanIP(\''+b.IP+'\')" style="background:#e74c3c;color:#fff;padding:4px 12px;border:none;border-radius:6px;cursor:pointer;font-size:12px">Kaldir</button></td></tr>').join(''):'<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:24px">Yasakli IP yok</td></tr>';
+    bl.innerHTML=bans.length?bans.map(b=>'<tr><td><code>'+b.IP+'</code></td><td>'+b.Reason+'</td><td>'+fmtLocaleDateTime(b.BannedAt).replace(/^-$/,'\u2014')+'</td><td><button onclick="unbanIP(\''+b.IP+'\')" style="background:#e74c3c;color:#fff;padding:4px 12px;border:none;border-radius:6px;cursor:pointer;font-size:12px">Kaldir</button></td></tr>').join(''):'<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:24px">Yasakli IP yok</td></tr>';
   }
   schedulePageRefresh('viewers',5000);
 }
@@ -2359,7 +3032,7 @@ async function generateStreamToken(){
   if(out){
     out.innerHTML=
       copyField('Token',res.token)+
-      copyField('Gecerlilik',res.expires_at?new Date(res.expires_at).toLocaleString('tr-TR'):'-');
+      copyField('Gecerlilik',fmtLocaleDateTime(res.expires_at));
   }
   toast('Token olusturuldu');
 }
@@ -2402,7 +3075,7 @@ async function renderTranscodeJobs(c){
   const list=document.getElementById('tc-job-list');
   if(list){
     list.innerHTML=jobs.length?jobs.map(function(job){
-      const started=job.started_at?new Date(job.started_at).toLocaleString('tr-TR'):'-';
+      const started=fmtLocaleDateTime(job.started_at);
       const type=job.type||'abr';
       const statusClass=job.status==='running'?'green':(job.status==='error'?'red':'gray');
       return '<tr>'+
@@ -2418,6 +3091,176 @@ async function renderTranscodeJobs(c){
     }).join(''):'<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px">Henuz transcode isi yok</td></tr>';
   }
   schedulePageRefresh('transcode-jobs',5000);
+}
+
+async function renderMaintenanceCenter(c){
+  const [serviceRes,backupsRes,healthRes,upgradeRes]=await Promise.all([
+    api('/api/system/service/status'),
+    api('/api/system/backups'),
+    api('/api/health/report'),
+    api('/api/system/upgrade/plan')
+  ]);
+  const status=(serviceRes&&serviceRes.status)||{};
+  const backups=(backupsRes&&backupsRes.items)||[];
+  const upgrade=(upgradeRes&&typeof upgradeRes==='object')?upgradeRes:{};
+  const commands=(upgrade&&upgrade.commands)||{};
+  const platform=String((serviceRes&&serviceRes.platform)||status.platform||'unknown');
+  const unit=String((serviceRes&&serviceRes.unit)||status.unit||'-');
+  const restoreCmd=commands.backup_restore||(platform==='linux'
+    ? 'sudo systemctl stop '+unit+' && sudo /opt/fluxstream/fluxstream backup restore fluxstream-backup-YYYYMMDD-HHMMSS.tar.gz && sudo systemctl start '+unit
+    : 'FluxStream.exe backup restore fluxstream-backup-YYYYMMDD-HHMMSS.tar.gz');
+  const upgradeCmd=commands.atomic_upgrade||'-';
+  const serviceButtons=platform==='linux'
+    ? '<button class="btn btn-primary" onclick="serviceAction(\'restart\')">Servisi Yeniden Baslat</button>'+
+      '<button class="btn btn-secondary" onclick="serviceAction(\'start\')">Servisi Baslat</button>'+
+      '<button class="btn btn-danger" onclick="serviceAction(\'stop\')">Servisi Durdur</button>'
+    : '<button class="btn btn-primary" onclick="restartServer()">Yeniden Baslat</button>'+
+      '<button class="btn btn-danger" onclick="stopServer()">Durdur</button>';
+  c.innerHTML=
+    '<div class="page-header"><h1 class="page-title">Bakim ve Yedek</h1><div style="color:var(--text-muted);font-size:13px">Servis durumu, tek tikla yedek alma ve temiz geri donus komutlari burada toplanir.</div></div>'+
+    '<div class="card-grid card-grid-4" style="margin-bottom:16px">'+
+      statCard(status.active?'green':'red','bi-hdd-network',status.active?'AKTIF':'DURDU','Servis Durumu')+
+      statCard(status.enabled?'blue':'orange','bi-toggle-on',status.enabled?'ACIK':'KAPALI','Otomatik Baslangic')+
+      statCard('purple','bi-archive-fill',fmtInt(backups.length),'Toplam Yedek')+
+      statCard('orange','bi-heart-pulse-fill',String((healthRes&&healthRes.status)||'ok').toUpperCase(),'Saglik')+
+    '</div>'+
+    '<div class="card-grid card-grid-2">'+
+      '<div class="card">'+
+        '<div class="card-title" style="margin-bottom:12px">Servis Bilgisi</div>'+
+        '<div class="metric-list">'+
+          '<div class="metric-row"><span>Platform</span><strong>'+escHtml(platform)+'</strong></div>'+
+          '<div class="metric-row"><span>Servis Yonetici</span><strong>'+escHtml(String(status.manager||'-'))+'</strong></div>'+
+          '<div class="metric-row"><span>Unit</span><span class="mono-wrap">'+escHtml(unit)+'</span></div>'+
+          '<div class="metric-row"><span>Main PID</span><strong>'+escHtml(String(status.main_pid||0))+'</strong></div>'+
+          '<div class="metric-row"><span>Aktif Oldugu Zaman</span><strong>'+escHtml(String(status.since||'-'))+'</strong></div>'+
+          '<div class="metric-row"><span>Kurulum Dizini</span><span class="mono-wrap">'+escHtml(String(upgrade.install_dir||'-'))+'</span></div>'+
+        '</div>'+
+        '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">'+
+          serviceButtons+
+          '<button class="btn btn-secondary" onclick="loadPage(\'maintenance-center\')">Durumu Yenile</button>'+
+        '</div>'+
+        (status.message?'<div class="form-hint" style="margin-top:12px">'+escHtml(String(status.message))+'</div>':'')+
+      '</div>'+
+      '<div class="card">'+
+        '<div class="card-title" style="margin-bottom:12px">Backup / Restore Akisi</div>'+
+        '<div class="form-hint" style="line-height:1.8;margin-bottom:12px">Panelden yedek alabilirsiniz. Geri yukleme bilerek web panelinden yapilmiyor; calisan servis uzerinde restore riskli oldugu icin offline komutla ilerliyoruz.</div>'+
+        '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">'+
+          '<button class="btn btn-primary" onclick="createSystemBackup(false)">Yedek Al</button>'+
+          '<button class="btn btn-secondary" onclick="createSystemBackup(true)">Kayitlarla Birlikte Al</button>'+
+        '</div>'+
+        '<div class="form-group" style="margin-bottom:14px"><label class="form-label">Geri Yukleme Komutu</label><textarea class="form-textarea" readonly style="min-height:96px">'+escHtml(restoreCmd)+'</textarea><div class="form-hint">Linux kurulumu icin servis once durdurulur, backup geri yuklenir, sonra servis tekrar baslatilir.</div></div>'+
+        '<div class="form-group" style="margin-bottom:0"><label class="form-label">Atomic Upgrade Komutu</label><textarea class="form-textarea" readonly style="min-height:96px">'+escHtml(upgradeCmd)+'</textarea><div class="form-hint">Yeni binary once *.next olarak yuklenir, servis durdurulur, atomik rename yapilip servis yeniden baslatilir.</div></div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="card" style="margin-top:16px">'+
+      '<div class="card-header"><div class="card-title">Hazir Yedekler</div><div class="form-hint">'+escHtml(backups.length?('Son yedek: '+fmtLocaleDateTime(backups[0].mod_time)):'Henuz backup yok')+'</div></div>'+
+      (backups.length
+        ?'<table><thead><tr><th>Dosya</th><th>Boyut</th><th>Tarih</th><th>Tur</th><th>Islem</th></tr></thead><tbody>'+
+          backups.map(function(item){
+            return '<tr><td class="mono-wrap">'+escHtml(item.name)+'</td><td>'+formatBytes(item.size||0)+'</td><td>'+escHtml(fmtLocaleDateTime(item.mod_time))+'</td><td>'+(item.include_recordings?'<span class="tag tag-blue">Kayitlar dahil</span>':'<span class="tag tag-green">Hafif</span>')+'</td><td style="white-space:nowrap"><a class="btn btn-sm btn-secondary" href="/api/system/backups/download/'+encodeURIComponent(item.name)+'">Indir</a> <button class="btn btn-sm btn-danger" onclick="deleteSystemBackup('+JSON.stringify(item.name)+')">Sil</button></td></tr>';
+          }).join('')+
+        '</tbody></table>'
+        :'<div class="empty-state"><div class="icon"><i class="bi bi-archive"></i></div><h3>Henuz backup yok</h3><p style="color:var(--text-muted)">Ilk yedegi bu ekrandan tek tikla alabilirsiniz.</p></div>')+
+    '</div>';
+}
+
+async function createSystemBackup(includeRecordings){
+  const res=await api('/api/system/backups',{method:'POST',body:{include_recordings:!!includeRecordings}});
+  if(res&&res.success){
+    toast('Backup hazirlandi');
+    loadPage('maintenance-center');
+  }else{
+    toast((res&&res.message)||'Backup olusturulamadi','error');
+  }
+}
+
+async function deleteSystemBackup(name){
+  if(!confirm('Bu backup silinsin mi?'))return;
+  const res=await api('/api/system/backups/'+encodeURIComponent(name),{method:'DELETE'});
+  if(res&&res.success){
+    toast('Backup silindi');
+    loadPage('maintenance-center');
+  }else{
+    toast((res&&res.message)||'Backup silinemedi','error');
+  }
+}
+
+async function serviceAction(action){
+  const res=await api('/api/system/service/action',{method:'POST',body:{action:action}});
+  if(res&&res.success){
+    toast('Servis aksiyonu gonderildi');
+    loadPage('maintenance-center');
+  }else{
+    toast((res&&res.message)||'Servis aksiyonu basarisiz','error');
+  }
+}
+
+async function renderLicensePage(c){
+  const [statusRes,sampleRes]=await Promise.all([api('/api/license/status'),api('/api/license/sample')]);
+  const status=(statusRes&&statusRes.status)||{};
+  const runtimeInfo=(statusRes&&statusRes.runtime)||{};
+  const sample=(sampleRes&&sampleRes.sample)||{};
+  const features=Array.isArray(runtimeInfo.enabled_features)&&runtimeInfo.enabled_features.length?runtimeInfo.enabled_features:(Array.isArray(status.features)?status.features:[]);
+  const mode=String(runtimeInfo.mode||status.mode||'unlicensed');
+  const warnings=Array.isArray(runtimeInfo.warnings)?runtimeInfo.warnings:[];
+  const tone=status.valid?'tag-green':(runtimeInfo.development?'tag-blue':mode==='unlicensed'?'tag-yellow':'tag-red');
+  c.innerHTML=
+    '<div class="page-header"><h1 class="page-title">Lisans</h1><div style="color:var(--text-muted);font-size:13px">Offline imzali lisans dosyasi burada saklanir. Internet baglantisi olmadan dogrulama yapilir.</div></div>'+
+    '<div class="card-grid card-grid-4" style="margin-bottom:16px">'+
+      statCard(status.valid?'green':(runtimeInfo.development?'blue':'orange'),'bi-patch-check-fill',escHtml(mode.toUpperCase()),'Durum')+
+      statCard('blue','bi-building',escHtml(status.customer||'-'),'Musteri')+
+      statCard('purple','bi-calendar-check',escHtml(status.valid_until||'-'),'Gecerlilik')+
+      statCard('orange','bi-grid-1x2-fill',fmtInt(features.length),'Ozellik')+
+    '</div>'+
+    '<div class="card-grid card-grid-2">'+
+      '<div class="card">'+
+        '<div class="card-title" style="margin-bottom:12px">Mevcut Lisans Durumu <span class="tag '+tone+'" style="margin-left:8px">'+escHtml(String(status.message||'Bekleniyor'))+'</span></div>'+
+        '<div class="metric-list">'+
+          '<div class="metric-row"><span>Runtime Modu</span><strong>'+escHtml(mode)+'</strong></div>'+
+          '<div class="metric-row"><span>Feature enforcement</span><strong>'+(runtimeInfo.enforced===false?'Gelistirme':'Aktif')+'</strong></div>'+
+          '<div class="metric-row"><span>Public key kaynagi</span><span class="mono-wrap">'+escHtml(String(status.public_key_source||'-'))+'</span></div>'+
+          '<div class="metric-row"><span>Embedded key kullaniyor mu?</span><strong>'+(status.using_embedded_key?'Evet':'Hayir')+'</strong></div>'+
+          '<div class="metric-row"><span>Lisans ID</span><span class="mono-wrap">'+escHtml(String(status.license_id||'-'))+'</span></div>'+
+          '<div class="metric-row"><span>Bakim Bitisi</span><strong>'+escHtml(String(status.maintenance_until||'-'))+'</strong></div>'+
+          '<div class="metric-row"><span>Maksimum Node</span><strong>'+escHtml(String(status.max_nodes||1))+'</strong></div>'+
+        '</div>'+
+        '<div style="margin-top:14px">'+
+          (features.length?features.map(function(item){return '<span class="tag tag-blue">'+escHtml(String(item))+'</span>'}).join(''):'<div class="form-hint">Lisans yuklenince aktif ozellikler burada gorunur.</div>')+
+        '</div>'+
+        (warnings.length?'<div class="form-hint" style="margin-top:14px">'+warnings.map(function(item){return escHtml(String(item));}).join('<br>')+'</div>':'')+
+      '</div>'+
+      '<div class="card">'+
+        '<div class="card-title" style="margin-bottom:12px">Lisans Dosyasi Yukle</div>'+
+        '<div class="form-group"><label class="form-label">Lisans JSON</label><textarea class="form-textarea" id="license-json-input" style="min-height:220px" placeholder="Imzali lisans JSONunu buraya yapistirin"></textarea></div>'+
+        '<div class="form-group"><label class="form-label">Public Key PEM (opsiyonel)</label><textarea class="form-textarea" id="license-public-key-input" style="min-height:140px" placeholder="Ozel bir public key kullanacaksaniz buraya yapistirin"></textarea><div class="form-hint">Bos birakirsaniz uygulamanin icindeki development public key kullanilir.</div></div>'+
+        '<div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-primary" onclick="saveLicenseConfig()">Lisansi Kaydet</button><button class="btn btn-secondary" onclick=\'loadSampleLicense('+JSON.stringify(JSON.stringify(sample,null,2))+')\'>Ornek JSON Yukle</button></div>'+
+      '</div>'+
+    '</div>';
+}
+
+function loadSampleLicense(sampleJSON){
+  const el=document.getElementById('license-json-input');
+  if(el)el.value=sampleJSON;
+}
+
+async function saveLicenseConfig(){
+  const licenseJSON=document.getElementById('license-json-input')?.value||'';
+  const publicKeyPEM=document.getElementById('license-public-key-input')?.value||'';
+  const res=await api('/api/license/upload',{method:'POST',body:{license_json:licenseJSON,public_key_pem:publicKeyPEM}});
+  if(res&&res.success){
+    toast('Lisans kaydedildi');
+    loadPage('license');
+  }else{
+    toast((res&&res.message)||'Lisans kaydedilemedi','error');
+  }
+}
+
+function settingSelect(key,label,value,options,hint){
+  return '<div class="form-group"><label class="form-label">'+label+'</label><select class="form-select setting-input" data-key="'+key+'">'+
+    (options||[]).map(function(opt){
+      return '<option value="'+escHtml(String(opt.value))+'" '+(String(opt.value)===String(value)?'selected':'')+'>'+escHtml(String(opt.label))+'</option>';
+    }).join('')+
+    '</select>'+(hint?'<div class="form-hint">'+hint+'</div>':'')+'</div>';
 }
 
 init();

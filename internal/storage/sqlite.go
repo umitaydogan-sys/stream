@@ -41,6 +41,16 @@ func (s *SQLiteDB) DB() *sql.DB {
 	return s.db
 }
 
+// ExportBackupSnapshot writes a consistent SQLite snapshot to destPath.
+func (s *SQLiteDB) ExportBackupSnapshot(destPath string) error {
+	escaped := strings.ReplaceAll(destPath, "'", "''")
+	if _, err := s.db.Exec("PRAGMA wal_checkpoint(FULL)"); err != nil {
+		return err
+	}
+	_, err := s.db.Exec(fmt.Sprintf("VACUUM INTO '%s'", escaped))
+	return err
+}
+
 func (s *SQLiteDB) migrate() error {
 	migrations := []string{
 		`CREATE TABLE IF NOT EXISTS config (
@@ -399,10 +409,37 @@ func (s *SQLiteDB) UpdateStreamStatus(key, status, ingestProto string) error {
 		return err
 	}
 	_, err := s.db.Exec(
-		"UPDATE streams SET status = ?, updated_at = ?, viewer_count = 0, input_bitrate = 0 WHERE stream_key = ?",
+		`UPDATE streams
+		 SET status = ?, ingest_proto = '', started_at = NULL, updated_at = ?,
+		     viewer_count = 0, input_bitrate = 0, input_codec = '',
+		     input_width = 0, input_height = 0, input_fps = 0
+		 WHERE stream_key = ?`,
 		status, now, key,
 	)
 	return err
+}
+
+func (s *SQLiteDB) ResetRuntimeStreamState() (int64, error) {
+	result, err := s.db.Exec(
+		`UPDATE streams
+		 SET status = 'offline', ingest_proto = '', started_at = NULL, updated_at = ?,
+		     viewer_count = 0, input_bitrate = 0, input_codec = '',
+		     input_width = 0, input_height = 0, input_fps = 0
+		 WHERE status != 'offline'
+		    OR ingest_proto != ''
+		    OR viewer_count != 0
+		    OR input_bitrate != 0
+		    OR input_codec != ''
+		    OR input_width != 0
+		    OR input_height != 0
+		    OR input_fps != 0`,
+		time.Now(),
+	)
+	if err != nil {
+		return 0, err
+	}
+	affected, _ := result.RowsAffected()
+	return affected, nil
 }
 
 func (s *SQLiteDB) UpdateStreamMeta(key string, codec string, width, height int, fps float64, bitrate int64) error {
@@ -514,6 +551,41 @@ func (s *SQLiteDB) GetAnalyticsSnapshots(limit int) ([]AnalyticsSnapshot, error)
 	defer rows.Close()
 
 	out := make([]AnalyticsSnapshot, 0, limit)
+	for rows.Next() {
+		var item AnalyticsSnapshot
+		if err := rows.Scan(
+			&item.ID,
+			&item.Timestamp,
+			&item.TotalStreams,
+			&item.TotalViewers,
+			&item.CurrentViewers,
+			&item.PeakConcurrent,
+			&item.TotalBandwidth,
+			&item.ViewersByFormat,
+			&item.ViewersByCountry,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+func (s *SQLiteDB) GetAnalyticsSnapshotsSince(since time.Time, limit int) ([]AnalyticsSnapshot, error) {
+	query := `SELECT id, timestamp, total_streams, total_viewers, current_viewers, peak_concurrent, total_bandwidth, viewers_by_format, viewers_by_country
+		 FROM analytics_snapshots WHERE timestamp >= ? ORDER BY timestamp ASC`
+	args := []interface{}{since}
+	if limit > 0 {
+		query += " LIMIT ?"
+		args = append(args, limit)
+	}
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]AnalyticsSnapshot, 0, 256)
 	for rows.Next() {
 		var item AnalyticsSnapshot
 		if err := rows.Scan(

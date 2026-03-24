@@ -214,6 +214,10 @@ func (m *Manager) OnUnpublish(streamKey string) {
 
 // OnPacket handles incoming media packets
 func (m *Manager) OnPacket(streamKey string, pkt *media.Packet) {
+	if pkt == nil || pkt.TrackID != 0 {
+		return
+	}
+
 	m.mu.RLock()
 	active, exists := m.streams[streamKey]
 	m.mu.RUnlock()

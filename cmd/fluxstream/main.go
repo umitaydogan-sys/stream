@@ -70,6 +70,12 @@ func main() {
 		}
 		return
 	}
+	if handled, err := handleBackupMode(os.Args[1:]); handled {
+		if err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 
 	startTime := time.Now()
 	fmt.Println()
@@ -93,7 +99,9 @@ func main() {
 		filepath.Join(dataDir, "hls"),
 		filepath.Join(dataDir, "dash"),
 		filepath.Join(dataDir, "recordings"),
+		filepath.Join(dataDir, "backups"),
 		filepath.Join(dataDir, "thumbnails"),
+		filepath.Join(dataDir, "license"),
 		filepath.Join(dataDir, "certs"),
 		filepath.Join(dataDir, "certs", "web"),
 		filepath.Join(dataDir, "certs", "stream"),
@@ -116,6 +124,11 @@ func main() {
 	}
 	defer db.Close()
 	log.Printf("[INIT] Veritabani: %s", dbPath)
+	if resetCount, err := db.ResetRuntimeStreamState(); err != nil {
+		log.Printf("[INIT] Calisma zamani stream durumu sifirlanamadi: %v", err)
+	} else if resetCount > 0 {
+		log.Printf("[INIT] Eski calisma zamani stream durumu temizlendi (%d kayit)", resetCount)
+	}
 
 	// Initialize config
 	cfg := config.NewManager(db)
@@ -123,6 +136,20 @@ func main() {
 		log.Fatalf("[FATAL] Varsayilan ayarlar yuklenemedi: %v", err)
 	}
 	log.Printf("[INIT] Yapilandirma yuklendi (%d ayar)", 115)
+	licenseRuntime := resolveRuntimeLicense(dataDir)
+	log.Printf("[INIT] Lisans modu: %s | aktif ozellikler: %s", licenseRuntime.Mode, strings.Join(licenseRuntime.EnabledFeatures, ","))
+	if licenseRuntime.Enforced {
+		if !licenseRuntime.allows(licenseFeatureABR) {
+			_ = cfg.Set("abr_enabled", "false", "outputs")
+			_ = cfg.Set("abr_master_enabled", "false", "outputs")
+		}
+		if !licenseRuntime.allows(licenseFeatureRTMPS) {
+			_ = cfg.Set("rtmps_enabled", "false", "protocols")
+		}
+		if !licenseRuntime.allows(licenseFeatureRecording) {
+			_ = cfg.Set("recording_enabled", "false", "recording")
+		}
+	}
 
 	webTLSSource, err := tlsutil.NewSource(cfg, tlsutil.ProfileWeb, dataDir)
 	if err != nil {
@@ -266,6 +293,10 @@ func main() {
 	tcManager := transcode.NewManager(ffmpegPath, gpuAccel, transcodeDir)
 	tcManager.SetHTTPPort(httpPort)
 	liveOpts := buildLiveOptionsFromConfig(cfg)
+	if !licenseRuntime.allows(licenseFeatureABR) {
+		liveOpts.ABREnabled = false
+		liveOpts.MasterEnabled = false
+	}
 	tcManager.SetLiveOptions(liveOpts)
 	mp4Server = mp4.NewServer(streamManager, tcManager, httpPort)
 	audioServer := audio.NewServer(streamManager, tcManager, httpPort)
@@ -278,7 +309,11 @@ func main() {
 	if liveDASHTranscode {
 		log.Println("[INIT] Canli DASH repack aktif")
 	}
-	pipelineHandler := stream.NewPipelineHandler(streamManager, tcManager, recManager, liveHLSTranscode, liveDASHTranscode, liveOpts)
+	recorderForPipeline := recManager
+	if !licenseRuntime.allows(licenseFeatureRecording) {
+		recorderForPipeline = nil
+	}
+	pipelineHandler := stream.NewPipelineHandler(streamManager, tcManager, recorderForPipeline, liveHLSTranscode, liveDASHTranscode, liveOpts, licenseRuntime.allows(licenseFeatureABR))
 
 	// Suppress warnings
 	_, _, _, _, _, _ = recManager, analyticsTracker, tokenMgr, rateLimiter, ipBanList, twoFA
@@ -294,7 +329,7 @@ func main() {
 	}()
 
 	// Initialize & start RTMPS server (if enabled)
-	if cfg.GetBool("rtmps_enabled", false) {
+	if cfg.GetBool("rtmps_enabled", false) && licenseRuntime.allows(licenseFeatureRTMPS) {
 		rtmpsPort := cfg.GetInt("rtmps_port", 1936)
 		if !streamTLSSource.Ready {
 			if streamTLSSource.UsesLetsEncrypt() {
@@ -384,6 +419,9 @@ func main() {
 	webServer := web.NewServer(httpPort, db, cfg, streamManager, hlsOutputDir, dataDir)
 	webServer.SetAnalyticsTracker(analyticsTracker)
 	webServer.SetPlaybackAuthorizer(playbackAuth)
+	webServer.SetSettingsMutator(licenseRuntime.normalizeSettings)
+	webServer.SetStreamMutator(licenseRuntime.normalizeStream)
+	webServer.SetPlayerTemplateMutator(licenseRuntime.normalizePlayerTemplate)
 	webServer.SetHLSOverrideDir(tcManager.GetLiveOutputDir())
 	webServer.SetDashOverrideDir(tcManager.GetLiveDashOutputDir())
 	// Register output routes on web server
@@ -449,6 +487,10 @@ func main() {
 			}
 			if err := decodeJSON(r, &req); err != nil {
 				http.Error(w, err.Error(), 400)
+				return
+			}
+			if !licenseRuntime.allows(licenseFeatureRecording) {
+				http.Error(w, "recording lisans gerektirir", http.StatusForbidden)
 				return
 			}
 			rec, err := recManager.StartRecording(req.StreamKey, recording.Format(req.Format))
@@ -572,6 +614,9 @@ func main() {
 				}
 			}
 		}
+		if cfg.GetBool("rtmps_enabled", false) && !licenseRuntime.allows(licenseFeatureRTMPS) {
+			log.Printf("[INIT] RTMPS lisans gerektiriyor; bu node icin devreye alinmadi")
+		}
 		jsonResp(w, dash)
 	})
 	webServer.RegisterHandler("/api/analytics/stream/", func(w http.ResponseWriter, r *http.Request) {
@@ -580,7 +625,8 @@ func main() {
 		jsonResp(w, stats)
 	})
 	webServer.RegisterHandler("/api/analytics/history", func(w http.ResponseWriter, r *http.Request) {
-		snapshots, err := db.GetAnalyticsSnapshots(72)
+		window := analyticsWindowForPeriod(r.URL.Query().Get("period"), time.Now())
+		snapshots, err := db.GetAnalyticsSnapshotsSince(window.Since, 0)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
@@ -588,7 +634,7 @@ func main() {
 		if snapshots == nil {
 			snapshots = []storage.AnalyticsSnapshot{}
 		}
-		jsonResp(w, snapshots)
+		jsonResp(w, buildAnalyticsHistoryPayload(window.Period, snapshots, time.Now()))
 	})
 
 	// Security API - Token
@@ -717,6 +763,7 @@ func main() {
 		}
 		jsonResp(w, rec)
 	})
+	registerProductAdminRoutes(webServer, cfg, db, dataDir, licenseRuntime)
 
 	go func() {
 		if err := webServer.Start(ctx); err != nil {
@@ -729,7 +776,8 @@ func main() {
 
 	hostName, _ := os.Hostname()
 	httpsEnabled := cfg.GetBool("ssl_enabled", false) && webTLSSource.Ready
-	rtmpsEnabled := cfg.GetBool("rtmps_enabled", false) && streamTLSSource.Ready
+	rtmpsConfigured := cfg.GetBool("rtmps_enabled", false)
+	rtmpsEnabled := rtmpsConfigured && licenseRuntime.allows(licenseFeatureRTMPS) && streamTLSSource.Ready
 	displayHost := strings.TrimSpace(cfg.Get("embed_domain", ""))
 	if displayHost == "" {
 		displayHost = "localhost"
@@ -773,7 +821,9 @@ func main() {
 			fmt.Printf("  NOTE   HTTPS icin gecerli CRT/KEY gerekli (%s | %s)\n", webTLSSource.CertPath, webTLSSource.KeyPath)
 		}
 	}
-	if cfg.GetBool("rtmps_enabled", false) && !rtmpsEnabled {
+	if rtmpsConfigured && !licenseRuntime.allows(licenseFeatureRTMPS) {
+		fmt.Printf("  NOTE   RTMPS lisans gerektiriyor; aktif degil\n")
+	} else if rtmpsConfigured && !rtmpsEnabled {
 		if streamTLSSource.UsesLetsEncrypt() {
 			fmt.Printf("  NOTE   RTMPS Let's Encrypt bekliyor (%s, port 80 DNS dogru olmali)\n", streamTLSSource.Domain)
 		} else {

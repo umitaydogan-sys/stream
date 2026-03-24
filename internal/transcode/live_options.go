@@ -24,7 +24,7 @@ func DefaultLiveOptions() LiveOptions {
 		ProfileSet:      "balanced",
 		Profiles:        DefaultProfiles(),
 		SegmentDuration: 2,
-		PlaylistLength:  6,
+		PlaylistLength:  10,
 	}
 }
 

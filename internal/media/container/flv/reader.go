@@ -21,6 +21,22 @@ const (
 	FrameInterframe = 2
 )
 
+const (
+	enhancedAudioFormat = 9
+
+	videoExTypeSequenceStart = 0
+	videoExTypeCodedFrames   = 1
+	videoExTypeSequenceEnd   = 2
+	videoExTypeFramesX       = 3
+	videoExTypeMetadata      = 4
+	videoExTypeMultitrack    = 6
+
+	audioExTypeSequenceStart = 0
+	audioExTypeCodedFrames   = 1
+	audioExTypeSequenceEnd   = 2
+	audioExTypeMultitrack    = 5
+)
+
 // Reader reads FLV tags from an io.Reader
 type Reader struct {
 	r io.Reader
@@ -33,40 +49,268 @@ func NewReader(r io.Reader) *Reader {
 
 // ReadTag reads the next FLV tag and returns a media.Packet
 func (f *Reader) ReadTag(tagType byte, dataSize uint32, timestamp uint32, data []byte) (*media.Packet, error) {
+	switch tagType {
+	case TagVideo:
+		if isEnhancedVideoTag(data) {
+			return f.readEnhancedVideoTag(timestamp, data)
+		}
+		return f.readLegacyVideoTag(timestamp, data), nil
+
+	case TagAudio:
+		if isEnhancedAudioTag(data) {
+			return f.readEnhancedAudioTag(timestamp, data)
+		}
+		return f.readLegacyAudioTag(timestamp, data), nil
+
+	case TagScript:
+		return &media.Packet{
+			Type:      media.PacketTypeMeta,
+			Timestamp: timestamp,
+			Data:      data,
+		}, nil
+	}
+
+	return &media.Packet{
+		Timestamp: timestamp,
+		Data:      data,
+	}, nil
+}
+
+func (f *Reader) readLegacyVideoTag(timestamp uint32, data []byte) *media.Packet {
 	pkt := &media.Packet{
+		Type:      media.PacketTypeVideo,
 		Timestamp: timestamp,
 		Data:      data,
 	}
-
-	switch tagType {
-	case TagVideo:
-		pkt.Type = media.PacketTypeVideo
-		if len(data) > 0 {
-			frameType := (data[0] >> 4) & 0x0F
-			pkt.IsKeyframe = (frameType == FrameKeyframe)
-
-			codecID := data[0] & 0x0F
-			if codecID == byte(media.VideoCodecH264) && len(data) > 1 {
-				avcPacketType := data[1]
-				pkt.IsSequenceHeader = (avcPacketType == 0) // AVC sequence header
-			}
-		}
-
-	case TagAudio:
-		pkt.Type = media.PacketTypeAudio
-		if len(data) > 0 {
-			codecID := (data[0] >> 4) & 0x0F
-			if codecID == byte(media.AudioCodecAAC) && len(data) > 1 {
-				aacPacketType := data[1]
-				pkt.IsSequenceHeader = (aacPacketType == 0) // AAC sequence header
-			}
-		}
-
-	case TagScript:
-		pkt.Type = media.PacketTypeMeta
+	if len(data) == 0 {
+		return pkt
 	}
 
-	return pkt, nil
+	frameType := (data[0] >> 4) & 0x0F
+	pkt.IsKeyframe = (frameType == FrameKeyframe)
+
+	codecID := data[0] & 0x0F
+	if codecID == byte(media.VideoCodecH264) && len(data) > 1 {
+		pkt.IsSequenceHeader = (data[1] == 0) // AVC sequence header
+	}
+	return pkt
+}
+
+func (f *Reader) readLegacyAudioTag(timestamp uint32, data []byte) *media.Packet {
+	pkt := &media.Packet{
+		Type:      media.PacketTypeAudio,
+		Timestamp: timestamp,
+		Data:      data,
+	}
+	if len(data) == 0 {
+		return pkt
+	}
+
+	codecID := (data[0] >> 4) & 0x0F
+	if codecID == byte(media.AudioCodecAAC) && len(data) > 1 {
+		pkt.IsSequenceHeader = (data[1] == 0) // AAC sequence header
+	}
+	return pkt
+}
+
+func (f *Reader) readEnhancedVideoTag(timestamp uint32, data []byte) (*media.Packet, error) {
+	if len(data) < 5 {
+		return nil, fmt.Errorf("enhanced video tag too short")
+	}
+
+	packetType := data[0] & 0x0F
+	trackID := uint8(0)
+	fourCCOffset := 1
+	bodyOffset := 5
+
+	if packetType == videoExTypeMultitrack {
+		if len(data) < 7 {
+			return nil, fmt.Errorf("enhanced multitrack video tag too short")
+		}
+		multitrackType := data[1] >> 4
+		if multitrackType != 0 {
+			return nil, nil
+		}
+		packetType = data[1] & 0x0F
+		fourCCOffset = 2
+		bodyOffset = 7
+		trackID = data[6]
+	}
+
+	fourCC := readFourCC(data, fourCCOffset)
+	switch packetType {
+	case videoExTypeSequenceStart:
+		if fourCC != "avc1" {
+			return nil, nil
+		}
+		body := data[bodyOffset:]
+		converted := make([]byte, 5+len(body))
+		converted[0] = 0x17
+		converted[1] = 0x00
+		copy(converted[5:], body)
+		return &media.Packet{
+			Type:             media.PacketTypeVideo,
+			Timestamp:        timestamp,
+			Data:             converted,
+			IsKeyframe:       true,
+			IsSequenceHeader: true,
+			TrackID:          trackID,
+			IsEnhanced:       true,
+			FourCC:           fourCC,
+		}, nil
+
+	case videoExTypeCodedFrames:
+		if fourCC != "avc1" {
+			return nil, nil
+		}
+		if len(data) < bodyOffset+3 {
+			return nil, fmt.Errorf("enhanced AVC coded-frames tag too short")
+		}
+		cts := data[bodyOffset : bodyOffset+3]
+		payload := data[bodyOffset+3:]
+		return buildEnhancedAVCPacket(timestamp, trackID, fourCC, cts, payload), nil
+
+	case videoExTypeFramesX:
+		if fourCC != "avc1" {
+			return nil, nil
+		}
+		payload := data[bodyOffset:]
+		return buildEnhancedAVCPacket(timestamp, trackID, fourCC, []byte{0x00, 0x00, 0x00}, payload), nil
+
+	case videoExTypeSequenceEnd, videoExTypeMetadata:
+		return nil, nil
+
+	default:
+		return nil, nil
+	}
+}
+
+func (f *Reader) readEnhancedAudioTag(timestamp uint32, data []byte) (*media.Packet, error) {
+	if len(data) < 5 {
+		return nil, fmt.Errorf("enhanced audio tag too short")
+	}
+
+	packetType := data[0] & 0x0F
+	trackID := uint8(0)
+	fourCCOffset := 1
+	bodyOffset := 5
+
+	if packetType == audioExTypeMultitrack {
+		if len(data) < 7 {
+			return nil, fmt.Errorf("enhanced multitrack audio tag too short")
+		}
+		multitrackType := data[1] >> 4
+		if multitrackType != 0 {
+			return nil, nil
+		}
+		packetType = data[1] & 0x0F
+		fourCCOffset = 2
+		bodyOffset = 7
+		trackID = data[6]
+	}
+
+	fourCC := readFourCC(data, fourCCOffset)
+	if fourCC != "mp4a" {
+		if packetType == audioExTypeSequenceEnd {
+			return nil, nil
+		}
+		return nil, nil
+	}
+
+	switch packetType {
+	case audioExTypeSequenceStart:
+		body := data[bodyOffset:]
+		converted := make([]byte, 2+len(body))
+		converted[0] = 0xAF
+		converted[1] = 0x00
+		copy(converted[2:], body)
+		return &media.Packet{
+			Type:             media.PacketTypeAudio,
+			Timestamp:        timestamp,
+			Data:             converted,
+			IsSequenceHeader: true,
+			TrackID:          trackID,
+			IsEnhanced:       true,
+			FourCC:           fourCC,
+		}, nil
+
+	case audioExTypeCodedFrames:
+		body := data[bodyOffset:]
+		converted := make([]byte, 2+len(body))
+		converted[0] = 0xAF
+		converted[1] = 0x01
+		copy(converted[2:], body)
+		return &media.Packet{
+			Type:       media.PacketTypeAudio,
+			Timestamp:  timestamp,
+			Data:       converted,
+			TrackID:    trackID,
+			IsEnhanced: true,
+			FourCC:     fourCC,
+		}, nil
+
+	case audioExTypeSequenceEnd:
+		return nil, nil
+
+	default:
+		return nil, nil
+	}
+}
+
+func buildEnhancedAVCPacket(timestamp uint32, trackID uint8, fourCC string, cts []byte, payload []byte) *media.Packet {
+	isKeyframe := isAVCCKeyframe(payload)
+	firstByte := byte(0x27)
+	if isKeyframe {
+		firstByte = 0x17
+	}
+
+	converted := make([]byte, 5+len(payload))
+	converted[0] = firstByte
+	converted[1] = 0x01
+	copy(converted[2:5], cts)
+	copy(converted[5:], payload)
+
+	return &media.Packet{
+		Type:       media.PacketTypeVideo,
+		Timestamp:  timestamp,
+		Data:       converted,
+		IsKeyframe: isKeyframe,
+		TrackID:    trackID,
+		IsEnhanced: true,
+		FourCC:     fourCC,
+	}
+}
+
+func isEnhancedVideoTag(data []byte) bool {
+	return len(data) > 0 && (data[0]&0x80) != 0
+}
+
+func isEnhancedAudioTag(data []byte) bool {
+	return len(data) > 0 && (data[0]>>4) == enhancedAudioFormat
+}
+
+func readFourCC(data []byte, offset int) string {
+	if offset < 0 || offset+4 > len(data) {
+		return ""
+	}
+	return string(data[offset : offset+4])
+}
+
+func isAVCCKeyframe(payload []byte) bool {
+	pos := 0
+	for pos+4 <= len(payload) {
+		naluLen := int(binary.BigEndian.Uint32(payload[pos : pos+4]))
+		pos += 4
+		if naluLen <= 0 || pos+naluLen > len(payload) {
+			return false
+		}
+		naluType := payload[pos] & 0x1F
+		if naluType == 5 {
+			return true
+		}
+		pos += naluLen
+	}
+	return false
 }
 
 // ParseFLVHeader reads and validates an FLV header
