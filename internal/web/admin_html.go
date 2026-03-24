@@ -1024,7 +1024,7 @@ function renderCreateStreamGuide(data){
     (hasRealStream?copyField('OBS RTMP URL',rtmpURL)+copyField('OBS Yayin Anahtari',streamKey):'')+
     copyCodeField('Config Override JSON',json,18)+
     '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px">'+
-      '<div style="font-size:13px;font-weight:700;margin-bottom:10px">Aptala anlatir gibi adim adim yap:</div>'+
+      '<div style="font-size:13px;font-weight:700;margin-bottom:10px">Adim adim kurulum rehberi:</div>'+
       '<ol style="margin:0;padding-left:18px;font-size:13px;line-height:1.85;color:var(--text-secondary)">'+
         '<li>OBS programini ac.</li>'+
         '<li>Alttaki bu sayfadan once yayini olustur. Yayin olusturunca burada <strong>OBS RTMP URL</strong> ve <strong>OBS Yayin Anahtari</strong> gorunur.</li>'+
