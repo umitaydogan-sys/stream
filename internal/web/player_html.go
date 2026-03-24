@@ -94,6 +94,12 @@ video{width:100%%;height:100%%;object-fit:contain;background:#000}
 .offline-msg{position:absolute;left:50%%;top:50%%;transform:translate(-50%%,-50%%);text-align:center;color:#cbd5e1;z-index:3;display:none;padding:18px 20px;border-radius:18px;background:rgba(15,23,42,.44);backdrop-filter:blur(10px)}
 .offline-msg h2{font-size:20px;margin-bottom:8px}
 .offline-msg p{font-size:13px;color:#94a3b8}
+.qoe-debug{position:absolute;right:14px;bottom:14px;z-index:7;display:none;min-width:260px;max-width:min(360px,calc(100%% - 28px));padding:12px 14px;border-radius:14px;background:rgba(2,6,23,.78);backdrop-filter:blur(12px);border:1px solid rgba(148,163,184,.18);box-shadow:0 16px 40px rgba(2,6,23,.34);font:12px/1.5 Consolas,Monaco,'Courier New',monospace;color:#dbeafe}
+.qoe-debug.visible{display:block}
+.qoe-debug-title{font:600 11px/1.2 'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#93c5fd;margin-bottom:8px}
+.qoe-debug-row{display:flex;justify-content:space-between;gap:12px;padding:2px 0}
+.qoe-debug-row span:first-child{color:#94a3b8}
+.qoe-debug-row span:last-child{text-align:right;word-break:break-word}
 .info-bar{height:40px;background:#0f172a;display:flex;align-items:center;justify-content:space-between;padding:0 16px;border-top:1px solid rgba(148,163,184,.18);font-size:12px;color:#94a3b8}
 @keyframes pulse{0%%,100%%{opacity:1}50%%{opacity:.5}}
 </style>
@@ -109,16 +115,19 @@ video{width:100%%;height:100%%;object-fit:contain;background:#000}
     <h2>Yayin cevrimdisi</h2>
     <p>Yayin basladiginda otomatik oynatilacak</p>
   </div>
+  <div id="qoe-debug" class="qoe-debug"></div>
 </div>
 %s
 <script>
 const streamKey = %q;
 const queryParams = new URLSearchParams(location.search);
 const preferredFormat = (queryParams.get('format') || %q).toLowerCase();
+const debugEnabled = queryParams.get('debug') === '1' || queryParams.get('debug') === 'true';
 const autoplay = queryParams.has('autoplay') ? (queryParams.get('autoplay') === '1' || queryParams.get('autoplay') === 'true') : %t;
 const muted = queryParams.has('muted') ? (queryParams.get('muted') === '1' || queryParams.get('muted') === 'true') : %t;
 const video = document.getElementById('video');
 const offline = document.getElementById('offline');
+const qoeDebug = document.getElementById('qoe-debug');
 const badge = document.getElementById('live-badge');
 const playerTitle = document.getElementById('player-title');
 const logoBox = document.getElementById('player-floating-logo');
@@ -133,9 +142,83 @@ let watchdogTimer = null;
 let lastProgressAt = 0;
 let lastCurrentTime = 0;
 let stallRecoveries = 0;
+let lastErrorMessage = '-';
+let reconnectState = 'idle';
+let retryAt = 0;
+let qoeTimer = null;
+const qoeState = {
+  preferredFormat: preferredFormat || 'auto',
+  sourceOverride: 'auto',
+  activeSourceKind: '-',
+  quality: '-',
+  stallCount: 0,
+  recoveries: 0,
+  lastError: '-',
+  reconnect: 'idle',
+  offline: 'hidden'
+};
 
 video.autoplay = autoplay;
 video.muted = muted;
+
+function formatSeconds(value) {
+  if (!Number.isFinite(value)) return '-';
+  return value.toFixed(1) + 's';
+}
+
+function updateQualityLabel() {
+  if (hls && hls.levels && hls.levels.length) {
+    const levelIndex = hls.currentLevel >= 0 ? hls.currentLevel : hls.loadLevel;
+    const level = levelIndex >= 0 ? hls.levels[levelIndex] : null;
+    qoeState.quality = level ? ((level.height || '?') + 'p @ ' + Math.round((level.bitrate || 0) / 1000) + ' kbps') : 'auto';
+    return;
+  }
+  if (dashPlayer && typeof dashPlayer.getQualityFor === 'function' && typeof dashPlayer.getBitrateInfoListFor === 'function') {
+    const idx = dashPlayer.getQualityFor('video');
+    const list = dashPlayer.getBitrateInfoListFor('video') || [];
+    const info = idx >= 0 ? list[idx] : null;
+    qoeState.quality = info ? ((info.height || '?') + 'p @ ' + Math.round((info.bitrate || 0) / 1000) + ' kbps') : 'auto';
+    return;
+  }
+  qoeState.quality = activeSourceKind || '-';
+}
+
+function renderQOEDebug() {
+  if (!debugEnabled || !qoeDebug) return;
+  qoeState.preferredFormat = preferredFormat || 'auto';
+  qoeState.sourceOverride = sourceOverride || 'auto';
+  qoeState.activeSourceKind = activeSourceKind || '-';
+  qoeState.recoveries = stallRecoveries;
+  qoeState.lastError = lastErrorMessage || '-';
+  qoeState.reconnect = reconnectState;
+  qoeState.offline = offline && offline.style.display !== 'none' ? 'visible' : 'hidden';
+  updateQualityLabel();
+  qoeDebug.classList.add('visible');
+  qoeDebug.innerHTML =
+    '<div class="qoe-debug-title">QoE Debug</div>' +
+    '<div class="qoe-debug-row"><span>Format</span><span>' + qoeState.preferredFormat + '</span></div>' +
+    '<div class="qoe-debug-row"><span>Kaynak</span><span>' + qoeState.activeSourceKind + '</span></div>' +
+    '<div class="qoe-debug-row"><span>Override</span><span>' + qoeState.sourceOverride + '</span></div>' +
+    '<div class="qoe-debug-row"><span>Kalite</span><span>' + qoeState.quality + '</span></div>' +
+    '<div class="qoe-debug-row"><span>Sure</span><span>' + formatSeconds(video.currentTime || 0) + '</span></div>' +
+    '<div class="qoe-debug-row"><span>Buffer</span><span>' + formatSeconds((video.buffered && video.buffered.length) ? (video.buffered.end(video.buffered.length - 1) - (video.currentTime || 0)) : 0) + '</span></div>' +
+    '<div class="qoe-debug-row"><span>Stall</span><span>' + qoeState.stallCount + '</span></div>' +
+    '<div class="qoe-debug-row"><span>Toparlanma</span><span>' + qoeState.recoveries + '</span></div>' +
+    '<div class="qoe-debug-row"><span>Reconnect</span><span>' + qoeState.reconnect + '</span></div>' +
+    '<div class="qoe-debug-row"><span>Offline</span><span>' + qoeState.offline + '</span></div>' +
+    '<div class="qoe-debug-row"><span>Hata</span><span>' + qoeState.lastError + '</span></div>';
+}
+
+function startQOEDebugLoop() {
+  if (!debugEnabled || qoeTimer) return;
+  renderQOEDebug();
+  qoeTimer = setInterval(renderQOEDebug, 1000);
+}
+
+function setLastError(message) {
+  lastErrorMessage = message || '-';
+  renderQOEDebug();
+}
 
 function passthroughURL(url) {
   const next = new URL(url, location.origin);
@@ -298,10 +381,12 @@ function cleanupPlayers() {
   try { if (hls) { hls.destroy(); hls = null; } } catch (e) {}
   try { if (dashPlayer) { dashPlayer.reset(); dashPlayer = null; } } catch (e) {}
   activeSourceKind = '';
+  reconnectState = 'idle';
   hideResumeButton();
   video.pause();
   video.removeAttribute('src');
   video.load();
+  renderQOEDebug();
 }
 
 function noteProgress() {
@@ -316,6 +401,8 @@ async function trySourceFallback(nextOverride) {
     return;
   }
   sourceOverride = nextOverride;
+  reconnectState = 'fallback:' + nextOverride;
+  renderQOEDebug();
   await tryPlay();
 }
 
@@ -340,7 +427,10 @@ function ensurePlaybackWatchdog() {
     }
     if (now-lastProgressAt < 6500) return;
     stallRecoveries += 1;
+    qoeState.stallCount += 1;
     lastProgressAt = now;
+    reconnectState = 'recovering';
+    renderQOEDebug();
     if (hls && activeSourceKind === 'hls' && stallRecoveries === 1) {
       try { hls.startLoad(); } catch (e) {}
       try { video.play().catch(function() {}); } catch (e) {}
@@ -359,11 +449,15 @@ function markReady() {
     clearTimeout(retryTimer);
     retryTimer = null;
   }
+  retryAt = 0;
   video.style.display = 'block';
   if (offline) offline.style.display = 'none';
   if (badge && badge.style.display !== 'none') badge.innerHTML = '<span class="badge-live">CANLI</span>';
+  reconnectState = 'playing';
   noteProgress();
+  renderQOEDebug();
   ensurePlaybackWatchdog();
+  startQOEDebugLoop();
   tryAutoplay();
 }
 
@@ -372,15 +466,22 @@ function scheduleRetry() {
   video.style.display = 'none';
   if (offline) offline.style.display = 'block';
   if (badge) badge.innerHTML = '';
+  retryAt = Date.now() + 3000;
+  reconnectState = 'retrying';
   cleanupPlayers();
+  renderQOEDebug();
   retryTimer = setTimeout(function() {
     retryTimer = null;
+    reconnectState = 'retry-now';
+    renderQOEDebug();
     tryPlay();
   }, 3000);
 }
 
 function startNative(url) {
   activeSourceKind = 'native';
+  reconnectState = 'native';
+  renderQOEDebug();
   video.src = url;
   video.load();
 }
@@ -406,13 +507,19 @@ function startHLS(url) {
     hls.loadSource(url);
     hls.attachMedia(video);
     hls.on(Hls.Events.MANIFEST_PARSED, markReady);
+    hls.on(Hls.Events.LEVEL_SWITCHED, renderQOEDebug);
     hls.on(Hls.Events.ERROR, function(event, data) {
+      setLastError('hls:' + ((data && data.details) || (data && data.type) || 'unknown'));
       if (!data || !data.fatal) return;
       if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+        reconnectState = 'hls-network-retry';
+        renderQOEDebug();
         hls.startLoad();
         return;
       }
       if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+        reconnectState = 'hls-media-recover';
+        renderQOEDebug();
         hls.recoverMediaError();
         return;
       }
@@ -422,6 +529,8 @@ function startHLS(url) {
   }
   if (video.canPlayType('application/vnd.apple.mpegurl')) {
     activeSourceKind = 'hls';
+    reconnectState = 'native-hls';
+    renderQOEDebug();
     video.src = url;
     video.load();
     return;
@@ -438,14 +547,19 @@ function startDASH(url) {
   dashPlayer = window.dashjs.MediaPlayer().create();
   dashPlayer.updateSettings({ streaming: { lowLatencyEnabled: true } });
   dashPlayer.on(window.dashjs.MediaPlayer.events.STREAM_INITIALIZED, markReady);
+  dashPlayer.on(window.dashjs.MediaPlayer.events.QUALITY_CHANGE_RENDERED, renderQOEDebug);
   dashPlayer.initialize(video, url, autoplay);
-  dashPlayer.on(window.dashjs.MediaPlayer.events.ERROR, function() {
+  renderQOEDebug();
+  dashPlayer.on(window.dashjs.MediaPlayer.events.ERROR, function(evt) {
+    setLastError('dash:' + (((evt && evt.error && evt.error.message) || (evt && evt.event && evt.event.message) || (evt && evt.message) || 'unknown')));
     tryHLSMasterFallback();
   });
 }
 
 async function tryPlay() {
   cleanupPlayers();
+  reconnectState = 'probing';
+  renderQOEDebug();
   const source = await resolveSource();
   if (source.kind === 'dash') {
     startDASH(source.url);
@@ -471,6 +585,9 @@ video.addEventListener('canplay', markReady);
 video.addEventListener('playing', function() { hideResumeButton(); markReady(); });
 video.addEventListener('timeupdate', noteProgress);
 video.addEventListener('stalled', function() {
+  qoeState.stallCount += 1;
+  reconnectState = 'stalled';
+  renderQOEDebug();
   if (activeSourceKind === 'dash' || preferredFormat === 'dash') {
     tryHLSMasterFallback();
     return;
@@ -481,13 +598,21 @@ video.addEventListener('waiting', function() {
   if (video.readyState <= 2) {
     lastProgressAt = Math.min(lastProgressAt || Date.now(), Date.now()-5000);
   }
+  reconnectState = 'waiting';
+  renderQOEDebug();
 });
 video.addEventListener('pause', function() {
   if (offline && offline.style.display === 'none') showResumeButton();
+  reconnectState = 'paused';
+  renderQOEDebug();
 });
-video.addEventListener('error', scheduleRetry);
+video.addEventListener('error', function() {
+  setLastError('video:' + ((video.error && video.error.message) || (video.error && video.error.code) || 'unknown'));
+  scheduleRetry();
+});
 
 applySkin();
+startQOEDebugLoop();
 tryPlay();
 </script>
 </body>
