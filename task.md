@@ -54,6 +54,7 @@
 - [x] DASH preview fallback davranisini uzun canli testte yeniden dogrula
 - [x] multitrack audio secimini son kullanici player tarafina tasi
 - [x] HLS alternate audio group yapisini ekle
+- [x] son kullanici player icinde secili ses izini kalici tercih ve fallback uyumlu hale getir
 - [x] dusuk bant genisligi icin ABR profil merdivenini olcumle optimize et
 
 ## 5. QoE ve Gozlemlenebilirlik
@@ -74,6 +75,7 @@
 - [x] DASH tarafinda coklu audio adaptation setini canli testle dogrula
 - [x] alarm esiklerini gercek saha verisine gore ince ayarla
 - [x] track bazli kalite gecisi ve ses izi degisimi raporunu ekle
+- [x] kalite / ses gecisi verisini saglik ve rapor ekranlarinda daha derin kullan
 
 ## 6. Urunlestirme ve Lisans
 
@@ -98,7 +100,7 @@
 ## 8. Uretim Seviyesi Buyuk Eksikler
 
 - [ ] multi-node origin-edge mimarisi
-- [ ] S3 / MinIO archive ve restore akisi
+- [x] S3 / MinIO archive ve restore akisi
 - [x] Prometheus / OpenTelemetry / alarm sistemi
 - [ ] RBAC, audit log ve SSO
 - [ ] DRM ve gelismis playback guvenligi

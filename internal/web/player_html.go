@@ -135,6 +135,7 @@ const autoplay = queryParams.has('autoplay') ? (queryParams.get('autoplay') === 
 const muted = queryParams.has('muted') ? (queryParams.get('muted') === '1' || queryParams.get('muted') === 'true') : %t;
 const telemetryEndpoint = location.origin + '/api/player/telemetry';
 const telemetrySessionKey = 'fluxstream_qoe_' + streamKey;
+const audioPreferenceKey = 'fluxstream_audio_pref_' + streamKey;
 const video = document.getElementById('video');
 const offline = document.getElementById('offline');
 const qoeDebug = document.getElementById('qoe-debug');
@@ -166,6 +167,7 @@ let telemetryDirty = false;
 let hlsAudioTracks = [];
 let dashAudioTracks = [];
 let preferredAudioTrack = (queryParams.get('audio_track') || '').trim();
+let preferredAudioTrackLabel = '';
 let preferredAudioTrackApplied = false;
 let qualityTransitionCount = 0;
 let audioSwitchCount = 0;
@@ -186,6 +188,33 @@ const qoeState = {
   reconnect: 'idle',
   offline: 'hidden'
 };
+
+function loadSavedAudioPreference() {
+  try {
+    const raw = localStorage.getItem(audioPreferenceKey);
+    if (!raw) return { id: '', label: '' };
+    const parsed = JSON.parse(raw);
+    return {
+      id: String((parsed && parsed.id) || '').trim(),
+      label: String((parsed && parsed.label) || '').trim()
+    };
+  } catch (e) {
+    return { id: '', label: '' };
+  }
+}
+
+function saveAudioPreference(id, label) {
+  try {
+    localStorage.setItem(audioPreferenceKey, JSON.stringify({
+      id: String(id || '').trim(),
+      label: String(label || '').trim()
+    }));
+  } catch (e) {}
+}
+
+const savedAudioPreference = loadSavedAudioPreference();
+if (!preferredAudioTrack && savedAudioPreference.id) preferredAudioTrack = savedAudioPreference.id;
+preferredAudioTrackLabel = savedAudioPreference.label || '';
 
 video.autoplay = autoplay;
 video.muted = muted;
@@ -284,6 +313,11 @@ function rememberSelectedAudioTrack(id, label, allowTransition) {
   const nextLabel = String(label || nextID || '-').trim() || '-';
   selectedAudioTrackID = nextID;
   selectedAudioTrackLabel = nextLabel;
+  if (nextID || nextLabel !== '-') {
+    preferredAudioTrack = nextID || preferredAudioTrack;
+    preferredAudioTrackLabel = nextLabel;
+    saveAudioPreference(preferredAudioTrack, preferredAudioTrackLabel);
+  }
   const nextSignature = nextID + '|' + nextLabel;
   if (!nextSignature.trim()) return;
   if (!lastSelectedAudioSignature) {
@@ -457,16 +491,66 @@ function hideAudioTrackSelector() {
   if (audioTrackSelect) audioTrackSelect.innerHTML = '';
 }
 
+function normalizeAudioToken(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function buildAudioTrackLabel(track, fallbackIndex) {
+  const index = Number(fallbackIndex || 0);
+  const attrs = track && track.attrs ? track.attrs : {};
+  const parts = [];
+  const primary = String(
+    (track && (track.label || track.name || track.displayName || track.lang || track.groupId)) ||
+    attrs.NAME ||
+    attrs.LANGUAGE ||
+    ''
+  ).trim();
+  if (primary) parts.push(primary);
+  const lang = String((track && track.lang) || attrs.LANGUAGE || '').trim();
+  if (lang && parts.every(function(item) { return normalizeAudioToken(item) !== normalizeAudioToken(lang); })) {
+    parts.push(lang.toUpperCase());
+  }
+  const channels = String((track && track.channels) || attrs.CHANNELS || '').trim();
+  if (channels) parts.push(channels.indexOf('ch') !== -1 ? channels : channels + 'ch');
+  const role = String((track && track.role) || attrs.CHARACTERISTICS || '').trim();
+  if (role) parts.push(role);
+  if (!parts.length) parts.push('Ses Track ' + (index + 1));
+  return parts.join(' • ');
+}
+
+function audioTrackAliases(track) {
+  const aliases = [];
+  const pushToken = function(value) {
+    const token = normalizeAudioToken(value);
+    if (!token || aliases.indexOf(token) !== -1) return;
+    aliases.push(token);
+  };
+  pushToken(track && track.id);
+  pushToken(track && track.name);
+  pushToken(track && track.lang);
+  pushToken(track && track.label);
+  pushToken(track && track.displayName);
+  pushToken(track && track.groupId);
+  pushToken(track && track.role);
+  pushToken(buildAudioTrackLabel(track, Number(track && track.id) || 0));
+  if (track && track.id != null) {
+    pushToken('track ' + track.id);
+    pushToken('track-' + track.id);
+    pushToken('audio track ' + track.id);
+  }
+  return aliases;
+}
+
 function trackMatchesPreferred(track, preferred) {
-  const target = String(preferred || '').trim().toLowerCase();
-  if (!target) return false;
-  const id = String((track && track.id != null) ? track.id : '').toLowerCase();
-  const name = String((track && (track.name || track.lang || track.label || track.displayName)) || '').toLowerCase();
-  if (id === target) return true;
-  if (name === target) return true;
-  if (name.indexOf('track ' + target) !== -1) return true;
-  if (name.indexOf('track-' + target) !== -1) return true;
-  return false;
+  const target = normalizeAudioToken(preferred);
+  const labelTarget = normalizeAudioToken(preferredAudioTrackLabel);
+  if (!target && !labelTarget) return false;
+  const aliases = audioTrackAliases(track);
+  if (target && aliases.indexOf(target) !== -1) return true;
+  if (labelTarget && aliases.indexOf(labelTarget) !== -1) return true;
+  return aliases.some(function(alias) {
+    return (target && alias.indexOf(target) !== -1) || (labelTarget && alias.indexOf(labelTarget) !== -1);
+  });
 }
 
 function renderAudioTrackSelector(items, selectedIndex, applyFn) {
@@ -495,7 +579,14 @@ function syncHLSAudioTracks(allowTransition) {
     return {
       id: track && track.id != null ? track.id : index,
       name: (track && (track.name || track.lang || track.groupId)) || ('Track ' + (index + 1)),
-      label: (track && (track.name || track.lang || track.groupId)) || ('Track ' + (index + 1))
+      label: buildAudioTrackLabel({
+        id: track && track.id != null ? track.id : index,
+        name: track && track.name,
+        lang: track && track.lang,
+        label: track && (track.name || track.lang || track.groupId),
+        groupId: track && track.groupId,
+        attrs: track && track.attrs
+      }, index)
     };
   });
   if (!preferredAudioTrackApplied && preferredAudioTrack) {
@@ -535,7 +626,13 @@ function syncDashAudioTracks(allowTransition) {
       raw: track,
       id: track && track.id != null ? track.id : index,
       name: (track && (track.lang || track.id || track.labels && track.labels[0])) || ('Track ' + (index + 1)),
-      label: (track && (track.lang || track.id || track.labels && track.labels[0])) || ('Track ' + (index + 1))
+      label: buildAudioTrackLabel({
+        id: track && track.id != null ? track.id : index,
+        lang: track && track.lang,
+        label: track && ((track.labels && track.labels[0]) || track.lang || track.id),
+        role: track && track.roles && track.roles[0],
+        channels: track && track.audioChannelConfiguration && track.audioChannelConfiguration[0]
+      }, index)
     };
   });
   if (!dashAudioTracks.length || dashAudioTracks.length === 1) {
@@ -685,6 +782,7 @@ function cleanupPlayers() {
   try { if (dashPlayer) { dashPlayer.reset(); dashPlayer = null; } } catch (e) {}
   hlsAudioTracks = [];
   dashAudioTracks = [];
+  preferredAudioTrackApplied = false;
   selectedAudioTrackID = '';
   selectedAudioTrackLabel = '-';
   hideAudioTrackSelector();
@@ -835,6 +933,7 @@ function startNative(url) {
 function startHLS(url) {
   if (window.Hls && Hls.isSupported()) {
     activeSourceKind = 'hls';
+    preferredAudioTrackApplied = false;
     hls = new Hls({
       liveSyncDurationCount: preferredFormat === 'll_hls' ? 3 : 4,
       liveMaxLatencyDurationCount: preferredFormat === 'll_hls' ? 6 : 10,
@@ -898,6 +997,7 @@ function startDASH(url) {
     return;
   }
   activeSourceKind = 'dash';
+  preferredAudioTrackApplied = false;
   dashPlayer = window.dashjs.MediaPlayer().create();
   dashPlayer.updateSettings({
     streaming: {

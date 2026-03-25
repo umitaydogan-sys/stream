@@ -61,6 +61,7 @@ streaming cekirdegi yeterince olgunlastiktan sonra eklenecek.
 - varsayilan video ve audio track secimi policy ve runtime seviyesinde uygulanabiliyor
 - direct multitrack HLS master artik alternate audio group uretebiliyor
 - video player icinde canli audio track secici gorunebiliyor
+- player audio secimi artik tarayici oturumunda kalici tercih olarak saklanabiliyor ve HLS/DASH fallback'lerinde yeniden uygulanabiliyor
 - audio-only HLS yonlendirmesi secili audio track playlistine gidebiliyor
 - track bitrate ve runtime ornekleri kalici analytics olarak SQLite'a yazilabiliyor
 - `/metrics` ve `/api/observability/otel` cikislari hazir
@@ -71,8 +72,12 @@ streaming cekirdegi yeterince olgunlastiktan sonra eklenecek.
 - player telemetrisi kalite gecisi ve audio track degisimi sayaclarini da tasiyor
 - stream detay ve Operasyon Merkezi ekranlari artik kalite gecisi, ses izi degisimi ve secili audio track dagilimini gosterebiliyor
 - QoE uyari esikleri aktif oturum oranina gore daha akilli hesaplanabiliyor
+- saglik ekraninda QoE riskli yayinlar, kalite gecisi ve ses gecisi yogunlugu daha derin raporlanabiliyor
 - dusuk bant icin `resilient` ABR profil seti eklendi, `balanced` ve `mobile` merdivenleri daha korumaci hale getirildi
 - canli dogrulamada HLS master 2 video katmani, DASH MPD ise 2 video + 1 audio representation ile dogrulandi
+- recording kutuphanesi icin object storage / archive yonetimi eklendi
+- lokal arsiv klasoru ve S3/MinIO uyumlu archive akisi ayni panelden yonetilebilir hale geldi
+- arsivlenen kayitlari panelden geri yukleme ve otomatik senkron mantigi eklendi
 
 ## 3. Bu Surecte Neleri Kapatmis Olduk
 
@@ -164,7 +169,7 @@ Bugun artik asagidaki maddeler kapanmis sayilmali:
 Bugun hala acik olan gercek eksikler ise sunlar:
 
 - DASH audio-only cikisi ve audio selector davranisinin farkli oynaticilarla daha genis saha testi
-- kalite gecisi ve audio switch raporlarini uzun sureli raporlama / alarm katmanina baglama
+- kalite gecisi ve audio switch verisini daha ileri alarm otomasyonu ve uzun periyot rapor katmanina baglama
 - ABR profil merdivenlerini gercek trafik ve cihaz verisine gore tekrar ince ayarlama
 - dusuk bant sahalarinda uzun sureli soak test ve canli benchmark calistirma
 
@@ -182,8 +187,8 @@ FluxStream'in bugun guclu oldugu taraflar:
 FluxStream'in bugun zayif veya eksik oldugu taraflar:
 
 - multi-node origin-edge cluster ve autoscaling yok
-- S3 / MinIO benzeri harici obje depolama ve archive restore akisi yok
-- Prometheus / OpenTelemetry / alarm omurgasi eksik
+- archive/object storage akisi yeni eklense de saha sertlestirmesi henuz yeni
+- Prometheus / OpenTelemetry / alarm omurgasi artik var ama daha derin entegrasyon acik
 - RBAC, audit log ve SSO eksik
 - DRM, SSAI ve gelismis monetizasyon eksik
 - otomatik test, yuk testi ve uzun sureli soak test kapsami dar
@@ -221,12 +226,11 @@ demek icin erken:
 Bir sonraki dogru kapatma sirasi bence su:
 
 1. audio-only DASH ve farkli client davranislarini canli saha testiyle sertlestir
-2. kalite gecisi / audio switch verilerini alarm ve rapor ekranlarina daha derin bagla
-3. Operasyon Merkezi ekranini uzun sureli kullanim ve buyuk stream sayisinda sertlestir
-4. S3 veya MinIO archive / restore akisini ekle
-5. multi-node origin-edge mimarisini tasarla
-6. RBAC, audit log, SSO ve lisans enforcement tarafini sertlestir
-7. ABR profil merdivenini gercek saha benchmarklari ile tekrar optimize et
+2. Operasyon Merkezi ekranini uzun sureli kullanim ve buyuk stream sayisinda sertlestir
+3. archive/object storage akisinda MinIO ve gercek S3 saha testi al
+4. multi-node origin-edge mimarisini tasarla
+5. RBAC, audit log, SSO ve lisans enforcement tarafini sertlestir
+6. ABR profil merdivenini gercek saha benchmarklari ile tekrar optimize et
 
 ## 9. Operasyon Merkezi Fazinin Uygulama Taslagi
 

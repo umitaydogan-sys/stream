@@ -277,6 +277,16 @@ func (m *Manager) ListAllRecordingFiles() ([]SavedRecording, error) {
 	return files, nil
 }
 
+// RecordingsDir returns the root directory for saved recordings.
+func (m *Manager) RecordingsDir() string {
+	return m.recordingsDir
+}
+
+// RecordingFilePath returns the absolute path for a saved recording file.
+func (m *Manager) RecordingFilePath(streamKey, filename string) string {
+	return filepath.Join(m.recordingsDir, streamKey, filepath.Base(filename))
+}
+
 func (m *Manager) recordLoop(rec *Recording) {
 	rec.subID = fmt.Sprintf("rec_%s", rec.ID)
 	sub := m.streamMgr.Subscribe(rec.StreamKey, rec.subID, 512)

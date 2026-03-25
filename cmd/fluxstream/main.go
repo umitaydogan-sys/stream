@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/fluxstream/fluxstream/internal/analytics"
+	"github.com/fluxstream/fluxstream/internal/archive"
 	"github.com/fluxstream/fluxstream/internal/config"
 	"github.com/fluxstream/fluxstream/internal/ingest/httppush"
 	"github.com/fluxstream/fluxstream/internal/ingest/mpegts"
@@ -99,6 +100,7 @@ func main() {
 		filepath.Join(dataDir, "hls"),
 		filepath.Join(dataDir, "dash"),
 		filepath.Join(dataDir, "recordings"),
+		filepath.Join(dataDir, "archive"),
 		filepath.Join(dataDir, "backups"),
 		filepath.Join(dataDir, "thumbnails"),
 		filepath.Join(dataDir, "license"),
@@ -258,6 +260,7 @@ func main() {
 	// Recording/DVR
 	recordingsDir := filepath.Join(dataDir, "recordings")
 	recManager := recording.NewManager(streamManager, recordingsDir)
+	archiveManager := archive.NewManager(cfg, db, recManager, dataDir)
 	log.Println("[INIT] Kayit/DVR sistemi aktif")
 
 	// Analytics
@@ -320,7 +323,7 @@ func main() {
 
 	// Suppress warnings
 	_, _, _, _, _, _ = recManager, analyticsTracker, tokenMgr, rateLimiter, ipBanList, twoFA
-	startMaintenanceLoops(ctx.Done(), cfg, db, analyticsTracker, recManager, tcManager, dataDir)
+	startMaintenanceLoops(ctx.Done(), cfg, db, analyticsTracker, recManager, archiveManager, tcManager, dataDir)
 
 	// Initialize & start RTMP server
 	rtmpPort := cfg.GetInt("rtmp_port", DefaultRTMPPort)
@@ -627,6 +630,81 @@ func main() {
 		}
 		jsonResp(w, files)
 	})
+	webServer.RegisterHandler("/api/recordings/archives", func(w http.ResponseWriter, r *http.Request) {
+		items, err := archiveManager.ListArchives()
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		if items == nil {
+			items = []storage.RecordingArchive{}
+		}
+		jsonResp(w, items)
+	})
+	webServer.RegisterHandler("/api/recordings/archive", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if !licenseRuntime.allows(licenseFeatureRecording) {
+			http.Error(w, "recording lisans gerektirir", http.StatusForbidden)
+			return
+		}
+		var req struct {
+			StreamKey string `json:"stream_key"`
+			Filename  string `json:"filename"`
+		}
+		if err := decodeJSON(r, &req); err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+		item, err := archiveManager.ArchiveRecording(r.Context(), req.StreamKey, req.Filename)
+		if err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+		jsonResp(w, item)
+	})
+	webServer.RegisterHandler("/api/recordings/restore", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if !licenseRuntime.allows(licenseFeatureRecording) {
+			http.Error(w, "recording lisans gerektirir", http.StatusForbidden)
+			return
+		}
+		var req struct {
+			StreamKey string `json:"stream_key"`
+			Filename  string `json:"filename"`
+		}
+		if err := decodeJSON(r, &req); err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+		item, err := archiveManager.RestoreRecording(r.Context(), req.StreamKey, req.Filename)
+		if err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+		jsonResp(w, item)
+	})
+	webServer.RegisterHandler("/api/recordings/archive/sync", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if !licenseRuntime.allows(licenseFeatureRecording) {
+			http.Error(w, "recording lisans gerektirir", http.StatusForbidden)
+			return
+		}
+		uploaded, err := archiveManager.SyncPending(r.Context(), cfg.GetInt("archive_batch_size", 3))
+		if err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+		jsonResp(w, map[string]interface{}{"success": true, "uploaded": uploaded})
+	})
 	webServer.RegisterHandler("/api/recordings/file", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "DELETE" {
 			http.Error(w, "Method not allowed", 405)
@@ -790,7 +868,7 @@ func main() {
 		stats.MemoryUsedMB = int64(memStats.Alloc / 1024 / 1024)
 		stats.MemoryTotalMB = int64(memStats.Sys / 1024 / 1024)
 		stats.UptimeSeconds = int64(time.Since(startTime).Seconds())
-		jsonResp(w, buildHealthReport(cfg, db, stats, tcManager, streamManager, playerTelemetry, dataDir))
+		jsonResp(w, buildHealthReport(cfg, db, stats, tcManager, streamManager, playerTelemetry, archiveManager, dataDir))
 	})
 	webServer.RegisterHandler("/api/maintenance/run", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {

@@ -100,9 +100,13 @@ func buildQoEAlerts(cfg *config.Manager, streamName string, snapshot playerTelem
 		label = strings.TrimSpace(snapshot.StreamKey)
 	}
 	maxStalls := 0
+	maxAudioSwitches := 0
 	for _, session := range snapshot.Sessions {
 		if session.StallCount > maxStalls {
 			maxStalls = session.StallCount
+		}
+		if session.AudioSwitches > maxAudioSwitches {
+			maxAudioSwitches = session.AudioSwitches
 		}
 	}
 
@@ -114,6 +118,7 @@ func buildQoEAlerts(cfg *config.Manager, streamName string, snapshot playerTelem
 	offlineBase := cfg.GetInt("alerts_qoe_offline_sessions", 1)
 	offlineRatio := cfg.GetInt("alerts_qoe_offline_ratio_percent", 20)
 	transitionRatioThreshold := cfg.GetInt("alerts_qoe_transition_ratio_threshold", 4)
+	audioRatioThreshold := cfg.GetInt("alerts_qoe_audio_ratio_threshold", 3)
 
 	waitingThreshold := maxInt(waitingBase, int(math.Ceil(float64(snapshot.ActiveSessions)*float64(waitingRatio)/100.0)))
 	offlineThreshold := maxInt(offlineBase, int(math.Ceil(float64(snapshot.ActiveSessions)*float64(offlineRatio)/100.0)))
@@ -170,6 +175,19 @@ func buildQoEAlerts(cfg *config.Manager, streamName string, snapshot playerTelem
 			Title:       "Kalite gecisleri siklasti",
 			Description: fmt.Sprintf("%s yayininda kalite gecisi sayisi %d oldu. Bu deger aktif oturum sayisina gore yuksek gorunuyor.", label, snapshot.TotalQualityTransitions),
 			Action:      "Dusuk bant profiline gecin, ABR merdivenini hafifletin ve istemcinin hizli yukselmesini sinirlayin.",
+		})
+	}
+	if audioRatioThreshold > 0 && len(snapshot.AudioTracks) > 1 && snapshot.ActiveSessions > 0 && snapshot.TotalAudioSwitches >= int64(snapshot.ActiveSessions*audioRatioThreshold) {
+		level := "warning"
+		if maxAudioSwitches >= audioRatioThreshold*2 {
+			level = "critical"
+		}
+		alerts = append(alerts, systemAlert{
+			Level:       level,
+			Code:        "qoe_audio_flapping",
+			Title:       "Ses izi degisimi siklasti",
+			Description: fmt.Sprintf("%s yayininda ses izi degisimi sayisi %d oldu. En hareketli oturum %d degisime ulasti.", label, snapshot.TotalAudioSwitches, maxAudioSwitches),
+			Action:      "Varsayilan audio track secimini netlestirin, alternate-audio etiketlerini kontrol edin ve istemci tarafindaki kullanici secimlerini gozden gecirin.",
 		})
 	}
 	return alerts

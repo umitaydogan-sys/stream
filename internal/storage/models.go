@@ -179,3 +179,25 @@ type TrackTelemetrySample struct {
 	DisplayLabel string    `json:"display_label"`
 	CreatedAt    time.Time `json:"created_at"`
 }
+
+// RecordingArchive stores archive/object-storage metadata for a recording file.
+type RecordingArchive struct {
+	ID           int64     `json:"id"`
+	StreamKey    string    `json:"stream_key"`
+	Filename     string    `json:"filename"`
+	Format       string    `json:"format"`
+	Provider     string    `json:"provider"`
+	Bucket       string    `json:"bucket,omitempty"`
+	Endpoint     string    `json:"endpoint,omitempty"`
+	ObjectKey    string    `json:"object_key"`
+	ObjectURL    string    `json:"object_url,omitempty"`
+	ETag         string    `json:"etag,omitempty"`
+	Size         int64     `json:"size"`
+	Status       string    `json:"status"`
+	LastError    string    `json:"last_error,omitempty"`
+	LocalDeleted bool      `json:"local_deleted"`
+	ArchivedAt   time.Time `json:"archived_at,omitempty"`
+	RestoredAt   time.Time `json:"restored_at,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}

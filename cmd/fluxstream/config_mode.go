@@ -75,11 +75,20 @@ func configCategoryForKey(key string) string {
 		return "transcode"
 	case "stream_key_required", "token_enabled", "token_duration", "rate_limit", "token_secret", "twfa_enabled":
 		return "security"
-	case "storage_max_gb", "storage_auto_clean", "recordings_retention_days", "recordings_keep_latest", "analytics_retention_days", "maintenance_auto_cleanup", "maintenance_cleanup_interval":
+	case "storage_max_gb", "storage_auto_clean", "recordings_retention_days", "recordings_keep_latest",
+		"archive_enabled", "archive_provider", "archive_local_dir", "archive_endpoint", "archive_region",
+		"archive_bucket", "archive_access_key", "archive_secret_key", "archive_prefix", "archive_use_path_style",
+		"archive_public_base_url", "archive_auto_upload", "archive_delete_local_after_upload",
+		"archive_scan_interval_minutes", "archive_batch_size",
+		"analytics_retention_days", "maintenance_auto_cleanup", "maintenance_cleanup_interval":
 		return "storage"
 	case "analytics_persist_enabled", "analytics_snapshot_interval":
 		return "analytics"
-	case "alerts_enabled", "alerts_disk_threshold_gb", "alerts_memory_threshold_mb", "alerts_cert_days", "diagnostics_enabled":
+	case "alerts_enabled", "alerts_disk_threshold_gb", "alerts_memory_threshold_mb", "alerts_cert_days",
+		"alerts_qoe_stalls_threshold", "alerts_qoe_buffer_seconds", "alerts_qoe_buffer_warn_seconds",
+		"alerts_qoe_buffer_critical_seconds", "alerts_qoe_waiting_sessions", "alerts_qoe_waiting_ratio_percent",
+		"alerts_qoe_offline_sessions", "alerts_qoe_offline_ratio_percent", "alerts_qoe_transition_ratio_threshold",
+		"alerts_qoe_audio_ratio_threshold", "diagnostics_enabled":
 		return "health"
 	case "recording_enabled", "recording_format", "recording_max_hours":
 		return "recording"

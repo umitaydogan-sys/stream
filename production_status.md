@@ -41,6 +41,7 @@ Bu tur itibariyla:
 - HLS master alternate-audio group uretebiliyor
 - DASH preview daha gec fallback yapan ve uzun izleme icin daha stabil ayarlarla calisiyor
 - player QoE telemetrisi kalite gecisi ve audio switch sayaclarini da topluyor
+- player audio secimi artik oturumlar arasi tercih olarak saklanabiliyor ve HLS / DASH fallback'lerinde korunabiliyor
 - canli dogrulamada DASH MPD artik 2 video + 1 audio representation uretiyor
 - varsayilan video ve audio track secimi policy ve runtime seviyesinde uygulanabiliyor
 - player tarafinda audio track secici cikabiliyor
@@ -64,6 +65,7 @@ Bugun elde olanlar:
 - kullanim ve tanilama rehberleri
 - runtime lisans modeli
 - backup omurgasi
+- object storage / archive omurgasi
 - Linux servis ve deploy akisi
 
 Karar:
@@ -96,9 +98,21 @@ Kapananlar:
 - OTel-benzeri `/api/observability/otel` cikisi
 - retention cleanup
 - aktif oturum oranina gore ayarlanan daha akilli QoE esikleri
+- saglik ekraninda QoE riskli yayinlar tablosu
 - Teshis ekraninda opsiyonel cikislari gereksiz kirmizi gostermeyen daha dogru durum mantigi
 
-### 3.3 Linux Urunlestirme
+### 3.3 Archive ve Object Storage
+
+Kapananlar:
+
+- recording kutuphanesi icin object storage metadata tablosu
+- lokal arsiv klasoru modu
+- S3 / MinIO uyumlu archive upload / restore akisi
+- otomatik arsiv senkronu
+- panelden arsive gonderme ve geri yukleme
+- saglik raporunda arsiv ozet gorunurlugu
+
+### 3.4 Linux Urunlestirme
 
 Kapananlar:
 
@@ -116,10 +130,10 @@ Karar:
 Asagidaki basliklar henuz tam production-ready degil:
 
 - audio-only DASH davranisinin farkli client'larda saha dogrulamasi
-- kalite gecisi ve audio switch verisinin daha derin alarm / rapor katmanina baglanmasi
+- kalite gecisi ve audio switch verisinin daha ileri alarm otomasyonu ve daha uzun rapor katmanina baglanmasi
 - dusuk bant genisligi icin ABR profil merdiveninin daha uzun benchmarklarla tekrar optimizasyonu
 - multi-node origin-edge cluster mimarisi
-- S3 veya MinIO archive / restore akisi
+- yeni archive / object storage akisinin gercek S3 ve MinIO sahasinda sertlestirilmesi
 - RBAC, audit log ve SSO
 - DRM, SSAI ve monetizasyon
 - kapsamli yuk testi ve soak testi
@@ -137,6 +151,7 @@ Yerelde:
 - `go build ./cmd/fluxstream-license/` gecti
 - `go test ./...` gecti
 - admin JS sentaks kontrolu gecti
+- lokal arsiv upload / restore akisi sentetik testte gecti
 
 Host:
 
@@ -144,7 +159,7 @@ Host:
 - systemd servis: `fluxstream`
 - servis durumu: `active`
 - health: `http://127.0.0.1:8844/api/health` -> `{"status":"ok","version":"2.0.0"}`
-- canli deploy hash: `f9f54483229f3c04379efb436a8f6fc468d9a09b283665cc2b8352acfd5f290c`
+- canli deploy hash: `60abb5c078fd18c007b0ac355ba371481978dd9369c6d6048f0ac21c22af56ec`
 - canli dogrulama: HLS master `2` video katmani, DASH MPD `3` representation (2 video + 1 audio)
 - yayin dogrulamasi: `test / live_14957742f633b59863173e5a` stream'i ile kontrol edildi
 
@@ -166,7 +181,7 @@ FluxStream'in bugun guclu oldugu taraflar:
 FluxStream'in bugun zayif oldugu taraflar:
 
 - cluster ve autoscaling yok
-- object storage / cloud archive akisi yok
+- object storage akisi yeni eklendi ama daha genis saha testi yok
 - kurumsal guvenlik katmanlari dar
 - DRM ve SSAI yok
 - test ve benchmark kapsami dar
@@ -196,7 +211,6 @@ Ama bugun hala su cumleyi kurmam:
 Bunu demek icin su basliklarin kapanmasi gerekiyor:
 
 - multi-node cluster
-- archive / object storage
 - audit / SSO / RBAC
 - daha derin observability ve alarm
 - yuk testi ve operasyonel sertlestirme
@@ -206,8 +220,7 @@ Bunu demek icin su basliklarin kapanmasi gerekiyor:
 Bana gore bundan sonraki en mantikli sira su:
 
 1. audio-only DASH davranisini farkli client'larda canli testle sertlestir
-2. kalite gecisi ve audio switch verisini alarm / rapor ekranlarina daha derin bagla
-3. Operasyon Merkezi'ni buyuk stream sayisi ve uzun oturumlarla sertlestir
-4. S3 / MinIO archive ve restore akisini getir
-5. multi-node origin-edge mimarisini tasarla
-6. RBAC, audit log ve SSO katmanini ekle
+2. Operasyon Merkezi'ni buyuk stream sayisi ve uzun oturumlarla sertlestir
+3. archive / object storage akisina gercek S3 ve MinIO saha testi yap
+4. multi-node origin-edge mimarisini tasarla
+5. RBAC, audit log ve SSO katmanini ekle

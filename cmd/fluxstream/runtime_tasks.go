@@ -1,15 +1,18 @@
 package main
 
 import (
+	"context"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/fluxstream/fluxstream/internal/analytics"
+	"github.com/fluxstream/fluxstream/internal/archive"
 	"github.com/fluxstream/fluxstream/internal/config"
 	"github.com/fluxstream/fluxstream/internal/recording"
 	"github.com/fluxstream/fluxstream/internal/storage"
@@ -39,7 +42,7 @@ func buildLiveOptionsFromConfig(cfg *config.Manager) transcode.LiveOptions {
 	return opts
 }
 
-func startMaintenanceLoops(ctxDone <-chan struct{}, cfg *config.Manager, db *storage.SQLiteDB, tracker *analytics.Tracker, recManager *recording.Manager, tcManager *transcode.Manager, dataDir string) {
+func startMaintenanceLoops(ctxDone <-chan struct{}, cfg *config.Manager, db *storage.SQLiteDB, tracker *analytics.Tracker, recManager *recording.Manager, archiveManager *archive.Manager, tcManager *transcode.Manager, dataDir string) {
 	if cfg.GetBool("analytics_persist_enabled", true) && tracker != nil {
 		interval := time.Duration(cfg.GetInt("analytics_snapshot_interval", 60)) * time.Second
 		if interval < 15*time.Second {
@@ -106,6 +109,39 @@ func startMaintenanceLoops(ctxDone <-chan struct{}, cfg *config.Manager, db *sto
 		}()
 	}
 
+	if archiveManager != nil {
+		interval := time.Duration(cfg.GetInt("archive_scan_interval_minutes", 10)) * time.Minute
+		if interval < 2*time.Minute {
+			interval = 2 * time.Minute
+		}
+		go func() {
+			ticker := time.NewTicker(interval)
+			defer ticker.Stop()
+			runArchiveSync := func() {
+				if !cfg.GetBool("archive_enabled", false) || !cfg.GetBool("archive_auto_upload", false) {
+					return
+				}
+				uploaded, err := archiveManager.SyncPending(context.Background(), cfg.GetInt("archive_batch_size", 3))
+				if err != nil {
+					_ = db.AddLog("WARN", "archive", fmt.Sprintf("Arsiv senkronizasyonu basarisiz: %v", err))
+					return
+				}
+				if uploaded > 0 {
+					_ = db.AddLog("INFO", "archive", fmt.Sprintf("Yeni arsivlenen kayit sayisi: %d", uploaded))
+				}
+			}
+			runArchiveSync()
+			for {
+				select {
+				case <-ctxDone:
+					return
+				case <-ticker.C:
+					runArchiveSync()
+				}
+			}
+		}()
+	}
+
 	if cfg.GetBool("maintenance_auto_cleanup", true) {
 		intervalHours := cfg.GetInt("maintenance_cleanup_interval", 6)
 		if intervalHours <= 0 {
@@ -161,10 +197,14 @@ func startMaintenanceLoops(ctxDone <-chan struct{}, cfg *config.Manager, db *sto
 	_ = dataDir
 }
 
-func buildHealthReport(cfg *config.Manager, db *storage.SQLiteDB, stats storage.ServerStats, tcManager *transcode.Manager, streamMgr *stream.Manager, playerTelemetry *playerTelemetryCollector, dataDir string) map[string]interface{} {
+func buildHealthReport(cfg *config.Manager, db *storage.SQLiteDB, stats storage.ServerStats, tcManager *transcode.Manager, streamMgr *stream.Manager, playerTelemetry *playerTelemetryCollector, archiveManager *archive.Manager, dataDir string) map[string]interface{} {
 	alerts := make([]systemAlert, 0, 8)
 	status := "ok"
 	qoeStreams := make([]map[string]interface{}, 0, 8)
+	archiveSummary := archive.Summary{}
+	if archiveManager != nil {
+		archiveSummary = archiveManager.Summary()
+	}
 
 	if cfg.GetBool("alerts_enabled", true) {
 		if cfg.GetBool("ssl_enabled", false) {
@@ -269,6 +309,26 @@ func buildHealthReport(cfg *config.Manager, db *storage.SQLiteDB, stats storage.
 				Action:      "Teslimat / ABR ekranindan adaptif bitrate'i acabilirsiniz.",
 			})
 		}
+		if cfg.GetBool("archive_enabled", false) {
+			switch {
+			case !archiveSummary.Enabled:
+				alerts = append(alerts, systemAlert{
+					Level:       "warning",
+					Code:        "archive_config_invalid",
+					Title:       "Arsivleme acik ama nesne depolama ayari eksik",
+					Description: "Archive / object storage akisi etkinlestirilmis gorunuyor ancak saglayici ayarlari tamamlanmadi.",
+					Action:      "Depolama ekranindan provider, endpoint veya bucket bilgilerini dogrulayin.",
+				})
+			case archiveSummary.ErrorItems > 0:
+				alerts = append(alerts, systemAlert{
+					Level:       "warning",
+					Code:        "archive_errors_present",
+					Title:       "Arsiv hatalari var",
+					Description: fmt.Sprintf("Kayit arsiv kutugunde %d hata durumundaki oge gorunuyor.", archiveSummary.ErrorItems),
+					Action:      "Kayitlar ekranindaki Arsiv Kutuphanesi tablosunu acip hatali ogeleri yeniden deneyin.",
+				})
+			}
+		}
 
 		for _, item := range collectRuntimeObservability(streamMgr, tcManager, playerTelemetry) {
 			streamAlerts := buildQoEAlerts(cfg, item.StreamName, item.Telemetry)
@@ -276,17 +336,22 @@ func buildHealthReport(cfg *config.Manager, db *storage.SQLiteDB, stats storage.
 				alerts = append(alerts, streamAlerts...)
 			}
 			qoeStreams = append(qoeStreams, map[string]interface{}{
-				"stream_key":             item.StreamKey,
-				"stream_name":            item.StreamName,
-				"active_sessions":        item.Telemetry.ActiveSessions,
-				"waiting_sessions":       item.Telemetry.WaitingSessions,
-				"offline_sessions":       item.Telemetry.OfflineSessions,
-				"average_buffer_seconds": item.Telemetry.AverageBufferSeconds,
-				"total_stalls":           item.Telemetry.TotalStalls,
-				"active_audio_track_id":  item.Tracks.ActiveAudioTrackID,
-				"active_video_track_id":  item.Tracks.ActiveVideoTrackID,
-				"video_track_count":      len(item.Tracks.VideoTracks),
-				"audio_track_count":      len(item.Tracks.AudioTracks),
+				"stream_key":                item.StreamKey,
+				"stream_name":               item.StreamName,
+				"active_sessions":           item.Telemetry.ActiveSessions,
+				"waiting_sessions":          item.Telemetry.WaitingSessions,
+				"offline_sessions":          item.Telemetry.OfflineSessions,
+				"average_buffer_seconds":    item.Telemetry.AverageBufferSeconds,
+				"total_stalls":              item.Telemetry.TotalStalls,
+				"total_quality_transitions": item.Telemetry.TotalQualityTransitions,
+				"total_audio_switches":      item.Telemetry.TotalAudioSwitches,
+				"dominant_quality":          dominantTelemetryLabel(item.Telemetry.Qualities),
+				"dominant_audio":            dominantTelemetryLabel(item.Telemetry.AudioTracks),
+				"qoe_alert_count":           len(streamAlerts),
+				"active_audio_track_id":     item.Tracks.ActiveAudioTrackID,
+				"active_video_track_id":     item.Tracks.ActiveVideoTrackID,
+				"video_track_count":         len(item.Tracks.VideoTracks),
+				"audio_track_count":         len(item.Tracks.AudioTracks),
 			})
 		}
 	}
@@ -325,6 +390,7 @@ func buildHealthReport(cfg *config.Manager, db *storage.SQLiteDB, stats storage.
 			"recordings_bytes": folderSize(filepath.Join(dataDir, "recordings")),
 			"hls_bytes":        folderSize(filepath.Join(dataDir, "hls")),
 			"dash_bytes":       folderSize(filepath.Join(dataDir, "dash")),
+			"archive":          archiveSummary,
 		},
 		"snapshots":       snapshots,
 		"qoe_streams":     qoeStreams,
@@ -347,6 +413,18 @@ func buildRecommendations(cfg *config.Manager, alerts []systemAlert) []string {
 		recs = append(recs, "Kritik bir sorun gorunmuyor. Sistem su an canli dagitim icin hazir.")
 	}
 	return recs
+}
+
+func dominantTelemetryLabel(values map[string]int) string {
+	bestLabel := "-"
+	bestValue := 0
+	for label, value := range values {
+		if value > bestValue && strings.TrimSpace(label) != "" {
+			bestLabel = label
+			bestValue = value
+		}
+	}
+	return bestLabel
 }
 
 func readCertificateExpiry(certPath string) (time.Time, bool) {
