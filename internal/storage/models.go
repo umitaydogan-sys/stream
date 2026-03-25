@@ -136,3 +136,42 @@ type AnalyticsSnapshot struct {
 	ViewersByFormat  string    `json:"viewers_by_format"`
 	ViewersByCountry string    `json:"viewers_by_country"`
 }
+
+// PlayerTelemetrySample stores a persisted QoE snapshot for a stream.
+type PlayerTelemetrySample struct {
+	ID                     int64     `json:"id"`
+	StreamKey              string    `json:"stream_key"`
+	ActiveSessions         int       `json:"active_sessions"`
+	WaitingSessions        int       `json:"waiting_sessions"`
+	OfflineSessions        int       `json:"offline_sessions"`
+	DebugSessions          int       `json:"debug_sessions"`
+	TotalStalls            int64     `json:"total_stalls"`
+	TotalRecoveries        int64     `json:"total_recoveries"`
+	AverageBufferSeconds   float64   `json:"average_buffer_seconds"`
+	AveragePlaybackSeconds float64   `json:"average_playback_seconds"`
+	LastError              string    `json:"last_error"`
+	SourcesJSON            string    `json:"sources_json"`
+	FormatsJSON            string    `json:"formats_json"`
+	PagesJSON              string    `json:"pages_json"`
+	CreatedAt              time.Time `json:"created_at"`
+}
+
+// TrackTelemetrySample stores a persisted bitrate and runtime snapshot for a live track.
+type TrackTelemetrySample struct {
+	ID           int64     `json:"id"`
+	StreamKey    string    `json:"stream_key"`
+	TrackID      int       `json:"track_id"`
+	Kind         string    `json:"kind"`
+	Codec        string    `json:"codec"`
+	Width        int       `json:"width,omitempty"`
+	Height       int       `json:"height,omitempty"`
+	SampleRate   int       `json:"sample_rate,omitempty"`
+	Channels     int       `json:"channels,omitempty"`
+	Bitrate      int64     `json:"bitrate"`
+	Packets      int64     `json:"packets"`
+	Bytes        int64     `json:"bytes"`
+	IsDefault    bool      `json:"is_default"`
+	IsActive     bool      `json:"is_active"`
+	DisplayLabel string    `json:"display_label"`
+	CreatedAt    time.Time `json:"created_at"`
+}

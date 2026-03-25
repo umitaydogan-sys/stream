@@ -13,6 +13,8 @@ type Policy struct {
 	AllowedOutputs       []string `json:"allowed_outputs,omitempty"`
 	RequirePlaybackToken bool     `json:"require_playback_token"`
 	RequireSignedURL     bool     `json:"require_signed_url"`
+	DefaultVideoTrackID  int      `json:"default_video_track_id,omitempty"`
+	DefaultAudioTrackID  int      `json:"default_audio_track_id,omitempty"`
 	RetentionDays        int      `json:"retention_days,omitempty"`
 	Notes                string   `json:"notes,omitempty"`
 }

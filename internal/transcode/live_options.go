@@ -7,14 +7,16 @@ import (
 
 // LiveOptions controls the live HLS transcode path.
 type LiveOptions struct {
-	ABREnabled       bool      `json:"abr_enabled"`
-	MasterEnabled    bool      `json:"master_enabled"`
-	ProfileSet       string    `json:"profile_set"`
-	ProfilesJSON     string    `json:"profiles_json,omitempty"`
-	Profiles         []Profile `json:"profiles"`
-	SegmentDuration  int       `json:"segment_duration"`
-	PlaylistLength   int       `json:"playlist_length"`
-	AudioPassthrough bool      `json:"audio_passthrough"`
+	ABREnabled          bool      `json:"abr_enabled"`
+	MasterEnabled       bool      `json:"master_enabled"`
+	ProfileSet          string    `json:"profile_set"`
+	ProfilesJSON        string    `json:"profiles_json,omitempty"`
+	Profiles            []Profile `json:"profiles"`
+	SegmentDuration     int       `json:"segment_duration"`
+	PlaylistLength      int       `json:"playlist_length"`
+	AudioPassthrough    bool      `json:"audio_passthrough"`
+	DefaultVideoTrackID uint8     `json:"default_video_track_id,omitempty"`
+	DefaultAudioTrackID uint8     `json:"default_audio_track_id,omitempty"`
 }
 
 func DefaultLiveOptions() LiveOptions {

@@ -191,14 +191,22 @@ func (m *Manager) LoadDefaults() error {
 		"embed_use_https":  {"false", "embed"},
 
 		// Analytics / Health / Diagnostics
-		"analytics_persist_enabled":   {"true", "analytics"},
-		"analytics_snapshot_interval": {"60", "analytics"},
-		"alerts_enabled":              {"true", "health"},
-		"alerts_disk_threshold_gb":    {"5", "health"},
-		"alerts_memory_threshold_mb":  {"2048", "health"},
-		"alerts_cert_days":            {"21", "health"},
-		"diagnostics_enabled":         {"true", "health"},
-		"guided_mode_enabled":         {"true", "general"},
+		"analytics_persist_enabled":       {"true", "analytics"},
+		"analytics_snapshot_interval":     {"60", "analytics"},
+		"track_analytics_enabled":         {"true", "analytics"},
+		"track_analytics_interval":        {"20", "analytics"},
+		"player_telemetry_retention_days": {"30", "analytics"},
+		"track_analytics_retention_days":  {"30", "analytics"},
+		"alerts_enabled":                  {"true", "health"},
+		"alerts_disk_threshold_gb":        {"5", "health"},
+		"alerts_memory_threshold_mb":      {"2048", "health"},
+		"alerts_cert_days":                {"21", "health"},
+		"alerts_qoe_stalls_threshold":     {"6", "health"},
+		"alerts_qoe_buffer_seconds":       {"1", "health"},
+		"alerts_qoe_waiting_sessions":     {"2", "health"},
+		"alerts_qoe_offline_sessions":     {"1", "health"},
+		"diagnostics_enabled":             {"true", "health"},
+		"guided_mode_enabled":             {"true", "general"},
 	}
 
 	for key, d := range defaults {

@@ -269,6 +269,7 @@ func main() {
 	}
 	log.Println("[INIT] Analitik izleyici aktif")
 	playerTelemetry := newPlayerTelemetryCollector()
+	playerTelemetry.SetDB(db)
 	log.Println("[INIT] Player QoE telemetrisi aktif")
 
 	// Security
@@ -319,7 +320,7 @@ func main() {
 
 	// Suppress warnings
 	_, _, _, _, _, _ = recManager, analyticsTracker, tokenMgr, rateLimiter, ipBanList, twoFA
-	startMaintenanceLoops(ctx.Done(), cfg, db, analyticsTracker, recManager, dataDir)
+	startMaintenanceLoops(ctx.Done(), cfg, db, analyticsTracker, recManager, tcManager, dataDir)
 
 	// Initialize & start RTMP server
 	rtmpPort := cfg.GetInt("rtmp_port", DefaultRTMPPort)
@@ -446,6 +447,14 @@ func main() {
 	webServer.RegisterHandler("/audio/hls/", audioServer.HandleHLSAudio)
 	webServer.RegisterHandler("/audio/dash/", audioServer.HandleDASHAudio)
 	webServer.RegisterHandler("/icecast/", wrapStreamingPlaybackHandler(analyticsTracker, playbackAuth, "icecast", icecastPlaybackKey, audioServer.HandleIcecast))
+	webServer.RegisterHandler("/metrics", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		_, _ = w.Write([]byte(buildPrometheusMetrics(Version, analyticsTracker, streamManager, tcManager, playerTelemetry)))
+	})
+	webServer.RegisterHandler("/api/observability/otel", func(w http.ResponseWriter, r *http.Request) {
+		jsonResp(w, buildOpenTelemetryPayload(Version, analyticsTracker, streamManager, tcManager, playerTelemetry))
+	})
 	webServer.RegisterHandler("/api/player/telemetry", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
 			http.Error(w, "Method not allowed", 405)
@@ -477,13 +486,58 @@ func main() {
 		if streamManager.IsLive(st.StreamKey) {
 			st.Status = "live"
 		}
+		history, _ := db.GetPlayerTelemetrySamples(st.StreamKey, 72)
+		trackSnapshot := transcode.LiveTrackSnapshot{}
+		if tcManager != nil {
+			trackSnapshot = tcManager.GetLiveTrackSnapshot(st.StreamKey)
+		}
+		qoeAlerts := buildQoEAlerts(cfg, st.Name, playerTelemetry.Snapshot(st.StreamKey))
+		trackHistory, _ := db.GetTrackTelemetrySamples(st.StreamKey, 160)
 		jsonResp(w, map[string]interface{}{
-			"stream_id":   st.ID,
-			"stream_key":  st.StreamKey,
-			"stream_name": st.Name,
-			"status":      st.Status,
-			"telemetry":   playerTelemetry.Snapshot(st.StreamKey),
+			"stream_id":     st.ID,
+			"stream_key":    st.StreamKey,
+			"stream_name":   st.Name,
+			"status":        st.Status,
+			"telemetry":     playerTelemetry.Snapshot(st.StreamKey),
+			"history":       history,
+			"tracks":        trackSnapshot,
+			"track_history": trackHistory,
+			"qoe_alerts":    qoeAlerts,
 		})
+	})
+	webServer.RegisterAdminHandler("/api/admin/stream/tracks/defaults/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		idStr := strings.TrimPrefix(r.URL.Path, "/api/admin/stream/tracks/defaults/")
+		var id int64
+		fmt.Sscanf(idStr, "%d", &id)
+		st, err := db.GetStreamByID(id)
+		if err != nil || st == nil {
+			http.Error(w, "Stream bulunamadi", http.StatusNotFound)
+			return
+		}
+		var req struct {
+			DefaultVideoTrackID int `json:"default_video_track_id"`
+			DefaultAudioTrackID int `json:"default_audio_track_id"`
+		}
+		if err := decodeJSON(r, &req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if tcManager != nil {
+			var videoTrackID uint8
+			var audioTrackID uint8
+			if req.DefaultVideoTrackID > 0 && req.DefaultVideoTrackID <= 255 {
+				videoTrackID = uint8(req.DefaultVideoTrackID)
+			}
+			if req.DefaultAudioTrackID > 0 && req.DefaultAudioTrackID <= 255 {
+				audioTrackID = uint8(req.DefaultAudioTrackID)
+			}
+			tcManager.SetStreamTrackDefaults(st.StreamKey, videoTrackID, audioTrackID)
+		}
+		jsonResp(w, map[string]interface{}{"success": true})
 	})
 	webServer.RegisterAdminHandler("/api/system/restart", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
@@ -736,7 +790,7 @@ func main() {
 		stats.MemoryUsedMB = int64(memStats.Alloc / 1024 / 1024)
 		stats.MemoryTotalMB = int64(memStats.Sys / 1024 / 1024)
 		stats.UptimeSeconds = int64(time.Since(startTime).Seconds())
-		jsonResp(w, buildHealthReport(cfg, db, stats, tcManager, dataDir))
+		jsonResp(w, buildHealthReport(cfg, db, stats, tcManager, streamManager, playerTelemetry, dataDir))
 	})
 	webServer.RegisterHandler("/api/maintenance/run", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
@@ -747,11 +801,15 @@ func main() {
 		deletedOld, _ := recManager.CleanupOld(time.Duration(retentionDays) * 24 * time.Hour)
 		trimmed, _ := recManager.TrimLatestPerStream(cfg.GetInt("recordings_keep_latest", 10))
 		snapshotDeleted, _ := db.CleanupAnalyticsSnapshots(time.Duration(cfg.GetInt("analytics_retention_days", 30)) * 24 * time.Hour)
+		playerTelemetryDeleted, _ := db.CleanupPlayerTelemetrySamples(time.Duration(cfg.GetInt("player_telemetry_retention_days", 30)) * 24 * time.Hour)
+		trackAnalyticsDeleted, _ := db.CleanupTrackTelemetrySamples(time.Duration(cfg.GetInt("track_analytics_retention_days", 30)) * 24 * time.Hour)
 		jsonResp(w, map[string]interface{}{
 			"success":                    true,
 			"deleted_recordings_old":     deletedOld,
 			"deleted_recordings_trimmed": trimmed,
 			"deleted_analytics":          snapshotDeleted,
+			"deleted_player_telemetry":   playerTelemetryDeleted,
+			"deleted_track_analytics":    trackAnalyticsDeleted,
 		})
 	})
 	webServer.RegisterHandler("/api/diagnostics/stream/", func(w http.ResponseWriter, r *http.Request) {
@@ -765,6 +823,12 @@ func main() {
 		}
 		payload := buildStreamDiagnostics(st, cfg, dataDir, tcManager)
 		payload["telemetry"] = playerTelemetry.Snapshot(st.StreamKey)
+		payload["telemetry_history"], _ = db.GetPlayerTelemetrySamples(st.StreamKey, 48)
+		payload["track_history"], _ = db.GetTrackTelemetrySamples(st.StreamKey, 160)
+		payload["qoe_alerts"] = buildQoEAlerts(cfg, st.Name, playerTelemetry.Snapshot(st.StreamKey))
+		if tcManager != nil {
+			payload["tracks"] = tcManager.GetLiveTrackSnapshot(st.StreamKey)
+		}
 		payload["live_now"] = streamManager.IsLive(st.StreamKey)
 		jsonResp(w, payload)
 	})

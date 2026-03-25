@@ -94,6 +94,9 @@ video{width:100%%;height:100%%;object-fit:contain;background:#000}
 .offline-msg{position:absolute;left:50%%;top:50%%;transform:translate(-50%%,-50%%);text-align:center;color:#cbd5e1;z-index:3;display:none;padding:18px 20px;border-radius:18px;background:rgba(15,23,42,.44);backdrop-filter:blur(10px)}
 .offline-msg h2{font-size:20px;margin-bottom:8px}
 .offline-msg p{font-size:13px;color:#94a3b8}
+.audio-track-box{position:absolute;top:16px;right:16px;z-index:6;display:none;align-items:center;gap:8px;padding:10px 12px;border-radius:14px;background:rgba(15,23,42,.56);backdrop-filter:blur(12px);border:1px solid rgba(148,163,184,.18)}
+.audio-track-box label{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#cbd5e1}
+.audio-track-box select{min-width:160px;padding:8px 10px;border-radius:10px;border:1px solid rgba(148,163,184,.22);background:#0f172a;color:#fff;font-size:12px}
 .qoe-debug{position:absolute;right:14px;bottom:14px;z-index:7;display:none;min-width:260px;max-width:min(360px,calc(100%% - 28px));padding:12px 14px;border-radius:14px;background:rgba(2,6,23,.78);backdrop-filter:blur(12px);border:1px solid rgba(148,163,184,.18);box-shadow:0 16px 40px rgba(2,6,23,.34);font:12px/1.5 Consolas,Monaco,'Courier New',monospace;color:#dbeafe}
 .qoe-debug.visible{display:block}
 .qoe-debug-title{font:600 11px/1.2 'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#93c5fd;margin-bottom:8px}
@@ -111,6 +114,10 @@ video{width:100%%;height:100%%;object-fit:contain;background:#000}
   <video id="video" controls playsinline></video>
   <button id="resume-button" class="resume-button" type="button"><i class="bi bi-play-fill"></i><span>Play</span></button>
   <div id="player-watermark" class="player-watermark"></div>
+  <div id="audio-track-box" class="audio-track-box">
+    <label for="audio-track-select">Ses</label>
+    <select id="audio-track-select"></select>
+  </div>
   <div id="offline" class="offline-msg">
     <h2>Yayin cevrimdisi</h2>
     <p>Yayin basladiginda otomatik oynatilacak</p>
@@ -136,6 +143,8 @@ const playerTitle = document.getElementById('player-title');
 const logoBox = document.getElementById('player-floating-logo');
 const watermark = document.getElementById('player-watermark');
 const resumeButton = document.getElementById('resume-button');
+const audioTrackBox = document.getElementById('audio-track-box');
+const audioTrackSelect = document.getElementById('audio-track-select');
 let hls;
 let dashPlayer;
 let retryTimer = null;
@@ -146,12 +155,18 @@ let lastProgressAt = 0;
 let lastCurrentTime = 0;
 let stallRecoveries = 0;
 let lastErrorMessage = '-';
+let lastErrorSourceKind = '';
+let fallbackNote = '-';
 let reconnectState = 'idle';
 let retryAt = 0;
 let qoeTimer = null;
 let telemetryTimer = null;
 let telemetryInflight = false;
 let telemetryDirty = false;
+let hlsAudioTracks = [];
+let dashAudioTracks = [];
+let preferredAudioTrack = (queryParams.get('audio_track') || '').trim();
+let preferredAudioTrackApplied = false;
 const qoeState = {
   preferredFormat: preferredFormat || 'auto',
   sourceOverride: 'auto',
@@ -160,6 +175,7 @@ const qoeState = {
   stallCount: 0,
   recoveries: 0,
   lastError: '-',
+  fallback: '-',
   reconnect: 'idle',
   offline: 'hidden'
 };
@@ -225,7 +241,8 @@ function renderQOEDebug() {
   qoeState.sourceOverride = sourceOverride || 'auto';
   qoeState.activeSourceKind = activeSourceKind || '-';
   qoeState.recoveries = stallRecoveries;
-  qoeState.lastError = lastErrorMessage || '-';
+  qoeState.lastError = getVisibleError();
+  qoeState.fallback = fallbackNote || '-';
   qoeState.reconnect = reconnectState;
   qoeState.offline = offline && offline.style.display !== 'none' ? 'visible' : 'hidden';
   updateQualityLabel();
@@ -241,6 +258,7 @@ function renderQOEDebug() {
     '<div class="qoe-debug-row"><span>Stall</span><span>' + qoeState.stallCount + '</span></div>' +
     '<div class="qoe-debug-row"><span>Toparlanma</span><span>' + qoeState.recoveries + '</span></div>' +
     '<div class="qoe-debug-row"><span>Reconnect</span><span>' + qoeState.reconnect + '</span></div>' +
+    '<div class="qoe-debug-row"><span>Gecis</span><span>' + qoeState.fallback + '</span></div>' +
     '<div class="qoe-debug-row"><span>Offline</span><span>' + qoeState.offline + '</span></div>' +
     '<div class="qoe-debug-row"><span>Hata</span><span>' + qoeState.lastError + '</span></div>';
 }
@@ -259,7 +277,7 @@ function buildTelemetryPayload() {
     buffer_seconds: Number(getBufferedSeconds()),
     stall_count: Number(qoeState.stallCount || 0),
     recoveries: Number(stallRecoveries || 0),
-    last_error: lastErrorMessage || '-',
+    last_error: getVisibleError(),
     reconnect: reconnectState || 'idle',
     offline: !!(offline && offline.style.display !== 'none'),
     waiting: reconnectState === 'waiting' || reconnectState === 'stalled' || reconnectState === 'retrying' || reconnectState === 'recovering',
@@ -302,8 +320,16 @@ function startQOEDebugLoop() {
   qoeTimer = setInterval(renderQOEDebug, 1000);
 }
 
-function setLastError(message) {
+function getVisibleError() {
+  if (reconnectState === 'playing' && activeSourceKind && lastErrorSourceKind && activeSourceKind !== lastErrorSourceKind) {
+    return '-';
+  }
+  return lastErrorMessage || '-';
+}
+
+function setLastError(message, sourceKind) {
   lastErrorMessage = message || '-';
+  lastErrorSourceKind = sourceKind || activeSourceKind || '';
   renderQOEDebug();
   sendTelemetry();
 }
@@ -356,6 +382,116 @@ function tryAutoplay() {
   if (playPromise && playPromise.catch) {
     playPromise.catch(function() { showResumeButton(); });
   }
+}
+
+function hideAudioTrackSelector() {
+  if (audioTrackBox) audioTrackBox.style.display = 'none';
+  if (audioTrackSelect) audioTrackSelect.innerHTML = '';
+}
+
+function trackMatchesPreferred(track, preferred) {
+  const target = String(preferred || '').trim().toLowerCase();
+  if (!target) return false;
+  const id = String((track && track.id != null) ? track.id : '').toLowerCase();
+  const name = String((track && (track.name || track.lang || track.label || track.displayName)) || '').toLowerCase();
+  if (id === target) return true;
+  if (name === target) return true;
+  if (name.indexOf('track ' + target) !== -1) return true;
+  if (name.indexOf('track-' + target) !== -1) return true;
+  return false;
+}
+
+function renderAudioTrackSelector(items, selectedIndex, applyFn) {
+  if (!audioTrackBox || !audioTrackSelect || !Array.isArray(items) || items.length <= 1) {
+    hideAudioTrackSelector();
+    return;
+  }
+  audioTrackBox.style.display = 'inline-flex';
+  audioTrackSelect.innerHTML = items.map(function(item, index) {
+    const label = item.label || item.name || item.lang || ('Track ' + (index + 1));
+    const selected = index === selectedIndex ? ' selected' : '';
+    return '<option value="' + index + '"' + selected + '>' + label + '</option>';
+  }).join('');
+  audioTrackSelect.onchange = function() {
+    const nextIndex = parseInt(audioTrackSelect.value || '0', 10) || 0;
+    applyFn(nextIndex);
+  };
+}
+
+function syncHLSAudioTracks() {
+  if (!hls || !Array.isArray(hls.audioTracks)) {
+    hideAudioTrackSelector();
+    return;
+  }
+  hlsAudioTracks = hls.audioTracks.map(function(track, index) {
+    return {
+      id: track && track.id != null ? track.id : index,
+      name: (track && (track.name || track.lang || track.groupId)) || ('Track ' + (index + 1)),
+      label: (track && (track.name || track.lang || track.groupId)) || ('Track ' + (index + 1))
+    };
+  });
+  if (!preferredAudioTrackApplied && preferredAudioTrack) {
+    const requestedIndex = hlsAudioTracks.findIndex(function(track) {
+      return trackMatchesPreferred(track, preferredAudioTrack);
+    });
+    if (requestedIndex >= 0) {
+      try { hls.audioTrack = requestedIndex; } catch (e) {}
+      preferredAudioTrackApplied = true;
+    }
+  }
+  const selectedIndex = hls.audioTrack >= 0 ? hls.audioTrack : hlsAudioTracks.findIndex(function(track) { return trackMatchesPreferred(track, preferredAudioTrack); });
+  renderAudioTrackSelector(hlsAudioTracks, selectedIndex >= 0 ? selectedIndex : 0, function(nextIndex) {
+    if (!hls) return;
+    try { hls.audioTrack = nextIndex; } catch (e) {}
+    const selected = hlsAudioTracks[nextIndex];
+    if (selected) preferredAudioTrack = String(selected.id || nextIndex + 1);
+    renderQOEDebug();
+    sendTelemetry();
+  });
+}
+
+function syncDashAudioTracks() {
+  if (!dashPlayer || typeof dashPlayer.getTracksFor !== 'function') {
+    hideAudioTrackSelector();
+    return;
+  }
+  dashAudioTracks = (dashPlayer.getTracksFor('audio') || []).map(function(track, index) {
+    return {
+      raw: track,
+      id: track && track.id != null ? track.id : index,
+      name: (track && (track.lang || track.id || track.labels && track.labels[0])) || ('Track ' + (index + 1)),
+      label: (track && (track.lang || track.id || track.labels && track.labels[0])) || ('Track ' + (index + 1))
+    };
+  });
+  if (!dashAudioTracks.length || dashAudioTracks.length === 1) {
+    hideAudioTrackSelector();
+    return;
+  }
+  let selectedIndex = 0;
+  if (typeof dashPlayer.getCurrentTrackFor === 'function') {
+    const current = dashPlayer.getCurrentTrackFor('audio');
+    const idx = dashAudioTracks.findIndex(function(track) { return track.raw === current; });
+    if (idx >= 0) selectedIndex = idx;
+  }
+  if (!preferredAudioTrackApplied && preferredAudioTrack) {
+    const requestedIndex = dashAudioTracks.findIndex(function(track) {
+      return trackMatchesPreferred(track, preferredAudioTrack);
+    });
+    if (requestedIndex >= 0) {
+      selectedIndex = requestedIndex;
+      if (typeof dashPlayer.setCurrentTrack === 'function') {
+        try { dashPlayer.setCurrentTrack(dashAudioTracks[requestedIndex].raw); } catch (e) {}
+      }
+      preferredAudioTrackApplied = true;
+    }
+  }
+  renderAudioTrackSelector(dashAudioTracks, selectedIndex, function(nextIndex) {
+    if (!dashPlayer || typeof dashPlayer.setCurrentTrack !== 'function' || !dashAudioTracks[nextIndex]) return;
+    try { dashPlayer.setCurrentTrack(dashAudioTracks[nextIndex].raw); } catch (e) {}
+    preferredAudioTrack = String(dashAudioTracks[nextIndex].id || nextIndex + 1);
+    renderQOEDebug();
+    sendTelemetry();
+  });
 }
 
 function applySkin() {
@@ -428,14 +564,14 @@ function sourceCatalog() {
       { kind: 'hls', url: passthroughURL(location.origin + '/hls/' + streamKey + '/index.m3u8'), marker: '#EXTM3U' }
     ],
     mp4: [
-      { kind: 'native', mime: 'video/mp4', url: passthroughURL(location.origin + '/mp4/' + streamKey + '/' + streamKey + '.mp4') },
       { kind: 'hls', url: passthroughURL(location.origin + '/hls/' + streamKey + '/master.m3u8'), marker: '#EXTM3U' },
-      { kind: 'dash', url: passthroughURL(location.origin + '/dash/' + streamKey + '/manifest.mpd'), marker: '<MPD' }
+      { kind: 'dash', url: passthroughURL(location.origin + '/dash/' + streamKey + '/manifest.mpd'), marker: '<MPD' },
+      { kind: 'native', mime: 'video/mp4', url: passthroughURL(location.origin + '/mp4/' + streamKey + '/' + streamKey + '.mp4') }
     ],
     webm: [
-      { kind: 'native', mime: 'video/webm', url: passthroughURL(location.origin + '/webm/' + streamKey + '/' + streamKey + '.webm') },
       { kind: 'hls', url: passthroughURL(location.origin + '/hls/' + streamKey + '/master.m3u8'), marker: '#EXTM3U' },
-      { kind: 'dash', url: passthroughURL(location.origin + '/dash/' + streamKey + '/manifest.mpd'), marker: '<MPD' }
+      { kind: 'dash', url: passthroughURL(location.origin + '/dash/' + streamKey + '/manifest.mpd'), marker: '<MPD' },
+      { kind: 'native', mime: 'video/webm', url: passthroughURL(location.origin + '/webm/' + streamKey + '/' + streamKey + '.webm') }
     ]
   };
   catalog.flv = catalog.hls.slice();
@@ -468,8 +604,12 @@ async function resolveSource() {
 function cleanupPlayers() {
   try { if (hls) { hls.destroy(); hls = null; } } catch (e) {}
   try { if (dashPlayer) { dashPlayer.reset(); dashPlayer = null; } } catch (e) {}
+  hlsAudioTracks = [];
+  dashAudioTracks = [];
+  hideAudioTrackSelector();
   activeSourceKind = '';
   reconnectState = 'idle';
+  fallbackNote = '-';
   hideResumeButton();
   video.pause();
   video.removeAttribute('src');
@@ -537,7 +677,9 @@ function markReady() {
     clearTimeout(retryTimer);
     retryTimer = null;
   }
+  fallbackNote = (lastErrorSourceKind && activeSourceKind && lastErrorSourceKind !== activeSourceKind) ? (lastErrorSourceKind + ' -> ' + activeSourceKind) : '-';
   lastErrorMessage = '-';
+  lastErrorSourceKind = '';
   retryAt = 0;
   video.style.display = 'block';
   if (offline) offline.style.display = 'none';
@@ -599,10 +741,12 @@ function startHLS(url) {
     });
     hls.loadSource(url);
     hls.attachMedia(video);
-    hls.on(Hls.Events.MANIFEST_PARSED, markReady);
+    hls.on(Hls.Events.MANIFEST_PARSED, function() { syncHLSAudioTracks(); markReady(); });
     hls.on(Hls.Events.LEVEL_SWITCHED, renderQOEDebug);
+    hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, syncHLSAudioTracks);
+    hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, syncHLSAudioTracks);
     hls.on(Hls.Events.ERROR, function(event, data) {
-      setLastError('hls:' + ((data && data.details) || (data && data.type) || 'unknown'));
+      setLastError('hls:' + ((data && data.details) || (data && data.type) || 'unknown'), 'hls');
       if (!data || !data.fatal) return;
       if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
         reconnectState = 'hls-network-retry';
@@ -641,12 +785,15 @@ function startDASH(url) {
   activeSourceKind = 'dash';
   dashPlayer = window.dashjs.MediaPlayer().create();
   dashPlayer.updateSettings({ streaming: { lowLatencyEnabled: true } });
-  dashPlayer.on(window.dashjs.MediaPlayer.events.STREAM_INITIALIZED, markReady);
+  dashPlayer.on(window.dashjs.MediaPlayer.events.STREAM_INITIALIZED, function() { syncDashAudioTracks(); markReady(); });
   dashPlayer.on(window.dashjs.MediaPlayer.events.QUALITY_CHANGE_RENDERED, renderQOEDebug);
+  if (window.dashjs.MediaPlayer.events.TRACK_CHANGE_RENDERED) {
+    dashPlayer.on(window.dashjs.MediaPlayer.events.TRACK_CHANGE_RENDERED, syncDashAudioTracks);
+  }
   dashPlayer.initialize(video, url, autoplay);
   renderQOEDebug();
   dashPlayer.on(window.dashjs.MediaPlayer.events.ERROR, function(evt) {
-    setLastError('dash:' + (((evt && evt.error && evt.error.message) || (evt && evt.event && evt.event.message) || (evt && evt.message) || 'unknown')));
+    setLastError('dash:' + (((evt && evt.error && evt.error.message) || (evt && evt.event && evt.event.message) || (evt && evt.message) || 'unknown')), 'dash');
     tryHLSMasterFallback();
   });
 }
@@ -654,6 +801,7 @@ function startDASH(url) {
 async function tryPlay() {
   cleanupPlayers();
   reconnectState = 'probing';
+  fallbackNote = '-';
   renderQOEDebug();
   startTelemetryLoop();
   sendTelemetry();
@@ -707,7 +855,7 @@ video.addEventListener('pause', function() {
   sendTelemetry();
 });
 video.addEventListener('error', function() {
-  setLastError('video:' + ((video.error && video.error.message) || (video.error && video.error.code) || 'unknown'));
+  setLastError('video:' + ((video.error && video.error.message) || (video.error && video.error.code) || 'unknown'), activeSourceKind || 'video');
   sendTelemetry();
   scheduleRetry();
 });

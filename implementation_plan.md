@@ -3,7 +3,7 @@
 ## 1. Urun Hedefi
 
 FluxStream, tek binary calisan, yerelde ve Linux sunucuda kolay kurulabilen,
-cok protokollu bir canli yayin sunucusudur.
+cok protokollu, urunlesmeye uygun bir canli yayin sunucusudur.
 
 Ana hedefler:
 
@@ -28,7 +28,6 @@ streaming cekirdegi yeterince olgunlastiktan sonra eklenecek.
 ### 2.2 Yonetim ve Urunlestirme
 
 - admin paneli, setup wizard, stream CRUD, embed uretici ve player template sistemi hazir
-- lisans yukleme ve dogrulama altyapisi mevcut
 - runtime lisans modeli ABR, RTMPS, recording ve branding tarafina bagli
 - backup, restore plani, Linux servis yonetimi ve dagitim akisi var
 
@@ -38,128 +37,75 @@ streaming cekirdegi yeterince olgunlastiktan sonra eklenecek.
 - `play` ve `embed` ekranlari iframe icinde kullanilabilir durumda
 - player template preview gercek gomulu player akisina cekildi
 - onceki `403`, framing ve sahte `offline` problemleri kapatildi
+- player tarafinda QoE debug overlay ve heartbeat tabanli telemetri var
+- debug paneli artik aktif kaynak, fallback gecisi ve gecerli hata durumunu daha durust gosteriyor
+- QoE verisi SQLite icinde kalici ornekler halinde saklanabiliyor
+- admin stream detay ekraninda temel zaman serisi grafikler gosterilebiliyor
+- admin panelde MPD/HLS manifestlerini ham metin olarak acabilen kullanim ve tanilama karti eklendi
+- VLC icin onerilen HLS linki, tarayici player linki ve ham MP4 farki arayuzde netlestirildi
+- menude ayri bir `Operasyon Merkezi` sayfasi eklendi
+- tum streamleri secerek sekmeli canli izleme ve tanilama merkezi kullanilabiliyor
+- stream arama alani yerine tum streamleri listeleyen merkezi bir selectbox eklendi
+- secim katmani ileride on-demand playlistleri de ayni merkezden yonetebilecek sekilde hazirlandi
+- `Genel Durum`, `Player ve Teslimat`, `QoE ve Telemetri`, `Track ve ABR`, `Manifest ve Ham Veri`, `OBS ve Ingest`, `Teshis` sekmeleri ayni merkezde bir araya getirildi
+- `MP4 Player` ve `WebM` preview davranisi tarayici dostu HLS / DASH oncelikli hale getirildi; ham cikis URL'leri yine arayuzde korunuyor
 
-## 3. Bu Turun Ana Isi: OBS Cok Kanalli Video Uyumu
+### 2.4 OBS Cok Kanalli Video ve Adaptif Dagitim
 
-Bu turdaki hedef, OBS tarafinda `Cok kanalli Video` acildiginda
-baglantinin kopmadan yayin kabul edebilmesiydi.
+- Enhanced RTMP multitrack ingest calisiyor
+- OBS icin panelde kopyalanabilir `Config Override JSON` veriliyor
+- stream olusturma ve stream detay ekranlarinda adim adim OBS rehberi var
+- OBS multitrack video katmanlari HLS varyantlarina baglanabiliyor
+- DASH repack, HLS master icindeki coklu varyantlari representation olarak mapleyebiliyor
+- admin/API tarafinda canli video ve audio track listesi gorulebiliyor
+- varsayilan video ve audio track secimi policy ve runtime seviyesinde uygulanabiliyor
+- direct multitrack HLS master artik alternate audio group uretebiliyor
+- video player icinde canli audio track secici gorunebiliyor
+- audio-only HLS yonlendirmesi secili audio track playlistine gidebiliyor
+- track bitrate ve runtime ornekleri kalici analytics olarak SQLite'a yazilabiliyor
+- `/metrics` ve `/api/observability/otel` cikislari hazir
+- QoE retention, esik tabanli uyarilar ve saglik raporu entegrasyonu aktif
+- Operasyon Merkezi teshis bolumu artik opsiyonel cikislari gereksiz yere kirmizi gostermiyor
+- `Hazir / Bekliyor / Kapali / Opsiyonel / Sorunlu` ayrimi ile daha durust teshis mantigi eklendi
 
-### 3.1 Kapatilan Teknik Sorun
+## 3. Bu Surecte Neleri Kapatmis Olduk
 
-Mevcut RTMP ingest sadece klasik FLV video/audio paketlerini okuyordu.
-OBS cok kanalli video acildiginda, birincil izin yanina ek video ve ses izleri
-Enhanced RTMP multitrack paketleri ile geliyordu.
+### 3.1 Player, Preview ve Embed Tarafi
 
-Bu ek iz paketleri sunucuda hata uretip baglantiyi dusuruyordu.
+- preview iframe engelleri kapatildi
+- direct link ve embed senaryolari yeniden duzeltildi
+- player template preview, gercek oynatici gorunumuyle hizalandi
+- sahte `offline` ve eski framing problemleri kapatildi
 
-### 3.2 Uygulanan Cozum
+### 3.2 OBS Cok Kanalli Video Destegi
 
-FLV okuyucuya Enhanced RTMP uyum katmani eklendi:
+- Enhanced RTMP multitrack paketleri parse edilir hale getirildi
+- `trackId` bilgisi ingest tarafinda alinmaya baslandi
+- OBS icin panelde hazir JSON ve kurulum rehberi eklendi
+- multitrack video katmanlari HLS master playlist tarafina baglandi
+- DASH tarafi HLS varyantlarindan representation uretebilir hale geldi
 
-- Enhanced video tag algilama
-- Enhanced audio tag algilama
-- multitrack wrapper icinden `trackId` okuma
-- H.264 `avc1` paketlerini klasik ic video formatina donusturme
-- AAC `mp4a` paketlerini klasik ic ses formatina donusturme
-- desteklenmeyen ek iz paketlerini baglantiyi dusurmeden yoksayma
+### 3.3 QoE ve Teshis Katmani
 
-RTMP handler ve stream manager tarafinda da:
+- player heartbeat telemetrisi eklendi
+- stall, toparlanma, reconnect, buffer ve hata bilgisi runtime olarak toplanmaya baslandi
+- admin stream detay ekranina canli `QoE ve Stall Telemetrisi` karti eklendi
+- diagnostics ekranina `HLS varyant sayisi` ve `DASH representation sayisi` eklendi
+- telemetri ornekleri SQLite icinde kalici olarak saklanmaya baslandi
+- admin stream detay ekranina temel zaman serisi grafikler eklendi
+- stream detay ekraninda canli track listesi ve varsayilan secim karti eklendi
 
-- `track 0` / varsayilan iz akisa alinacak
-- ek izler baglantiyi bozmadan yoksayilacak
+### 3.4 Log ve Metin Tarafi
 
-### 3.3 Panel Entegrasyonu
+- log ekraninda yeni kayitlar icin metin normalize etme katmani eklendi
+- API hata mesajlarinda metin normalize etme uygulandi
+- eski DASH hata metninin fallback sonrasi gereksiz yere kalmasi buyuk olcude temizlendi
+- debug panelinde artik aktif kaynak ve fallback gecisi ayri alanlarda izlenebiliyor
 
-Multitrack destegi sadece backend tarafinda birakilmadi.
-Stream olusturma ve stream detay ekranlarina su yardim katmani eklendi:
+## 4. Canli Testte Bulunan Kok Neden ve Kalici Cozum
 
-- kopyalanabilir `Config Override JSON`
-- secilen yayin moduna gore hazir OBS multitrack JSON on ayari
-- yayin olustuktan sonra otomatik dolan `OBS RTMP URL`
-- yayin olustuktan sonra otomatik dolan `OBS Yayin Anahtari`
-- cok basit, adim adim OBS kurulum rehberi
-- stream detay sayfasinda da ayni rehbere tekrar ulasabilme
-
-Boylece son kullanici teknik dokuman aramadan panelden dogrudan
-kopyala-yapistir ile kurulumu tamamlayabilir.
-
-## 4. Bu Fazin Bilincli Siniri
-
-Bu ilk fazda sunucu artik OBS cok kanalli video yayinini kabul eder,
-ancak mevcut dagitim zinciri hala tek bir birincil video izi uzerinden calisir.
-
-Yani su an:
-
-- OBS multitrack baglantisi kopmuyor
-- varsayilan video/ses izi akiyor
-- ek izler gelecekte kullanilmak uzere taninmis oluyor
-- ama ek izler henuz HLS master varyantlarina dogrudan baglanmiyor
-
-Bu bilincli bir ilk adimdir. Once baglanti ve temel akisi kararlilastirdik.
-Sonraki fazda bu izleri gercek ABR cikislarina baglayacagiz.
-
-## 5. Sonraki Multitrack Fazlari
-
-### 5.1 Faz 2
-
-- ek video izlerini stream icinde sakla
-- track metadatasini admin/API tarafina ac
-- OBS tarafindan gelen kalite katmanlarini ayristir
-- birincil iz yerine secilebilir varsayilan iz mantigi ekle
-
-### 5.2 Faz 3
-
-- OBS multitrack katmanlarini dogrudan ABR varyantlarina bagla
-- HLS master playlist icine OBS kaynakli varyantlar yaz
-- gerekmiyorsa sunucu tarafi yeniden encode maliyetini dusur
-- transcode ile OBS katmanlari arasinda karma mod ekle
-
-### 5.2.1 Bu Turda Kapanan Parca
-
-Bu turda OBS tarafindan gelen cok kanalli video izleri,
-live HLS override klasorunde dogrudan varyant playlist olarak yazilmaya baslandi.
-
-Yeni davranis:
-
-- `TrackID != 0` paketler artik ingest tarafinda tamamen atilmiyor
-- live transcode katmani bu paketleri bootstrap olarak bellekte tutuyor
-- cok kanalli video algilanirsa `ffmpeg` tabanli tek giris ABR yerine
-  dogrudan multitrack HLS session aktif oluyor
-- birincil OBS video izi kok `index.m3u8` olarak kalirken
-  diger izler alt varyant dizinlerine yaziliyor
-- kok `master.m3u8` bu varyantlari gercek ABR playlist olarak sunuyor
-
-Bu sayede OBS'ten gelen kalite katmanlari ilk kez gercekten
-HLS master playlist tarafina baglanmis oldu.
-
-### 5.2.2 Bu Turda Kapanan Parca
-
-Bu turda multitrack akis sadece HLS tarafinda birakilmadi.
-DASH repack ve player izleme tarafi da buna gore guclendirildi.
-
-Yeni davranis:
-
-- canli DASH repack artik HLS master icindeki tum video izlerini mapliyor
-- boylece OBS multitrack HLS kaynagi varsa DASH manifest tarafinda da
-  coklu representation uretilebiliyor
-- diagnostics ekranina `HLS varyant sayisi` ve
-  `DASH representation sayisi` alanlari eklendi
-- player sayfasi 5 saniyelik heartbeat ile QoE telemetrisi gonderiyor
-- stall, toparlanma, buffer, aktif kaynak, reconnect ve hata bilgisi
-  sunucu tarafinda runtime olarak toplanıyor
-- stream detay ekranina admin tarafinda canli `QoE ve Stall Telemetrisi`
-  karti eklendi
-- admin preview iframe'leri `debug=1` ile acilarak overlay
-  dogrudan panel icinde de gorulebilir hale geldi
-
-Bu sayede bir sonraki OBS testinde sadece "goruntu var mi yok mu"
-degil, HLS ve DASH tarafinda kac katman olustugu ile
-player tarafinda stall davranisinin nasil aktigi da ayni anda izlenebilir.
-
-### 5.2.3 Canli Testte Bulunan Kok Neden ve Kalici Cozum
-
-Canli VPS testinde `1080p` multitrack varyantta gorulen mikro segment
-probleminin asil nedeni RTMP chunk reader tarafinda bulundu.
+Canli VPS testlerinde `1080p` OBS multitrack varyantinda gorulen
+mikro segment probleminin asil kok nedeni RTMP chunk reader tarafinda bulundu.
 
 Kok neden:
 
@@ -180,9 +126,9 @@ Yapilan kalici duzeltmeler:
   gercek timestamp uretiyor
 - Type 3 yeni mesaj algisi, ayni delta'yi yeni mesaja dogru sekilde tasiyor
 - `internal/output/hls/muxer.go`
-  icinde timestamp sorunlarina karsi wall-clock savunma katmani eklendi
+  icinde wall-clock savunma katmani eklendi
 - `internal/output/dash/muxer.go`
-  icinde de ayni duration fallback mantigi uygulandi
+  icinde ayni duration fallback mantigi uygulandi
 - `internal/transcode/live_multitrack.go`
   icinde master playlist tekrar tum saglikli varyantlari ilan edecek hale getirildi
 
@@ -190,47 +136,139 @@ Sonuc:
 
 - mikro `EXTINF` segmentleri ortadan kalkti
 - DASH `SegmentTimeline` degerleri tutarli hale geldi
-- `master.m3u8` icinde hem `360p` hem `1080p` katmanlari yeniden saglikli
-  adaptif bitrate olarak gorunebilir hale geldi
-- onceki gecici guvenli mod, hata ayiklama asamasinda kullanilan bir ara adim olarak kaldi
+- `master.m3u8` icinde `360p` ve `1080p` katmanlari yeniden saglikli adaptif bitrate
+  olarak gorunebilir hale geldi
+- onceki gecici guvenli mod, hata ayiklama asamasinda kullanilan ara adim olarak kaldi
 
-Bu fazdan sonra odak noktasi artik sunlardir:
+## 5. Bugun Acik Kalan Gercek Eksikler
 
-- multitrack video katmanlari icin daha zengin analytics eklemek
-- multitrack audio track secimini urun seviyesine tasimak
-- karma OBS varyanti + transcode modunu olgunlastirmak
+Bugun artik asagidaki maddeler kapanmis sayilmali:
 
-### 5.3 Faz 4
+- OBS multitrack baglantisini kabul etme
+- multitrack video katmanlarini HLS varyantlarina baglama
+- mikro segment kok nedenini kapatma
+- HLS ve DASH tarafinda temel adaptif dagitimi ayaga kaldirma
+- admin tarafinda QoE ve stall gorunurlugu saglama
+- admin/API tarafinda track metadata ve track listesi acma
+- varsayilan video/audio track secimini policy ve runtime seviyesinde urunlestirme
+- QoE telemetrisini kalici depoya alma ve temel grafiklerle gosterebilme
 
-- cok izli audio secimi
-- dil bazli audio izleri
-- track bazli analytics
-- track bazli recording / archive metadata
+Bugun hala acik olan gercek eksikler ise sunlar:
 
-## 6. Dogrulama Durumu
+- DASH tarafinda coklu audio adaptation setinin canli testle dogrulanmasi
+- track bazli kalite gecisi, audio track degisimi ve codec davranisinin raporlastirilmasi
+- QoE alarm esiklerinin gercek saha verisiyle ince ayarlanmasi
+- dusuk bant genisligi icin ABR profil merdiveninin olcumle daha da optimize edilmemis olmasi
 
-Yerelde:
+## 6. Rakiplere Gore Bugunku Konum
 
-- `go test ./...` gecti
-- yeni Enhanced RTMP parser testleri eklendi
-- `go build ./cmd/fluxstream/` gecti
-- `go build ./cmd/fluxstream-license/` gecti
-- admin panel JS sentaks kontrolu gecti
+FluxStream'in bugun guclu oldugu taraflar:
 
-Windows:
+- tek binary ile kolay kurulum
+- ayni urunde admin paneli + setup wizard + stream CRUD + embed + template akisi
+- zengin ingest ve output matrisi
+- runtime lisans, backup ve Linux servis omurgasi
+- OBS cok kanalli video icin panel destekli kullanim rehberi
+- artik gercek OBS multitrack to ABR omurgasinin calisiyor olmasi
 
-- portable paket yeniden uretildi
-- Windows tarafinda yeniden test icin hazir
+FluxStream'in bugun zayif veya eksik oldugu taraflar:
 
-## 7. Acik Urunlestirme Basliklari
+- multi-node origin-edge cluster ve autoscaling yok
+- S3 / MinIO benzeri harici obje depolama ve archive restore akisi yok
+- Prometheus / OpenTelemetry / alarm omurgasi eksik
+- RBAC, audit log ve SSO eksik
+- DRM, SSAI ve gelismis monetizasyon eksik
+- otomatik test, yuk testi ve uzun sureli soak test kapsami dar
 
-- `max_nodes` lisans enforcement
-- maintenance expiry ve grace policy
-- `de`, `es`, `fr` ceviri kapsaminin tamamlanmasi
-- `.deb` paketleme ve rollback guvenli dagitim
-- Linux upgrade ve restore akisinin daha da sertlestirilmesi
+## 7. Bugunku Uretim Degerlendirmesi
 
-## 8. Cekirdek Sonrasi Buyuk Faz
+25 Mart 2026 itibariyla FluxStream artik yalnizca prototip degildir.
+
+Bugun icin en dogru tanim:
+
+- iyi bir tek-node medya sunucusu
+- urunlesmis bir yayin cekirdegi
+- canli testte kendini gostermis bir HLS merkezli dagitim sistemi
+
+Bu haliyle su alanlar icin ciddi bicimde kullanilabilir durumdadir:
+
+- kurum ici TV
+- radyo
+- webcast
+- webinar
+- markali player ve embed dagitimi
+
+Ama su haliyle henuz "ust seviye enterprise rakiplerle ayni ligde"
+demek icin erken:
+
+- cluster
+- storage
+- telemetry
+- security
+- audit
+- monetization
+
+## 8. Simdi Ne Yapmaliyiz
+
+Bir sonraki dogru kapatma sirasi bence su:
+
+1. Operasyon Merkezi ekranini canli kullanimla sertlestir
+2. DASH tarafinda coklu audio ve uzun sureli preview davranisini canli testle dogrula
+3. track bazli kalite gecisi, ses izi degisimi ve codec analytics raporlarini ekle
+4. QoE alarm esiklerini saha verisine gore ince ayarla
+5. S3 veya MinIO archive / restore akisini ekle
+6. multi-node origin-edge mimarisini tasarla
+7. RBAC, audit log, SSO ve lisans enforcement tarafini sertlestir
+8. ABR profil merdivenini olcum ve yuk testleriyle optimize et
+
+## 9. Operasyon Merkezi Fazinin Uygulama Taslagi
+
+Bu faz, stream detay ekranindaki yeni kartlari kaldirmadan daha guclu bir
+operasyon yuzeyi uretmeyi hedefler.
+
+Menu ve sayfa:
+
+- menu adi: `Operasyon Merkezi`
+- sayfa basligi: `Canli Izleme ve Tanilama Merkezi`
+- amac: tum streamleri tek merkezden secip, canli teslimat, telemetry,
+  track, manifest ve OBS bilgisini ayni yerden gormek
+
+Sayfa mimarisi:
+
+- sol kolon: stream listesi, arama ve filtreler
+- orta kolon: secilen stream icin sekmeli detay paneli
+- sag kolon: hizli linkler ve operator eylemleri
+
+Sekmeler:
+
+- `Genel Durum`
+- `Player ve Teslimat`
+- `QoE ve Telemetri`
+- `Track ve ABR`
+- `Manifest ve Ham Veri`
+- `OBS ve Ingest`
+- `Teshis`
+
+Bu fazda kullanilacak mevcut veri kaynaklari:
+
+- `/api/streams`
+- `/api/streams/{id}`
+- `/api/admin/player/telemetry/stream/{id}`
+- `/api/diagnostics/stream/{id}`
+- `/api/settings`
+- `/hls/{key}/master.m3u8`
+- `/hls/{key}/index.m3u8`
+- `/dash/{key}/manifest.mpd`
+
+Bu fazin ayni teslimat paketi icindeki ikinci zorunlu isi:
+
+- `MP4 preview fix`
+- ham MP4 cikisini korurken, tarayici preview ve panel butonlarini
+  kullaniciya daha durust ve kararlı sekilde sunmak
+- `MP4 Player` davranisini operasyon paneli, gelismis embed ve rehber
+  metinleriyle tutarli hale getirmek
+
+## 10. Cekirdek Sonrasi Buyuk Faz
 
 Streaming cekirdegi yeterince olgunlastiginda siradaki urun katmanlari:
 
@@ -241,44 +279,3 @@ Streaming cekirdegi yeterince olgunlastiginda siradaki urun katmanlari:
 - yoklama ve katilim
 - breakout room mantigi
 - takim ici mesajlasma
-
-## 9. Bugunku Uretim Degerlendirmesi
-
-24 Mart 2026 itibariyla FluxStream artik yalnizca prototip degildir.
-Tek node kurulumda, admin paneli olan, kurulabilen, yayin alabilen,
-oynatabilen, embed ve player linkleri uretebilen bir medya sunucusu haline geldi.
-
-Bugun icin guclu oldugu alanlar:
-
-- tek binary ile kolay kurulum
-- zengin ingest protokol seti
-- genis playback ve audio output matrisi
-- admin paneli, setup wizard ve stream yonetimi
-- recording, analytics ve player template sistemi
-- runtime lisans, backup ve Linux servis omurgasi
-- OBS multitrack video icin dogrudan ABR varyant uretimi ve canli QoE gorunurlugu
-
-Bugun icin sinirli veya eksik oldugu alanlar:
-
-- multitrack audio secimi ve track bazli analytics henuz tam urunlesmedi
-- multi-node origin-edge cluster mimarisi yok
-- S3/MinIO benzeri harici obje depolama akisi yok
-- tam enterprise seviye RBAC, audit log ve SSO katmani yok
-- DRM, SSAI ve gelismis monetizasyon katmani yok
-- otomatik test kapsami cekirdege gore henuz dar
-
-Kisa karar:
-
-- tek sunuculu kurum ici TV, radyo, webcast ve beyaz etiketli yayin isleri icin kullanilabilir seviyeye yaklasti
-- ama Wowza / Ant Media / Red5 / Nimble gibi ust seviye urunlerle ayni ligde diyebilmek icin cluster, storage, telemetry ve security taraflari daha da olgunlasmali
-
-## 10. Uretim Icin Siradaki Kapatma Sirasi
-
-Bir sonraki zorunlu kapatma sirasini su sekilde goruyorum:
-
-1. OBS cok kanalli izleri gercek ABR varyantlarina bagla
-2. player QoE ve stall telemetry katmani ekle
-3. Prometheus / OpenTelemetry / alarm entegrasyonu ekle
-4. S3 veya MinIO recording archive ve restore akisini ekle
-5. multi-node origin-edge mimarisini tasarla ve uygula
-6. RBAC, audit log ve SSO tarafini urunlestir

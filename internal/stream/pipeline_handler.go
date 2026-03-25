@@ -57,6 +57,12 @@ func (h *PipelineHandler) OnPublish(streamKey string, conn net.Conn) error {
 			if policy.ProfileSet != "" {
 				opts.ProfileSet = policy.ProfileSet
 			}
+			if policy.DefaultVideoTrackID > 0 && policy.DefaultVideoTrackID <= 255 {
+				opts.DefaultVideoTrackID = uint8(policy.DefaultVideoTrackID)
+			}
+			if policy.DefaultAudioTrackID > 0 && policy.DefaultAudioTrackID <= 255 {
+				opts.DefaultAudioTrackID = uint8(policy.DefaultAudioTrackID)
+			}
 			opts.Profiles = transcode.ResolveProfiles(opts.ProfileSet, opts.ProfilesJSON)
 		}
 		h.transcodeManager.SetStreamLiveOptions(streamKey, opts)

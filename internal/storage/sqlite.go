@@ -149,12 +149,49 @@ func (s *SQLiteDB) migrate() error {
 			viewers_by_format TEXT DEFAULT '{}',
 			viewers_by_country TEXT DEFAULT '{}'
 		)`,
+		`CREATE TABLE IF NOT EXISTS player_telemetry_samples (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			stream_key TEXT NOT NULL,
+			active_sessions INTEGER DEFAULT 0,
+			waiting_sessions INTEGER DEFAULT 0,
+			offline_sessions INTEGER DEFAULT 0,
+			debug_sessions INTEGER DEFAULT 0,
+			total_stalls INTEGER DEFAULT 0,
+			total_recoveries INTEGER DEFAULT 0,
+			average_buffer_seconds REAL DEFAULT 0,
+			average_playback_seconds REAL DEFAULT 0,
+			last_error TEXT DEFAULT '',
+			sources_json TEXT DEFAULT '{}',
+			formats_json TEXT DEFAULT '{}',
+			pages_json TEXT DEFAULT '{}',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE TABLE IF NOT EXISTS track_telemetry_samples (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			stream_key TEXT NOT NULL,
+			track_id INTEGER NOT NULL,
+			kind TEXT NOT NULL DEFAULT 'video',
+			codec TEXT DEFAULT '',
+			width INTEGER DEFAULT 0,
+			height INTEGER DEFAULT 0,
+			sample_rate INTEGER DEFAULT 0,
+			channels INTEGER DEFAULT 0,
+			bitrate INTEGER DEFAULT 0,
+			packets INTEGER DEFAULT 0,
+			bytes INTEGER DEFAULT 0,
+			is_default INTEGER DEFAULT 0,
+			is_active INTEGER DEFAULT 0,
+			display_label TEXT DEFAULT '',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
 		`CREATE INDEX IF NOT EXISTS idx_logs_created ON logs(created_at DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_logs_level ON logs(level)`,
 		`CREATE INDEX IF NOT EXISTS idx_streams_key ON streams(stream_key)`,
 		`CREATE INDEX IF NOT EXISTS idx_streams_status ON streams(status)`,
 		`CREATE INDEX IF NOT EXISTS idx_viewers_stream ON viewers(stream_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_analytics_snapshots_ts ON analytics_snapshots(timestamp DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_player_telemetry_stream_created ON player_telemetry_samples(stream_key, created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_track_telemetry_stream_created ON track_telemetry_samples(stream_key, created_at DESC)`,
 	}
 
 	for _, m := range migrations {
@@ -521,6 +558,199 @@ func (s *SQLiteDB) GetLogs(limit int, level, component string) ([]LogEntry, erro
 	return logs, nil
 }
 
+func (s *SQLiteDB) SavePlayerTelemetrySample(sample *PlayerTelemetrySample) error {
+	if sample == nil || strings.TrimSpace(sample.StreamKey) == "" {
+		return nil
+	}
+	lastError := textutil.FixLegacyUTF8String(sample.LastError)
+	_, err := s.db.Exec(
+		`INSERT INTO player_telemetry_samples
+		(stream_key, active_sessions, waiting_sessions, offline_sessions, debug_sessions,
+		 total_stalls, total_recoveries, average_buffer_seconds, average_playback_seconds,
+		 last_error, sources_json, formats_json, pages_json, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		sample.StreamKey,
+		sample.ActiveSessions,
+		sample.WaitingSessions,
+		sample.OfflineSessions,
+		sample.DebugSessions,
+		sample.TotalStalls,
+		sample.TotalRecoveries,
+		sample.AverageBufferSeconds,
+		sample.AveragePlaybackSeconds,
+		lastError,
+		sample.SourcesJSON,
+		sample.FormatsJSON,
+		sample.PagesJSON,
+		time.Now(),
+	)
+	return err
+}
+
+func (s *SQLiteDB) GetPlayerTelemetrySamples(streamKey string, limit int) ([]PlayerTelemetrySample, error) {
+	streamKey = strings.TrimSpace(streamKey)
+	if streamKey == "" {
+		return []PlayerTelemetrySample{}, nil
+	}
+	if limit <= 0 {
+		limit = 48
+	}
+	rows, err := s.db.Query(
+		`SELECT id, stream_key, active_sessions, waiting_sessions, offline_sessions, debug_sessions,
+		        total_stalls, total_recoveries, average_buffer_seconds, average_playback_seconds,
+		        last_error, sources_json, formats_json, pages_json, created_at
+		   FROM player_telemetry_samples
+		  WHERE stream_key = ?
+		  ORDER BY created_at DESC
+		  LIMIT ?`,
+		streamKey, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	samples := make([]PlayerTelemetrySample, 0, limit)
+	for rows.Next() {
+		var sample PlayerTelemetrySample
+		if err := rows.Scan(
+			&sample.ID,
+			&sample.StreamKey,
+			&sample.ActiveSessions,
+			&sample.WaitingSessions,
+			&sample.OfflineSessions,
+			&sample.DebugSessions,
+			&sample.TotalStalls,
+			&sample.TotalRecoveries,
+			&sample.AverageBufferSeconds,
+			&sample.AveragePlaybackSeconds,
+			&sample.LastError,
+			&sample.SourcesJSON,
+			&sample.FormatsJSON,
+			&sample.PagesJSON,
+			&sample.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		sample.LastError = textutil.FixLegacyUTF8String(sample.LastError)
+		samples = append(samples, sample)
+	}
+
+	for i, j := 0, len(samples)-1; i < j; i, j = i+1, j-1 {
+		samples[i], samples[j] = samples[j], samples[i]
+	}
+	return samples, nil
+}
+
+func (s *SQLiteDB) SaveTrackTelemetrySamples(samples []TrackTelemetrySample) error {
+	if len(samples) == 0 {
+		return nil
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	stmt, err := tx.Prepare(
+		`INSERT INTO track_telemetry_samples
+		(stream_key, track_id, kind, codec, width, height, sample_rate, channels, bitrate,
+		 packets, bytes, is_default, is_active, display_label, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+	)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	defer stmt.Close()
+
+	now := time.Now()
+	for _, sample := range samples {
+		if strings.TrimSpace(sample.StreamKey) == "" || sample.TrackID <= 0 {
+			continue
+		}
+		if _, err := stmt.Exec(
+			sample.StreamKey,
+			sample.TrackID,
+			textutil.FixLegacyUTF8String(strings.TrimSpace(sample.Kind)),
+			textutil.FixLegacyUTF8String(strings.TrimSpace(sample.Codec)),
+			sample.Width,
+			sample.Height,
+			sample.SampleRate,
+			sample.Channels,
+			sample.Bitrate,
+			sample.Packets,
+			sample.Bytes,
+			boolToInt(sample.IsDefault),
+			boolToInt(sample.IsActive),
+			textutil.FixLegacyUTF8String(strings.TrimSpace(sample.DisplayLabel)),
+			now,
+		); err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func (s *SQLiteDB) GetTrackTelemetrySamples(streamKey string, limit int) ([]TrackTelemetrySample, error) {
+	streamKey = strings.TrimSpace(streamKey)
+	if streamKey == "" {
+		return []TrackTelemetrySample{}, nil
+	}
+	if limit <= 0 {
+		limit = 120
+	}
+	rows, err := s.db.Query(
+		`SELECT id, stream_key, track_id, kind, codec, width, height, sample_rate, channels,
+		        bitrate, packets, bytes, is_default, is_active, display_label, created_at
+		   FROM track_telemetry_samples
+		  WHERE stream_key = ?
+		  ORDER BY created_at DESC, track_id ASC
+		  LIMIT ?`,
+		streamKey, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	samples := make([]TrackTelemetrySample, 0, limit)
+	for rows.Next() {
+		var sample TrackTelemetrySample
+		var isDefault int
+		var isActive int
+		if err := rows.Scan(
+			&sample.ID,
+			&sample.StreamKey,
+			&sample.TrackID,
+			&sample.Kind,
+			&sample.Codec,
+			&sample.Width,
+			&sample.Height,
+			&sample.SampleRate,
+			&sample.Channels,
+			&sample.Bitrate,
+			&sample.Packets,
+			&sample.Bytes,
+			&isDefault,
+			&isActive,
+			&sample.DisplayLabel,
+			&sample.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		sample.Kind = textutil.FixLegacyUTF8String(sample.Kind)
+		sample.Codec = textutil.FixLegacyUTF8String(sample.Codec)
+		sample.DisplayLabel = textutil.FixLegacyUTF8String(sample.DisplayLabel)
+		sample.IsDefault = isDefault == 1
+		sample.IsActive = isActive == 1
+		samples = append(samples, sample)
+	}
+	for i, j := 0, len(samples)-1; i < j; i, j = i+1, j-1 {
+		samples[i], samples[j] = samples[j], samples[i]
+	}
+	return samples, nil
+}
+
 func (s *SQLiteDB) ClearLogs() error {
 	_, err := s.db.Exec("DELETE FROM logs")
 	return err
@@ -622,6 +852,35 @@ func (s *SQLiteDB) CleanupAnalyticsSnapshots(maxAge time.Duration) (int64, error
 		return 0, err
 	}
 	return res.RowsAffected()
+}
+
+func (s *SQLiteDB) CleanupPlayerTelemetrySamples(maxAge time.Duration) (int64, error) {
+	if maxAge <= 0 {
+		return 0, nil
+	}
+	res, err := s.db.Exec("DELETE FROM player_telemetry_samples WHERE created_at < ?", time.Now().Add(-maxAge))
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+func (s *SQLiteDB) CleanupTrackTelemetrySamples(maxAge time.Duration) (int64, error) {
+	if maxAge <= 0 {
+		return 0, nil
+	}
+	res, err := s.db.Exec("DELETE FROM track_telemetry_samples WHERE created_at < ?", time.Now().Add(-maxAge))
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+func boolToInt(value bool) int {
+	if value {
+		return 1
+	}
+	return 0
 }
 
 // ─── Player Template Operations ──────────────────────────────

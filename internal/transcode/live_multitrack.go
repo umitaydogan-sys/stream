@@ -17,19 +17,22 @@ import (
 
 type liveTrackBootstrap struct {
 	videoSeq map[uint8]*media.Packet
-	audioSeq *media.Packet
+	audioSeq map[uint8]*media.Packet
 }
 
 type liveDirectSession struct {
-	streamKey      string
-	outputDir      string
-	parentMuxer    *hls.Muxer
-	primaryTrackID uint8
-	videoSeq       map[uint8]*media.Packet
-	audioSeq       *media.Packet
-	variants       map[uint8]*directVariant
-	lastMasterAt   time.Time
-	mu             sync.Mutex
+	streamKey             string
+	outputDir             string
+	parentMuxer           *hls.Muxer
+	primaryTrackID        uint8
+	preferredVideoTrackID uint8
+	selectedAudioTrackID  uint8
+	videoSeq              map[uint8]*media.Packet
+	audioSeq              map[uint8]*media.Packet
+	variants              map[uint8]*directVariant
+	audioVariants         map[uint8]*directAudioVariant
+	lastMasterAt          time.Time
+	mu                    sync.Mutex
 }
 
 type directVariant struct {
@@ -44,9 +47,23 @@ type directVariant struct {
 	muxer         *hls.StreamMuxer
 }
 
+type directAudioVariant struct {
+	trackID       uint8
+	streamName    string
+	playlistPath  string
+	codec         string
+	sampleRate    int
+	channels      int
+	bitrate       int64
+	packetBytes   int64
+	windowStarted time.Time
+	muxer         *hls.StreamMuxer
+}
+
 func newLiveTrackBootstrap() *liveTrackBootstrap {
 	return &liveTrackBootstrap{
 		videoSeq: make(map[uint8]*media.Packet),
+		audioSeq: make(map[uint8]*media.Packet),
 	}
 }
 
@@ -68,7 +85,7 @@ func (m *Manager) cacheLiveBootstrap(streamKey string, pkt *media.Packet) *liveT
 		case media.PacketTypeVideo:
 			boot.videoSeq[pkt.TrackID] = pkt.Clone()
 		case media.PacketTypeAudio:
-			boot.audioSeq = pkt.Clone()
+			boot.audioSeq[pkt.TrackID] = pkt.Clone()
 		}
 	}
 	return boot
@@ -98,7 +115,7 @@ func (m *Manager) tryActivateDirectMultitrackSession(streamKey string, pkt *medi
 	m.mu.RUnlock()
 
 	rootDir := filepath.Join(m.GetLiveOutputDir(), streamKey)
-	session := newLiveDirectSession(streamKey, rootDir, boot, pkt.TrackID)
+	session := newLiveDirectSession(streamKey, rootDir, boot, pkt.TrackID, opts.DefaultVideoTrackID, opts.DefaultAudioTrackID)
 	hadDash := m.stopLivePipelineForDirectSwitch(streamKey)
 	cleanupLiveOutputDir(rootDir)
 	session.bootstrapKnownTracks()
@@ -108,6 +125,9 @@ func (m *Manager) tryActivateDirectMultitrackSession(streamKey string, pkt *medi
 		m.mu.Unlock()
 		return existing
 	}
+	reg := m.ensureTrackRegistryLocked(streamKey)
+	reg.defaultVideoTrackID = opts.DefaultVideoTrackID
+	reg.defaultAudioTrackID = opts.DefaultAudioTrackID
 	m.liveDirect[streamKey] = session
 	m.mu.Unlock()
 
@@ -151,20 +171,23 @@ func (m *Manager) stopLivePipelineForDirectSwitch(streamKey string) bool {
 	return dashJob != nil
 }
 
-func newLiveDirectSession(streamKey, outputDir string, boot *liveTrackBootstrap, fallbackPrimary uint8) *liveDirectSession {
+func newLiveDirectSession(streamKey, outputDir string, boot *liveTrackBootstrap, fallbackPrimary, preferredVideoTrackID, preferredAudioTrackID uint8) *liveDirectSession {
 	session := &liveDirectSession{
-		streamKey:   streamKey,
-		outputDir:   outputDir,
-		parentMuxer: hls.NewMuxer(outputDir),
-		videoSeq:    make(map[uint8]*media.Packet),
-		variants:    make(map[uint8]*directVariant),
+		streamKey:             streamKey,
+		outputDir:             outputDir,
+		parentMuxer:           hls.NewMuxer(outputDir),
+		preferredVideoTrackID: preferredVideoTrackID,
+		videoSeq:              make(map[uint8]*media.Packet),
+		audioSeq:              make(map[uint8]*media.Packet),
+		variants:              make(map[uint8]*directVariant),
+		audioVariants:         make(map[uint8]*directAudioVariant),
 	}
 	if boot != nil {
 		for trackID, seq := range boot.videoSeq {
 			session.videoSeq[trackID] = seq.Clone()
 		}
-		if boot.audioSeq != nil {
-			session.audioSeq = boot.audioSeq.Clone()
+		for trackID, seq := range boot.audioSeq {
+			session.audioSeq[trackID] = seq.Clone()
 		}
 	}
 	if trackID, ok := session.pickPrimaryTrack(); ok {
@@ -172,10 +195,18 @@ func newLiveDirectSession(streamKey, outputDir string, boot *liveTrackBootstrap,
 	} else {
 		session.primaryTrackID = fallbackPrimary
 	}
+	if trackID, ok := session.pickAudioTrack(preferredAudioTrackID); ok {
+		session.selectedAudioTrackID = trackID
+	}
 	return session
 }
 
 func (s *liveDirectSession) pickPrimaryTrack() (uint8, bool) {
+	if s.preferredVideoTrackID != 0 {
+		if _, ok := s.videoSeq[s.preferredVideoTrackID]; ok {
+			return s.preferredVideoTrackID, true
+		}
+	}
 	if len(s.videoSeq) == 0 {
 		return 0, false
 	}
@@ -213,6 +244,23 @@ func (s *liveDirectSession) pickPrimaryTrack() (uint8, bool) {
 	return candidates[0].trackID, true
 }
 
+func (s *liveDirectSession) pickAudioTrack(preferred uint8) (uint8, bool) {
+	if preferred != 0 {
+		if _, ok := s.audioSeq[preferred]; ok {
+			return preferred, true
+		}
+	}
+	if len(s.audioSeq) == 0 {
+		return 0, false
+	}
+	trackIDs := make([]int, 0, len(s.audioSeq))
+	for trackID := range s.audioSeq {
+		trackIDs = append(trackIDs, int(trackID))
+	}
+	sort.Ints(trackIDs)
+	return uint8(trackIDs[0]), true
+}
+
 func (s *liveDirectSession) bootstrapKnownTracks() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -229,6 +277,18 @@ func (s *liveDirectSession) bootstrapKnownTracks() {
 			continue
 		}
 		s.ensureVariantLocked(trackID)
+	}
+	audioTrackIDs := make([]int, 0, len(s.audioSeq))
+	for trackID := range s.audioSeq {
+		audioTrackIDs = append(audioTrackIDs, int(trackID))
+	}
+	sort.Ints(audioTrackIDs)
+	for _, rawTrackID := range audioTrackIDs {
+		trackID := uint8(rawTrackID)
+		if s.audioSeq[trackID] == nil {
+			continue
+		}
+		s.ensureAudioVariantLocked(trackID)
 	}
 	s.writeMasterPlaylistLocked(true)
 }
@@ -251,15 +311,34 @@ func (s *liveDirectSession) writePacket(pkt *media.Packet) {
 			}
 			return
 		case media.PacketTypeAudio:
-			s.audioSeq = pkt.Clone()
+			s.audioSeq[pkt.TrackID] = pkt.Clone()
+			if s.selectedAudioTrackID == 0 {
+				if trackID, ok := s.pickAudioTrack(0); ok {
+					s.selectedAudioTrackID = trackID
+				}
+			}
+			if variant := s.ensureAudioVariantLocked(pkt.TrackID); variant != nil {
+				_ = variant.muxer.WritePacket(pkt.Clone())
+			}
+			s.writeMasterPlaylistLocked(true)
+			return
 		}
 	}
 
 	switch pkt.Type {
 	case media.PacketTypeAudio:
-		for _, variant := range s.variants {
-			_ = variant.muxer.WritePacket(pkt.Clone())
+		if s.selectedAudioTrackID == 0 {
+			if trackID, ok := s.pickAudioTrack(0); ok {
+				s.selectedAudioTrackID = trackID
+			}
 		}
+		variant := s.ensureAudioVariantLocked(pkt.TrackID)
+		if variant == nil {
+			return
+		}
+		variant.observePacket(pkt)
+		_ = variant.muxer.WritePacket(pkt.Clone())
+		s.writeMasterPlaylistLocked(false)
 	case media.PacketTypeVideo:
 		variant := s.ensureVariantLocked(pkt.TrackID)
 		if variant == nil {
@@ -289,9 +368,6 @@ func (s *liveDirectSession) ensureVariantLocked(trackID uint8) *directVariant {
 		playlistPath = filepath.ToSlash(filepath.Join(streamName, "index.m3u8"))
 	}
 	muxer := s.parentMuxer.AddStream(streamName)
-	if s.audioSeq != nil {
-		_ = muxer.WritePacket(s.audioSeq.Clone())
-	}
 	_ = muxer.WritePacket(videoSeq.Clone())
 
 	variant := &directVariant{
@@ -304,6 +380,86 @@ func (s *liveDirectSession) ensureVariantLocked(trackID uint8) *directVariant {
 	}
 	s.variants[trackID] = variant
 	return variant
+}
+
+func (s *liveDirectSession) ensureAudioVariantLocked(trackID uint8) *directAudioVariant {
+	if variant, ok := s.audioVariants[trackID]; ok {
+		return variant
+	}
+	audioSeq := s.audioSeq[trackID]
+	if audioSeq == nil {
+		return nil
+	}
+	streamName := audioVariantStreamName(trackID)
+	playlistPath := filepath.ToSlash(filepath.Join(streamName, "index.m3u8"))
+	muxer := s.parentMuxer.AddStream(streamName)
+	_ = muxer.WritePacket(audioSeq.Clone())
+	sampleRate, channels := parseAACAudioTrackMeta(audioSeq.Data)
+	variant := &directAudioVariant{
+		trackID:      trackID,
+		streamName:   streamName,
+		playlistPath: playlistPath,
+		codec:        "AAC",
+		sampleRate:   sampleRate,
+		channels:     channels,
+		muxer:        muxer,
+	}
+	s.audioVariants[trackID] = variant
+	return variant
+}
+
+func (s *liveDirectSession) setPreferredVideoTrack(trackID uint8) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.preferredVideoTrackID = trackID
+}
+
+func (s *liveDirectSession) setSelectedAudioTrack(trackID uint8) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if trackID == 0 {
+		if selected, ok := s.pickAudioTrack(0); ok {
+			s.selectedAudioTrackID = selected
+		} else {
+			s.selectedAudioTrackID = 0
+			return false
+		}
+	} else {
+		if _, ok := s.audioSeq[trackID]; !ok {
+			return false
+		}
+		s.selectedAudioTrackID = trackID
+	}
+	_ = s.ensureAudioVariantLocked(s.selectedAudioTrackID)
+	s.writeMasterPlaylistLocked(true)
+	return true
+}
+
+func (s *liveDirectSession) getPrimaryTrackID() uint8 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.primaryTrackID
+}
+
+func (s *liveDirectSession) getSelectedAudioTrackID() uint8 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.selectedAudioTrackID
+}
+
+func (s *liveDirectSession) getPreferredVideoTrackID() uint8 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.preferredVideoTrackID != 0 {
+		return s.preferredVideoTrackID
+	}
+	return s.primaryTrackID
+}
+
+func (s *liveDirectSession) getPreferredAudioTrackID() uint8 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.selectedAudioTrackID
 }
 
 func (s *liveDirectSession) writeMasterPlaylistLocked(force bool) {
@@ -340,20 +496,66 @@ func (s *liveDirectSession) writeMasterPlaylistLocked(force bool) {
 		return leftBandwidth < rightBandwidth
 	})
 
+	type audioItem struct {
+		variant *directAudioVariant
+	}
+	audioItems := make([]audioItem, 0, len(s.audioVariants))
+	for _, variant := range s.audioVariants {
+		target := filepath.Join(s.outputDir, filepath.FromSlash(variant.playlistPath))
+		if info, err := os.Stat(target); err == nil && !info.IsDir() && info.Size() > 0 {
+			audioItems = append(audioItems, audioItem{variant: variant})
+		}
+	}
+	sort.Slice(audioItems, func(i, j int) bool {
+		return audioItems[i].variant.trackID < audioItems[j].variant.trackID
+	})
+
 	var b strings.Builder
 	b.WriteString("#EXTM3U\n")
 	b.WriteString("#EXT-X-VERSION:3\n")
+	selectedAudioTrackID := s.selectedAudioTrackID
+	if selectedAudioTrackID == 0 && len(audioItems) > 0 {
+		selectedAudioTrackID = audioItems[0].variant.trackID
+	}
+	if len(audioItems) > 0 {
+		for _, item := range audioItems {
+			audio := item.variant
+			defaultAttr := "NO"
+			autoSelectAttr := "YES"
+			if audio.trackID == selectedAudioTrackID {
+				defaultAttr = "YES"
+			}
+			line := fmt.Sprintf("#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"audio\",NAME=\"%s\",DEFAULT=%s,AUTOSELECT=%s,URI=\"%s\"",
+				audio.displayLabel(), defaultAttr, autoSelectAttr, audio.playlistPath)
+			if audio.channels > 0 {
+				line += fmt.Sprintf(",CHANNELS=\"%d\"", audio.channels)
+			}
+			b.WriteString(line)
+			b.WriteString("\n")
+		}
+	}
 	for _, item := range items {
 		v := item.variant
 		bandwidth := v.bandwidthEstimate()
 		if bandwidth <= 0 {
 			bandwidth = int(fallbackVariantBandwidth(v.width, v.height))
 		}
-		codecs := `avc1.64001f,mp4a.40.2`
+		codecs := `avc1.64001f`
+		if len(audioItems) > 0 {
+			codecs = `avc1.64001f,mp4a.40.2`
+		}
 		if v.width > 0 && v.height > 0 {
-			b.WriteString(fmt.Sprintf("#EXT-X-STREAM-INF:BANDWIDTH=%d,AVERAGE-BANDWIDTH=%d,RESOLUTION=%dx%d,CODECS=\"%s\"\n", bandwidth, bandwidth, v.width, v.height, codecs))
+			if len(audioItems) > 0 {
+				b.WriteString(fmt.Sprintf("#EXT-X-STREAM-INF:BANDWIDTH=%d,AVERAGE-BANDWIDTH=%d,RESOLUTION=%dx%d,CODECS=\"%s\",AUDIO=\"audio\"\n", bandwidth, bandwidth, v.width, v.height, codecs))
+			} else {
+				b.WriteString(fmt.Sprintf("#EXT-X-STREAM-INF:BANDWIDTH=%d,AVERAGE-BANDWIDTH=%d,RESOLUTION=%dx%d,CODECS=\"%s\"\n", bandwidth, bandwidth, v.width, v.height, codecs))
+			}
 		} else {
-			b.WriteString(fmt.Sprintf("#EXT-X-STREAM-INF:BANDWIDTH=%d,AVERAGE-BANDWIDTH=%d,CODECS=\"%s\"\n", bandwidth, bandwidth, codecs))
+			if len(audioItems) > 0 {
+				b.WriteString(fmt.Sprintf("#EXT-X-STREAM-INF:BANDWIDTH=%d,AVERAGE-BANDWIDTH=%d,CODECS=\"%s\",AUDIO=\"audio\"\n", bandwidth, bandwidth, codecs))
+			} else {
+				b.WriteString(fmt.Sprintf("#EXT-X-STREAM-INF:BANDWIDTH=%d,AVERAGE-BANDWIDTH=%d,CODECS=\"%s\"\n", bandwidth, bandwidth, codecs))
+			}
 		}
 		b.WriteString(v.playlistPath)
 		b.WriteString("\n")
@@ -364,7 +566,54 @@ func (s *liveDirectSession) writeMasterPlaylistLocked(force bool) {
 	if err := os.WriteFile(tmpPath, []byte(b.String()), 0644); err == nil {
 		_ = os.Rename(tmpPath, finalPath)
 	}
+	s.writeDefaultAudioPlaylistLocked(selectedAudioTrackID)
 	s.lastMasterAt = time.Now()
+}
+
+func (s *liveDirectSession) writeDefaultAudioPlaylistLocked(trackID uint8) {
+	if trackID == 0 {
+		return
+	}
+	variant := s.audioVariants[trackID]
+	if variant == nil {
+		return
+	}
+	sourcePath := filepath.Join(s.outputDir, filepath.FromSlash(variant.playlistPath))
+	data, err := os.ReadFile(sourcePath)
+	if err != nil || len(data) == 0 {
+		return
+	}
+	tmpPath := filepath.Join(s.outputDir, "audio.m3u8.tmp")
+	finalPath := filepath.Join(s.outputDir, "audio.m3u8")
+	if err := os.WriteFile(tmpPath, data, 0644); err == nil {
+		_ = os.Rename(tmpPath, finalPath)
+	}
+}
+
+func (s *liveDirectSession) resolveAudioPlaylistPath(trackID uint8) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if trackID != 0 {
+		if variant := s.audioVariants[trackID]; variant != nil {
+			return variant.playlistPath
+		}
+	}
+	if s.selectedAudioTrackID != 0 {
+		if variant := s.audioVariants[s.selectedAudioTrackID]; variant != nil {
+			return variant.playlistPath
+		}
+	}
+	trackIDs := make([]int, 0, len(s.audioVariants))
+	for id := range s.audioVariants {
+		trackIDs = append(trackIDs, int(id))
+	}
+	sort.Ints(trackIDs)
+	for _, raw := range trackIDs {
+		if variant := s.audioVariants[uint8(raw)]; variant != nil {
+			return variant.playlistPath
+		}
+	}
+	return "audio.m3u8"
 }
 
 func playlistLooksStable(path string) bool {
@@ -405,6 +654,11 @@ func (s *liveDirectSession) close() {
 			variant.muxer.Close()
 		}
 	}
+	for _, variant := range s.audioVariants {
+		if variant != nil && variant.muxer != nil {
+			variant.muxer.Close()
+		}
+	}
 }
 
 func (v *directVariant) observePacket(pkt *media.Packet) {
@@ -429,6 +683,36 @@ func (v *directVariant) bandwidthEstimate() int {
 	return int(fallbackVariantBandwidth(v.width, v.height))
 }
 
+func (v *directAudioVariant) observePacket(pkt *media.Packet) {
+	if pkt == nil || pkt.Type != media.PacketTypeAudio || pkt.IsSequenceHeader {
+		return
+	}
+	if v.windowStarted.IsZero() {
+		v.windowStarted = time.Now()
+	}
+	v.packetBytes += int64(len(pkt.Data))
+	if elapsed := time.Since(v.windowStarted); elapsed >= 2*time.Second {
+		v.bitrate = int64(float64(v.packetBytes*8) / elapsed.Seconds())
+		v.packetBytes = 0
+		v.windowStarted = time.Now()
+	}
+}
+
+func (v *directAudioVariant) displayLabel() string {
+	parts := []string{fmt.Sprintf("Audio Track %d", v.trackID)}
+	meta := make([]string, 0, 2)
+	if v.sampleRate > 0 {
+		meta = append(meta, fmt.Sprintf("%d Hz", v.sampleRate))
+	}
+	if v.channels > 0 {
+		meta = append(meta, fmt.Sprintf("%d ch", v.channels))
+	}
+	if len(meta) > 0 {
+		parts = append(parts, strings.Join(meta, " / "))
+	}
+	return strings.Join(parts, " - ")
+}
+
 func variantStreamName(trackID uint8, width, height int) string {
 	switch {
 	case height > 0:
@@ -438,6 +722,10 @@ func variantStreamName(trackID uint8, width, height int) string {
 	default:
 		return fmt.Sprintf("obs_track_%d", trackID)
 	}
+}
+
+func audioVariantStreamName(trackID uint8) string {
+	return fmt.Sprintf("audio_t%d", trackID)
 }
 
 func fallbackVariantBandwidth(width, height int) int64 {
@@ -453,6 +741,24 @@ func fallbackVariantBandwidth(width, height int) int64 {
 	default:
 		return 600000
 	}
+}
+
+func parseAACAudioTrackMeta(data []byte) (int, int) {
+	if len(data) < 4 {
+		return 0, 0
+	}
+	asc := data[2:]
+	if len(asc) < 2 {
+		return 0, 0
+	}
+	freqIdx := int(((asc[0] & 0x07) << 1) | ((asc[1] >> 7) & 0x01))
+	channels := int((asc[1] >> 3) & 0x0F)
+	sampleRates := []int{96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350}
+	sampleRate := 0
+	if freqIdx >= 0 && freqIdx < len(sampleRates) {
+		sampleRate = sampleRates[freqIdx]
+	}
+	return sampleRate, channels
 }
 
 func parseAVCSequenceHeaderDimensions(data []byte) (int, int) {

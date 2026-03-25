@@ -1,14 +1,18 @@
 package main
 
 import (
+	"encoding/json"
 	"net"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/fluxstream/fluxstream/internal/storage"
 )
 
 const playerTelemetryTTL = 45 * time.Second
+const playerTelemetryPersistEvery = 15 * time.Second
 
 type playerTelemetryPayload struct {
 	StreamKey        string  `json:"stream_key"`
@@ -31,6 +35,7 @@ type playerTelemetryPayload struct {
 
 type playerTelemetryCollector struct {
 	mu      sync.Mutex
+	db      *storage.SQLiteDB
 	streams map[string]*playerTelemetryStream
 }
 
@@ -42,6 +47,7 @@ type playerTelemetryStream struct {
 	TotalRecoveries int64
 	LastError       string
 	LastUpdate      time.Time
+	LastPersist     time.Time
 }
 
 type playerTelemetrySession struct {
@@ -112,6 +118,12 @@ func newPlayerTelemetryCollector() *playerTelemetryCollector {
 	}
 }
 
+func (c *playerTelemetryCollector) SetDB(db *storage.SQLiteDB) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.db = db
+}
+
 func (c *playerTelemetryCollector) Record(payload playerTelemetryPayload, remoteAddr, userAgent string) {
 	streamKey := strings.TrimSpace(payload.StreamKey)
 	sessionID := strings.TrimSpace(payload.SessionID)
@@ -122,8 +134,9 @@ func (c *playerTelemetryCollector) Record(payload playerTelemetryPayload, remote
 	now := time.Now()
 	payload = normalizeTelemetryPayload(payload)
 
+	var persistSample *storage.PlayerTelemetrySample
+
 	c.mu.Lock()
-	defer c.mu.Unlock()
 
 	c.cleanupLocked(now)
 
@@ -175,6 +188,18 @@ func (c *playerTelemetryCollector) Record(payload playerTelemetryPayload, remote
 		RemoteAddr:       compactLabel(stripPort(remoteAddr), 80),
 		UserAgent:        compactLabel(userAgent, 160),
 	}
+
+	if c.db != nil && (state.LastPersist.IsZero() || now.Sub(state.LastPersist) >= playerTelemetryPersistEvery) {
+		persistSample = snapshotToTelemetrySample(c.snapshotForStateLocked(state, now))
+		state.LastPersist = now
+	}
+	c.mu.Unlock()
+
+	if c.db != nil && persistSample != nil {
+		if err := c.db.SavePlayerTelemetrySample(persistSample); err != nil {
+			// Persistence is best-effort; runtime telemetry should continue even if snapshot writes fail.
+		}
+	}
 }
 
 func (c *playerTelemetryCollector) Snapshot(streamKey string) playerTelemetrySnapshot {
@@ -196,6 +221,10 @@ func (c *playerTelemetryCollector) Snapshot(streamKey string) playerTelemetrySna
 		}
 	}
 
+	return c.snapshotForStateLocked(state, now)
+}
+
+func (c *playerTelemetryCollector) snapshotForStateLocked(state *playerTelemetryStream, now time.Time) playerTelemetrySnapshot {
 	snapshot := playerTelemetrySnapshot{
 		StreamKey:       state.StreamKey,
 		Reports:         state.Reports,
@@ -334,4 +363,26 @@ func maxInt(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func snapshotToTelemetrySample(snapshot playerTelemetrySnapshot) *storage.PlayerTelemetrySample {
+	sourcesJSON, _ := json.Marshal(snapshot.Sources)
+	formatsJSON, _ := json.Marshal(snapshot.Formats)
+	pagesJSON, _ := json.Marshal(snapshot.Pages)
+	return &storage.PlayerTelemetrySample{
+		StreamKey:              snapshot.StreamKey,
+		ActiveSessions:         snapshot.ActiveSessions,
+		WaitingSessions:        snapshot.WaitingSessions,
+		OfflineSessions:        snapshot.OfflineSessions,
+		DebugSessions:          snapshot.DebugSessions,
+		TotalStalls:            snapshot.TotalStalls,
+		TotalRecoveries:        snapshot.TotalRecoveries,
+		AverageBufferSeconds:   snapshot.AverageBufferSeconds,
+		AveragePlaybackSeconds: snapshot.AveragePlayback,
+		LastError:              snapshot.LastError,
+		SourcesJSON:            string(sourcesJSON),
+		FormatsJSON:            string(formatsJSON),
+		PagesJSON:              string(pagesJSON),
+		CreatedAt:              snapshot.LastUpdate,
+	}
 }

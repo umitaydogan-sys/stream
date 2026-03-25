@@ -13,6 +13,7 @@ import (
 	"github.com/fluxstream/fluxstream/internal/config"
 	"github.com/fluxstream/fluxstream/internal/recording"
 	"github.com/fluxstream/fluxstream/internal/storage"
+	"github.com/fluxstream/fluxstream/internal/stream"
 	"github.com/fluxstream/fluxstream/internal/tlsutil"
 	"github.com/fluxstream/fluxstream/internal/transcode"
 )
@@ -38,7 +39,7 @@ func buildLiveOptionsFromConfig(cfg *config.Manager) transcode.LiveOptions {
 	return opts
 }
 
-func startMaintenanceLoops(ctxDone <-chan struct{}, cfg *config.Manager, db *storage.SQLiteDB, tracker *analytics.Tracker, recManager *recording.Manager, dataDir string) {
+func startMaintenanceLoops(ctxDone <-chan struct{}, cfg *config.Manager, db *storage.SQLiteDB, tracker *analytics.Tracker, recManager *recording.Manager, tcManager *transcode.Manager, dataDir string) {
 	if cfg.GetBool("analytics_persist_enabled", true) && tracker != nil {
 		interval := time.Duration(cfg.GetInt("analytics_snapshot_interval", 60)) * time.Second
 		if interval < 15*time.Second {
@@ -70,7 +71,42 @@ func startMaintenanceLoops(ctxDone <-chan struct{}, cfg *config.Manager, db *sto
 		}()
 	}
 
-	if cfg.GetBool("maintenance_auto_cleanup", true) && recManager != nil {
+	if cfg.GetBool("track_analytics_enabled", true) && tcManager != nil {
+		interval := time.Duration(cfg.GetInt("track_analytics_interval", 20)) * time.Second
+		if interval < 10*time.Second {
+			interval = 10 * time.Second
+		}
+		go func() {
+			ticker := time.NewTicker(interval)
+			defer ticker.Stop()
+			persistTrackSamples := func() {
+				streams, err := db.GetAllStreams()
+				if err != nil {
+					return
+				}
+				for _, st := range streams {
+					snapshot := tcManager.GetLiveTrackSnapshot(st.StreamKey)
+					if len(snapshot.VideoTracks) == 0 && len(snapshot.AudioTracks) == 0 {
+						continue
+					}
+					if err := db.SaveTrackTelemetrySamples(trackTelemetrySamplesFromSnapshot(snapshot)); err != nil {
+						continue
+					}
+				}
+			}
+			persistTrackSamples()
+			for {
+				select {
+				case <-ctxDone:
+					return
+				case <-ticker.C:
+					persistTrackSamples()
+				}
+			}
+		}()
+	}
+
+	if cfg.GetBool("maintenance_auto_cleanup", true) {
 		intervalHours := cfg.GetInt("maintenance_cleanup_interval", 6)
 		if intervalHours <= 0 {
 			intervalHours = 6
@@ -79,21 +115,33 @@ func startMaintenanceLoops(ctxDone <-chan struct{}, cfg *config.Manager, db *sto
 			ticker := time.NewTicker(time.Duration(intervalHours) * time.Hour)
 			defer ticker.Stop()
 			runMaintenance := func() {
-				retentionDays := cfg.GetInt("recordings_retention_days", cfg.GetInt("storage_auto_clean", 30))
-				if retentionDays > 0 {
-					if deleted, err := recManager.CleanupOld(time.Duration(retentionDays) * 24 * time.Hour); err == nil && deleted > 0 {
-						_ = db.AddLog("INFO", "maintenance", fmt.Sprintf("Eski kayitlar temizlendi: %d dosya", deleted))
+				if recManager != nil {
+					retentionDays := cfg.GetInt("recordings_retention_days", cfg.GetInt("storage_auto_clean", 30))
+					if retentionDays > 0 {
+						if deleted, err := recManager.CleanupOld(time.Duration(retentionDays) * 24 * time.Hour); err == nil && deleted > 0 {
+							_ = db.AddLog("INFO", "maintenance", fmt.Sprintf("Eski kayitlar temizlendi: %d dosya", deleted))
+						}
 					}
-				}
-				keepLatest := cfg.GetInt("recordings_keep_latest", 10)
-				if keepLatest > 0 {
-					if deleted, err := recManager.TrimLatestPerStream(keepLatest); err == nil && deleted > 0 {
-						_ = db.AddLog("INFO", "maintenance", fmt.Sprintf("Kayit trim uygulandi: %d dosya", deleted))
+					keepLatest := cfg.GetInt("recordings_keep_latest", 10)
+					if keepLatest > 0 {
+						if deleted, err := recManager.TrimLatestPerStream(keepLatest); err == nil && deleted > 0 {
+							_ = db.AddLog("INFO", "maintenance", fmt.Sprintf("Kayit trim uygulandi: %d dosya", deleted))
+						}
 					}
 				}
 				if days := cfg.GetInt("analytics_retention_days", 30); days > 0 {
 					if deleted, err := db.CleanupAnalyticsSnapshots(time.Duration(days) * 24 * time.Hour); err == nil && deleted > 0 {
 						_ = db.AddLog("INFO", "maintenance", fmt.Sprintf("Eski analytics snapshot temizlendi: %d", deleted))
+					}
+				}
+				if days := cfg.GetInt("player_telemetry_retention_days", 30); days > 0 {
+					if deleted, err := db.CleanupPlayerTelemetrySamples(time.Duration(days) * 24 * time.Hour); err == nil && deleted > 0 {
+						_ = db.AddLog("INFO", "maintenance", fmt.Sprintf("Eski QoE telemetry ornekleri temizlendi: %d", deleted))
+					}
+				}
+				if days := cfg.GetInt("track_analytics_retention_days", 30); days > 0 {
+					if deleted, err := db.CleanupTrackTelemetrySamples(time.Duration(days) * 24 * time.Hour); err == nil && deleted > 0 {
+						_ = db.AddLog("INFO", "maintenance", fmt.Sprintf("Eski track analytics ornekleri temizlendi: %d", deleted))
 					}
 				}
 			}
@@ -113,9 +161,10 @@ func startMaintenanceLoops(ctxDone <-chan struct{}, cfg *config.Manager, db *sto
 	_ = dataDir
 }
 
-func buildHealthReport(cfg *config.Manager, db *storage.SQLiteDB, stats storage.ServerStats, tcManager *transcode.Manager, dataDir string) map[string]interface{} {
+func buildHealthReport(cfg *config.Manager, db *storage.SQLiteDB, stats storage.ServerStats, tcManager *transcode.Manager, streamMgr *stream.Manager, playerTelemetry *playerTelemetryCollector, dataDir string) map[string]interface{} {
 	alerts := make([]systemAlert, 0, 8)
 	status := "ok"
+	qoeStreams := make([]map[string]interface{}, 0, 8)
 
 	if cfg.GetBool("alerts_enabled", true) {
 		if cfg.GetBool("ssl_enabled", false) {
@@ -220,6 +269,26 @@ func buildHealthReport(cfg *config.Manager, db *storage.SQLiteDB, stats storage.
 				Action:      "Teslimat / ABR ekranindan adaptif bitrate'i acabilirsiniz.",
 			})
 		}
+
+		for _, item := range collectRuntimeObservability(streamMgr, tcManager, playerTelemetry) {
+			streamAlerts := buildQoEAlerts(cfg, item.StreamName, item.Telemetry)
+			if len(streamAlerts) > 0 {
+				alerts = append(alerts, streamAlerts...)
+			}
+			qoeStreams = append(qoeStreams, map[string]interface{}{
+				"stream_key":             item.StreamKey,
+				"stream_name":            item.StreamName,
+				"active_sessions":        item.Telemetry.ActiveSessions,
+				"waiting_sessions":       item.Telemetry.WaitingSessions,
+				"offline_sessions":       item.Telemetry.OfflineSessions,
+				"average_buffer_seconds": item.Telemetry.AverageBufferSeconds,
+				"total_stalls":           item.Telemetry.TotalStalls,
+				"active_audio_track_id":  item.Tracks.ActiveAudioTrackID,
+				"active_video_track_id":  item.Tracks.ActiveVideoTrackID,
+				"video_track_count":      len(item.Tracks.VideoTracks),
+				"audio_track_count":      len(item.Tracks.AudioTracks),
+			})
+		}
 	}
 
 	for _, alert := range alerts {
@@ -258,6 +327,7 @@ func buildHealthReport(cfg *config.Manager, db *storage.SQLiteDB, stats storage.
 			"dash_bytes":       folderSize(filepath.Join(dataDir, "dash")),
 		},
 		"snapshots":       snapshots,
+		"qoe_streams":     qoeStreams,
 		"recommendations": buildRecommendations(cfg, alerts),
 	}
 }

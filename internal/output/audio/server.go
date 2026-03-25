@@ -306,7 +306,21 @@ func (s *Server) HandleHLSAudio(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Redirect to HLS with audio-only variant
-	target := fmt.Sprintf("/hls/%s/audio.m3u8", key)
+	targetPlaylist := "audio.m3u8"
+	if s.transcode != nil {
+		var requestedTrackID uint8
+		if raw := strings.TrimSpace(r.URL.Query().Get("track")); raw != "" {
+			var parsed int
+			fmt.Sscanf(raw, "%d", &parsed)
+			if parsed > 0 && parsed <= 255 {
+				requestedTrackID = uint8(parsed)
+			}
+		}
+		if resolved := s.transcode.ResolveLiveAudioPlaylistPath(key, requestedTrackID); strings.TrimSpace(resolved) != "" {
+			targetPlaylist = strings.TrimLeft(resolved, "/")
+		}
+	}
+	target := fmt.Sprintf("/hls/%s/%s", key, targetPlaylist)
 	if r.URL.RawQuery != "" {
 		target += "?" + r.URL.RawQuery
 	}

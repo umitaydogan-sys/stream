@@ -56,6 +56,7 @@ type Job struct {
 	PID          int       `json:"pid,omitempty"`
 	Type         string    `json:"type,omitempty"`
 	ManifestPath string    `json:"manifest_path,omitempty"`
+	ctx          context.Context
 	cmd          *exec.Cmd
 	cancel       context.CancelFunc
 	stdin        io.WriteCloser
@@ -86,6 +87,7 @@ type Manager struct {
 	liveDash   map[string]*Job
 	liveDirect map[string]*liveDirectSession
 	liveBoot   map[string]*liveTrackBootstrap
+	liveTracks map[string]*liveTrackRegistry
 	streamOpts map[string]LiveOptions
 	mu         sync.RWMutex
 }
@@ -117,6 +119,7 @@ func NewManager(ffmpegPath string, gpuAccel GPUAccel, outputDir string) *Manager
 		liveDash:   make(map[string]*Job),
 		liveDirect: make(map[string]*liveDirectSession),
 		liveBoot:   make(map[string]*liveTrackBootstrap),
+		liveTracks: make(map[string]*liveTrackRegistry),
 		streamOpts: make(map[string]LiveOptions),
 	}
 }
@@ -398,11 +401,6 @@ func (m *Manager) StartLiveHLS(streamKey string) (*Job, error) {
 
 // StartLiveDASH starts a live DASH repack job from the local HLS output.
 func (m *Manager) StartLiveDASH(streamKey string) (*Job, error) {
-	ffPath, err := m.DetectFFmpeg()
-	if err != nil {
-		return nil, err
-	}
-
 	m.mu.Lock()
 	if existing, ok := m.liveDash[streamKey]; ok && (existing.Status == "running" || existing.Status == "pending") {
 		m.mu.Unlock()
@@ -422,10 +420,6 @@ func (m *Manager) StartLiveDASH(streamKey string) (*Job, error) {
 	cleanupLiveOutputDir(jobOutputDir)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	inputURL := fmt.Sprintf("http://127.0.0.1:%d/hls/%s/%s", httpPort, streamKey, manifestNameForLiveOptions(m.getLiveOptions(streamKey)))
-	args := m.buildLiveDASHArgs(inputURL, jobOutputDir)
-	cmd := exec.CommandContext(ctx, ffPath, args...)
-	cmd.Dir = jobOutputDir
 
 	job := &Job{
 		ID:           fmt.Sprintf("live_dash_%s_%d", streamKey, time.Now().Unix()),
@@ -435,17 +429,10 @@ func (m *Manager) StartLiveDASH(streamKey string) (*Job, error) {
 		OutputDir:    jobOutputDir,
 		Type:         "live_dash",
 		ManifestPath: filepath.Join(jobOutputDir, "manifest.mpd"),
-		cmd:          cmd,
+		ctx:          ctx,
 		cancel:       cancel,
 	}
 	job.logFile = openLogFile(jobOutputDir)
-	if job.logFile != nil {
-		cmd.Stdout = job.logFile
-		cmd.Stderr = job.logFile
-	} else {
-		cmd.Stdout = io.Discard
-		cmd.Stderr = io.Discard
-	}
 
 	m.mu.Lock()
 	if existing, ok := m.liveDash[streamKey]; ok && (existing.Status == "running" || existing.Status == "pending") {
@@ -485,6 +472,7 @@ func (m *Manager) StopLiveHLS(streamKey string) {
 		delete(m.liveDirect, streamKey)
 	}
 	delete(m.liveBoot, streamKey)
+	delete(m.liveTracks, streamKey)
 	m.mu.Unlock()
 
 	if direct != nil {
@@ -557,6 +545,8 @@ func (m *Manager) WriteLivePacket(streamKey string, pkt *media.Packet) {
 	if pkt == nil {
 		return
 	}
+
+	m.observeTrackPacket(streamKey, pkt)
 
 	boot := m.cacheLiveBootstrap(streamKey, pkt)
 	if session := m.getLiveDirectSession(streamKey); session != nil {
@@ -711,12 +701,26 @@ func (m *Manager) runLiveStaticJob(job *Job, cleanup func(*Job), logPrefix strin
 }
 
 func (m *Manager) runLiveDASHJob(job *Job) {
-	if err := m.waitForLiveManifest(job.StreamKey, 20*time.Second); err != nil {
+	if err := m.waitForLiveManifest(job.ctx, job.StreamKey, 20*time.Second); err != nil {
 		defer job.closeLog()
+		if err == context.Canceled && job.Status == "completed" {
+			m.removeLiveDashJob(job)
+			return
+		}
 		if job.Status != "completed" {
 			job.Status = "error"
 			job.Error = err.Error()
 			log.Printf("[TC] Canli DASH baslatilamadi (%s): %v", job.StreamKey, err)
+		}
+		m.removeLiveDashJob(job)
+		return
+	}
+	if err := m.configureLiveDASHCommand(job); err != nil {
+		defer job.closeLog()
+		if job.Status != "completed" {
+			job.Status = "error"
+			job.Error = err.Error()
+			log.Printf("[TC] Canli DASH komutu hazirlanamadi (%s): %v", job.StreamKey, err)
 		}
 		m.removeLiveDashJob(job)
 		return
@@ -1074,18 +1078,25 @@ func cleanupLiveOutputDir(dir string) {
 	}
 }
 
-func (m *Manager) waitForLiveManifest(streamKey string, timeout time.Duration) error {
-	if path := m.GetLiveManifestPath(streamKey); path != "" {
+func (m *Manager) waitForLiveManifest(ctx context.Context, streamKey string, timeout time.Duration) error {
+	if path := m.getReadyLiveManifestPath(streamKey); path != "" {
 		return nil
 	}
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		if path := m.GetLiveManifestPath(streamKey); path != "" {
+		if ctx != nil {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+			}
+		}
+		if path := m.getReadyLiveManifestPath(streamKey); path != "" {
 			return nil
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
-	return fmt.Errorf("live hls manifest hazir degil: %s", streamKey)
+	return fmt.Errorf("live hls manifest oynatima hazir degil: %s", streamKey)
 }
 
 func (m *Manager) selectVideoEncoder() string {
@@ -1157,15 +1168,25 @@ func (m *Manager) GetLiveManifestPath(streamKey string) string {
 	return ""
 }
 
+func (m *Manager) getReadyLiveManifestPath(streamKey string) string {
+	outputDir := filepath.Join(m.GetLiveOutputDir(), streamKey)
+	for _, candidate := range manifestCandidatesForLiveOptions(outputDir, m.getLiveOptions(streamKey)) {
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() && info.Size() > 0 && playlistReady(candidate) {
+			return candidate
+		}
+	}
+	return ""
+}
+
 // WaitForLiveManifestPath waits until the preferred live playlist exists.
 func (m *Manager) WaitForLiveManifestPath(streamKey string, timeout time.Duration) string {
-	if path := m.GetLiveManifestPath(streamKey); path != "" {
+	if path := m.getReadyLiveManifestPath(streamKey); path != "" {
 		return path
 	}
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
 		time.Sleep(200 * time.Millisecond)
-		if path := m.GetLiveManifestPath(streamKey); path != "" {
+		if path := m.getReadyLiveManifestPath(streamKey); path != "" {
 			return path
 		}
 	}
@@ -1177,7 +1198,7 @@ func (m *Manager) GetLiveManifestURL(streamKey string) string {
 	if m.httpPort <= 0 {
 		return ""
 	}
-	path := m.GetLiveManifestPath(streamKey)
+	path := m.getReadyLiveManifestPath(streamKey)
 	if path == "" {
 		return ""
 	}
@@ -1205,6 +1226,92 @@ func (m *Manager) WaitForLiveManifestURL(streamKey string, timeout time.Duration
 		return fmt.Sprintf("http://127.0.0.1:%d/hls/%s/%s", m.httpPort, streamKey, rel)
 	}
 	return ""
+}
+
+func (m *Manager) configureLiveDASHCommand(job *Job) error {
+	if job == nil {
+		return fmt.Errorf("dash job nil")
+	}
+	ffPath, err := m.DetectFFmpeg()
+	if err != nil {
+		return err
+	}
+	inputURL := m.GetLiveManifestURL(job.StreamKey)
+	if inputURL == "" {
+		return fmt.Errorf("hazir live hls girisi bulunamadi")
+	}
+	ctx := job.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	args := m.buildLiveDASHArgs(inputURL, job.OutputDir)
+	cmd := exec.CommandContext(ctx, ffPath, args...)
+	cmd.Dir = job.OutputDir
+	if job.logFile != nil {
+		cmd.Stdout = job.logFile
+		cmd.Stderr = job.logFile
+	} else {
+		cmd.Stdout = io.Discard
+		cmd.Stderr = io.Discard
+	}
+	job.cmd = cmd
+	return nil
+}
+
+func playlistReady(path string) bool {
+	return playlistReadyRecursive(path, map[string]bool{})
+}
+
+func playlistReadyRecursive(path string, seen map[string]bool) bool {
+	path = filepath.Clean(path)
+	if seen[path] {
+		return false
+	}
+	seen[path] = true
+	defer delete(seen, path)
+
+	data, err := os.ReadFile(path)
+	if err != nil || len(data) == 0 {
+		return false
+	}
+	lines := strings.Split(string(data), "\n")
+	var childPlaylists []string
+	var segments []string
+	for _, raw := range lines {
+		line := strings.TrimSpace(raw)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		lower := strings.ToLower(line)
+		if strings.HasSuffix(lower, ".m3u8") {
+			childPlaylists = append(childPlaylists, line)
+			continue
+		}
+		segments = append(segments, line)
+	}
+
+	if len(childPlaylists) > 0 {
+		baseDir := filepath.Dir(path)
+		for _, child := range childPlaylists {
+			childPath := filepath.Join(baseDir, filepath.FromSlash(child))
+			if !playlistReadyRecursive(childPath, seen) {
+				return false
+			}
+		}
+		return true
+	}
+
+	if !playlistLooksStable(path) || len(segments) == 0 {
+		return false
+	}
+	baseDir := filepath.Dir(path)
+	for _, segment := range segments {
+		segmentPath := filepath.Join(baseDir, filepath.FromSlash(segment))
+		if info, err := os.Stat(segmentPath); err == nil && !info.IsDir() && info.Size() > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // GetLiveOutputDir returns the root directory for live HLS transcode outputs.
@@ -1281,6 +1388,7 @@ func (m *Manager) StopAll() {
 	m.liveDash = make(map[string]*Job)
 	m.liveDirect = make(map[string]*liveDirectSession)
 	m.liveBoot = make(map[string]*liveTrackBootstrap)
+	m.liveTracks = make(map[string]*liveTrackRegistry)
 	m.streamOpts = make(map[string]LiveOptions)
 }
 

@@ -229,6 +229,7 @@ let pageRefreshTimer=null;
 let streamTelemetryTimer=null;
 let currentLang=localStorage.getItem('fluxstream_lang')||'tr';
 let runtimeSettings={};
+const operationsCenterState={sourceType:'streams',streamID:0,tab:'general',filter:'all'};
 const LANGUAGE_META={
   tr:{label:'Turkce',locale:'tr-TR'},
   en:{label:'English',locale:'en-US'},
@@ -539,6 +540,7 @@ function renderApp(){
           navItem('settings-transcode','bi-cpu-fill',t('Transkod'))+
         '</div>'+
         '<div class="nav-section"><div class="nav-section-title">'+t('Izleme')+'</div>'+
+          navItem('operations-center','bi-broadcast-pin',t('Operasyon Merkezi'))+
           navItem('analytics','bi-graph-up',t('Analitik'))+
           navItem('recordings','bi-camera-reels-fill',t('Kayitlar'))+
           navItem('viewers','bi-people-fill',t('Izleyiciler'))+
@@ -649,6 +651,37 @@ function closeModal(id){
   if(el&&el.parentNode)el.parentNode.removeChild(el);
 }
 
+function scrollToElementId(id){
+  const el=document.getElementById(id);
+  if(el&&typeof el.scrollIntoView==='function'){
+    el.scrollIntoView({behavior:'smooth',block:'start'});
+  }
+}
+
+async function openTextInspectModal(title,url){
+  const modalId='text-inspect-modal';
+  closeModal(modalId);
+  const html=
+    '<div class="modal-overlay" id="'+modalId+'" onclick="if(event.target===this)closeModal(\''+modalId+'\')">'+
+      '<div class="modal" style="max-width:980px">'+
+        '<div class="modal-title">'+escHtml(title||'Metin Onizleme')+'</div>'+
+        '<div class="form-hint" style="margin-bottom:12px">'+escHtml(url||'-')+'</div>'+
+        '<pre id="text-inspect-body" style="margin:0;white-space:pre-wrap;word-break:break-word;max-height:60vh;overflow:auto;background:var(--bg-primary);border:1px solid var(--border);border-radius:12px;padding:16px;font-size:12px;line-height:1.55">Yukleniyor...</pre>'+
+        '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px"><a class="btn btn-secondary" href="'+escHtml(url||'#')+'" target="_blank" rel="noopener">Yeni Sekmede Ac</a><button class="btn btn-primary" onclick="closeModal(\''+modalId+'\')">Kapat</button></div>'+
+      '</div>'+
+    '</div>';
+  document.body.insertAdjacentHTML('beforeend',html);
+  const body=document.getElementById('text-inspect-body');
+  if(!body)return;
+  try{
+    const resp=await fetch(url,{cache:'no-store'});
+    const text=await resp.text();
+    body.textContent=text||'(Bos yanit)';
+  }catch(e){
+    body.textContent='Icerik yuklenemedi: '+String((e&&e.message)||e||'Bilinmeyen hata');
+  }
+}
+
 async function loadProtoStatus(){
   const s=await api('/api/settings');
   const el=document.getElementById('proto-status');
@@ -669,6 +702,7 @@ async function loadPage(page){
   else if(page==='guided-settings')await renderGuidedSettings(c);
   else if(page==='embed-codes')await renderEmbedCodes(c);
   else if(page.startsWith('stream-detail-'))await renderStreamDetail(c,page.replace('stream-detail-',''));
+  else if(page==='operations-center')await renderOperationsCenter(c);
   else if(page==='settings-general')await renderSettingsGeneral(c);
   else if(page==='settings-embed')await renderSettingsEmbed(c);
   else if(page==='settings-protocols')await renderSettingsProtocols(c);
@@ -899,12 +933,184 @@ function renderTelemetrySessionsTable(items){
     }).join('')+
   '</tbody></table></div>';
 }
+function renderTelemetryTrendChart(history,key,color,label,formatter){
+  const items=Array.isArray(history)?history:[];
+  if(!items.length){
+    return '<div class="card" style="padding:16px"><div class="card-title" style="margin-bottom:12px">'+escHtml(label)+'</div><div class="form-hint">Kalici zaman serisi henuz olusmadi.</div></div>';
+  }
+  const values=items.map(function(item){
+    const raw=Number(item&&item[key]);
+    return Number.isFinite(raw)?raw:0;
+  });
+  const latest=values.length?values[values.length-1]:0;
+  const min=Math.min.apply(null,values);
+  const max=Math.max.apply(null,values);
+  const width=320;
+  const height=84;
+  const pad=10;
+  const span=Math.max(1,max-min);
+  const points=values.map(function(value,index){
+    const x=pad+((width-(pad*2))*index/Math.max(1,values.length-1));
+    const normalized=(value-min)/span;
+    const y=(height-pad)-((height-(pad*2))*normalized);
+    return x.toFixed(1)+','+y.toFixed(1);
+  }).join(' ');
+  return '<div class="card" style="padding:16px">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px">'+
+      '<div class="card-title">'+escHtml(label)+'</div>'+
+      '<strong style="color:'+escHtml(color)+'">'+escHtml((formatter||fmtInt)(latest))+'</strong>'+
+    '</div>'+
+    '<svg viewBox="0 0 '+width+' '+height+'" preserveAspectRatio="none" style="width:100%;height:84px;display:block;background:var(--bg-primary);border-radius:10px;border:1px solid var(--border-color)">'+
+      '<polyline fill="none" stroke="'+escHtml(color)+'" stroke-width="3" points="'+points+'"></polyline>'+
+    '</svg>'+
+    '<div class="form-hint" style="margin-top:8px">Son '+fmtInt(items.length)+' kalici ornek</div>'+
+  '</div>';
+}
+function trackBitrateLabel(value){
+  const num=Number(value||0);
+  if(!Number.isFinite(num)||num<=0)return '-';
+  return Math.round(num/1000)+' kbps';
+}
+function renderAlertList(items,emptyText){
+  const alerts=Array.isArray(items)?items:[];
+  if(!alerts.length)return '<div class="form-hint">'+(emptyText||'Aktif uyari yok.')+'</div>';
+  return '<div style="display:grid;gap:10px">'+alerts.map(function(alert){
+    const tone=alert.level==='critical'?'tag-red':(alert.level==='warning'?'tag-yellow':'tag-blue');
+    return '<div class="card" style="padding:14px;border:1px solid var(--border-color)">'+
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px">'+
+        '<div class="card-title" style="font-size:14px">'+escHtml(alert.title||alert.code||'Uyari')+'</div>'+
+        '<span class="tag '+tone+'">'+escHtml((alert.level||'info').toUpperCase())+'</span>'+
+      '</div>'+
+      '<div class="form-hint" style="line-height:1.7">'+escHtml(alert.description||'-')+'</div>'+
+      (alert.action?'<div class="form-hint" style="margin-top:8px;color:var(--text-primary)"><strong>Oneri:</strong> '+escHtml(alert.action)+'</div>':'')+
+    '</div>';
+  }).join('')+'</div>';
+}
+function groupTrackHistory(items,kind){
+  const groups={};
+  (Array.isArray(items)?items:[]).forEach(function(sample){
+    if(kind&&sample.kind!==kind)return;
+    const id=String(Number(sample.track_id||0));
+    if(!groups[id]){
+      groups[id]={
+        track_id:Number(sample.track_id||0),
+        kind:sample.kind||kind||'video',
+        display_label:sample.display_label||('Track '+id),
+        items:[]
+      };
+    }
+    groups[id].items.push(sample);
+  });
+  return Object.values(groups).map(function(group){
+    group.items.sort(function(a,b){
+      return new Date(a.created_at||0).getTime()-new Date(b.created_at||0).getTime();
+    });
+    return group;
+  }).sort(function(a,b){return a.track_id-b.track_id;});
+}
+function renderTrackAnalyticsGroups(items,kind,color){
+  const groups=groupTrackHistory(items,kind);
+  if(!groups.length)return '<div class="form-hint">'+(kind==='audio'?'Audio':'Video')+' track analytics verisi henuz birikmedi.</div>';
+  return '<div class="card-grid card-grid-2">'+groups.map(function(group){
+    return renderTelemetryTrendChart(group.items,'bitrate',color,group.display_label+' bitrate',trackBitrateLabel);
+  }).join('')+'</div>';
+}
+function trackMetaLabel(track){
+  if(!track)return '-';
+  if(track.kind==='video'){
+    if(track.width&&track.height)return track.width+'x'+track.height;
+    if(track.height)return track.height+'p';
+    return '-';
+  }
+  const parts=[];
+  if(track.sample_rate)parts.push(track.sample_rate+' Hz');
+  if(track.channels)parts.push(track.channels+' ch');
+  return parts.length?parts.join(' / '):'-';
+}
+function renderTrackSelector(id,items,selectedID,emptyText,disabled){
+  const tracks=Array.isArray(items)?items:[];
+  return '<select class="form-select" id="'+id+'"'+(disabled?' disabled':'')+'>'+
+    '<option value="0">Otomatik</option>'+
+    tracks.map(function(track){
+      const selected=Number(selectedID||0)===Number(track.track_id||0)?' selected':'';
+      return '<option value="'+String(Number(track.track_id||0))+'"'+selected+'>'+escHtml(track.display_label||('Track '+track.track_id))+'</option>';
+    }).join('')+
+  '</select>'+(tracks.length?'':'<div class="form-hint" style="margin-top:8px">'+(emptyText||'Canli track verisi bekleniyor')+'</div>');
+}
+function renderTrackTable(items){
+  const tracks=Array.isArray(items)?items:[];
+  if(!tracks.length)return '<div class="form-hint">Track bilgisi henuz gelmedi.</div>';
+  return '<div style="overflow:auto"><table class="viewer-table"><thead><tr><th>Track</th><th>Codec</th><th>Meta</th><th>Bitrate</th><th>Durum</th><th>Son Gorus</th></tr></thead><tbody>'+
+    tracks.map(function(track){
+      const tags=[];
+      if(track.is_default)tags.push('<span class="tag tag-blue">Varsayilan</span>');
+      if(track.is_active)tags.push('<span class="tag tag-green">Aktif</span>');
+      if(track.enhanced)tags.push('<span class="tag tag-yellow">Enhanced</span>');
+      return '<tr>'+
+        '<td><strong>'+escHtml(track.display_label||('Track '+track.track_id))+'</strong><div class="form-hint">ID '+fmtInt(track.track_id||0)+'</div></td>'+
+        '<td>'+escHtml(track.codec||'-')+'</td>'+
+        '<td>'+escHtml(trackMetaLabel(track))+'</td>'+
+        '<td>'+escHtml(trackBitrateLabel(track.bitrate))+'</td>'+
+        '<td>'+(tags.join(' ')||'<span class="form-hint">-</span>')+'</td>'+
+        '<td>'+escHtml(formatAgoSeconds(track.last_seen_ago_sec))+'</td>'+
+      '</tr>';
+    }).join('')+
+  '</tbody></table></div>';
+}
+function renderTrackRuntimeBody(payload,policy,options){
+  const opts=options||{};
+  const tracks=payload&&payload.tracks?payload.tracks:{};
+  const trackHistory=Array.isArray(payload&&payload.track_history)?payload.track_history:[];
+  const videoTracks=Array.isArray(tracks.video_tracks)?tracks.video_tracks:[];
+  const audioTracks=Array.isArray(tracks.audio_tracks)?tracks.audio_tracks:[];
+  const defaultVideoID=Number((tracks.default_video_track_id!=null?tracks.default_video_track_id:policy&&policy.default_video_track_id)||0);
+  const defaultAudioID=Number((tracks.default_audio_track_id!=null?tracks.default_audio_track_id:policy&&policy.default_audio_track_id)||0);
+  const directMode=!!tracks.direct_mode;
+  const readOnly=!!opts.readOnly;
+  const footerHint=readOnly
+    ?'Varsayilan secimleri kalici degistirmek icin yayin detay ekranindaki politika kartini kullan.'
+    :'Video secimi yeni publish ile kokten etkili olur. Audio secimi mevcut canli oturuma da uygulanabilir.';
+  return '<div class="card-grid card-grid-2" style="margin-bottom:16px">'+
+      '<div class="card" style="padding:16px">'+
+        '<div class="card-title" style="margin-bottom:12px">Varsayilan Track Secimi</div>'+
+        '<div class="form-group"><label class="form-label">Varsayilan Video Track</label>'+renderTrackSelector('sd-default-video-track',videoTracks,defaultVideoID,'Video track secimi yeni yayinda tam olarak uygulanir.',readOnly)+'</div>'+
+        '<div class="form-group"><label class="form-label">Varsayilan Audio Track</label>'+renderTrackSelector('sd-default-audio-track',audioTracks,defaultAudioID,'Audio track secimi canli yayinda uygulanabilir.',readOnly)+'</div>'+
+        '<div class="form-hint">Durum: '+(directMode?'Direct multitrack HLS aktif':'Tek track veya klasik pipeline modu')+'</div>'+
+        '<div class="form-hint" style="margin-top:8px">'+footerHint+'</div>'+
+      '</div>'+
+      '<div class="card" style="padding:16px">'+
+        '<div class="card-title" style="margin-bottom:12px">Canli Runtime Ozet</div>'+
+        '<div class="metric-list">'+
+          '<div class="metric-row"><span>Aktif video track</span><strong>'+(tracks.active_video_track_id?fmtInt(tracks.active_video_track_id):'-')+'</strong></div>'+
+          '<div class="metric-row"><span>Aktif audio track</span><strong>'+(tracks.active_audio_track_id?fmtInt(tracks.active_audio_track_id):'-')+'</strong></div>'+
+          '<div class="metric-row"><span>Video track sayisi</span><strong>'+fmtInt(videoTracks.length)+'</strong></div>'+
+          '<div class="metric-row"><span>Audio track sayisi</span><strong>'+fmtInt(audioTracks.length)+'</strong></div>'+
+          '<div class="metric-row"><span>Son guncelleme</span><strong>'+escHtml(tracks.updated_at?fmtLocaleDateTime(tracks.updated_at):'-')+'</strong></div>'+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="card-grid card-grid-2" style="margin-bottom:16px">'+
+      '<div class="card" style="padding:16px"><div class="card-title" style="margin-bottom:12px">Video Trackleri</div>'+renderTrackTable(videoTracks)+'</div>'+
+      '<div class="card" style="padding:16px"><div class="card-title" style="margin-bottom:12px">Audio Trackleri</div>'+renderTrackTable(audioTracks)+'</div>'+
+    '</div>'+
+    '<div class="card" style="padding:16px">'+
+      '<div class="card-title" style="margin-bottom:12px">Track Analytics</div>'+
+      '<div class="form-hint" style="margin-bottom:14px">Kalici bitrate ve track runtime ornekleri burada zaman serisi olarak birikir.</div>'+
+      '<div class="form-hint" style="margin-bottom:8px">Video Trackleri</div>'+
+      renderTrackAnalyticsGroups(trackHistory,'video','var(--accent)')+
+      '<div class="form-hint" style="margin:16px 0 8px">Audio Trackleri</div>'+
+      renderTrackAnalyticsGroups(trackHistory,'audio','var(--success)')+
+    '</div>';
+}
 function renderStreamTelemetryBody(payload){
   const telemetry=payload&&payload.telemetry?payload.telemetry:{};
   const sessions=Array.isArray(telemetry.sessions)?telemetry.sessions:[];
+  const history=Array.isArray(payload&&payload.history)?payload.history:[];
+  const alerts=Array.isArray(payload&&payload.qoe_alerts)?payload.qoe_alerts:[];
   const lastUpdate=telemetry.last_update?fmtLocaleDateTime(telemetry.last_update):'-';
   const lastError=telemetry.last_error&&telemetry.last_error!=='-'?telemetry.last_error:'Yok';
-  return '<div class="card-grid card-grid-4" style="margin-bottom:16px">'+
+  return (alerts.length?'<div class="card" style="padding:16px;margin-bottom:16px"><div class="card-title" style="margin-bottom:12px">QoE Uyarilari</div>'+renderAlertList(alerts,'Aktif QoE uyarisi yok.')+'</div>':'')+
+    '<div class="card-grid card-grid-4" style="margin-bottom:16px">'+
       statCard('blue','bi-play-circle-fill',fmtInt(telemetry.active_sessions||0),'Aktif Player')+
       statCard('orange','bi-hourglass-split',fmtInt(telemetry.waiting_sessions||0),'Bekleyen')+
       statCard('red','bi-exclamation-triangle-fill',fmtInt(telemetry.total_stalls||0),'Toplam Stall')+
@@ -916,7 +1122,7 @@ function renderStreamTelemetryBody(payload){
         '<div class="metric-list">'+
           '<div class="metric-row"><span>Son guncelleme</span><strong>'+escHtml(lastUpdate)+'</strong></div>'+
           '<div class="metric-row"><span>Ortalama buffer</span><strong>'+escHtml(formatShortSeconds(telemetry.average_buffer_seconds))+'</strong></div>'+
-          '<div class="metric-row"><span>Ortalama oynatma suresi</span><strong>'+escHtml(formatShortSeconds(telemetry.average_playback))+'</strong></div>'+
+          '<div class="metric-row"><span>Ortalama oynatma suresi</span><strong>'+escHtml(formatShortSeconds(telemetry.average_playback_seconds))+'</strong></div>'+
           '<div class="metric-row"><span>Offline oturum</span><strong>'+fmtInt(telemetry.offline_sessions||0)+'</strong></div>'+
           '<div class="metric-row"><span>Debug acik</span><strong>'+fmtInt(telemetry.debug_sessions||0)+'</strong></div>'+
           '<div class="metric-row"><span>Son hata</span><strong style="text-align:right">'+escHtml(lastError)+'</strong></div>'+
@@ -929,6 +1135,11 @@ function renderStreamTelemetryBody(payload){
         '<div class="form-hint" style="margin:14px 0 8px">Sayfa</div>'+renderTelemetryPills(telemetry.pages,'Sayfa verisi yok')+
       '</div>'+
     '</div>'+
+    '<div class="card-grid card-grid-3" style="margin-bottom:16px">'+
+      renderTelemetryTrendChart(history,'active_sessions','var(--accent)','Aktif Player Trendi',fmtInt)+
+      renderTelemetryTrendChart(history,'average_buffer_seconds','var(--warning)','Buffer Trendi',formatShortSeconds)+
+      renderTelemetryTrendChart(history,'total_stalls','var(--danger)','Stall Birikimi',fmtInt)+
+    '</div>'+
     '<div class="card" style="padding:16px">'+
       '<div class="card-title" style="margin-bottom:12px">Son Aktif Oturumlar</div>'+
       renderTelemetrySessionsTable(sessions)+
@@ -936,13 +1147,22 @@ function renderStreamTelemetryBody(payload){
 }
 async function loadStreamTelemetry(id){
   const body=document.getElementById('stream-qoe-body');
-  if(!body)return;
+  const trackBody=document.getElementById('stream-track-body');
+  if(!body&&!trackBody)return;
+  const currentVideoSelection=document.getElementById('sd-default-video-track')?.value||'';
+  const currentAudioSelection=document.getElementById('sd-default-audio-track')?.value||'';
   const data=await api('/api/admin/player/telemetry/stream/'+id);
   if(!data||data.error){
-    body.innerHTML='<div class="form-hint" style="color:var(--danger)">QoE telemetrisi alinamadi.</div>';
+    if(body)body.innerHTML='<div class="form-hint" style="color:var(--danger)">QoE telemetrisi alinamadi.</div>';
+    if(trackBody)trackBody.innerHTML='<div class="form-hint" style="color:var(--danger)">Track runtime verisi alinamadi.</div>';
     return;
   }
-  body.innerHTML=renderStreamTelemetryBody(data);
+  if(body)body.innerHTML=renderStreamTelemetryBody(data);
+  if(trackBody){
+    trackBody.innerHTML=renderTrackRuntimeBody(data,parseStreamPolicy(window._streamDetailData&&window._streamDetailData.policy_json));
+    if(currentVideoSelection&&document.getElementById('sd-default-video-track'))document.getElementById('sd-default-video-track').value=currentVideoSelection;
+    if(currentAudioSelection&&document.getElementById('sd-default-audio-track'))document.getElementById('sd-default-audio-track').value=currentAudioSelection;
+  }
 }
 function startStreamTelemetryLoop(id){
   if(streamTelemetryTimer){
@@ -1316,7 +1536,362 @@ function urlSection(title,pairs){
     pairs.map(function(p){return copyField(p[0],p[1])}).join('')+'</div>';
 }
 
+function renderDeliveryUsageCard(streamID,urls,options){
+  const u=urls||{};
+  const opts=options||{};
+  const dashPlayer=withQueryParam(u.play||'','format','dash');
+  const mp4Player=withQueryParam(u.play||'','format','mp4');
+  let telemetryAction='<button class="btn btn-secondary btn-sm" onclick="scrollToElementId(\'stream-qoe-card\')">Telemetri Kartina Git</button>';
+  if(opts.telemetryMode==='navigate'){
+    telemetryAction='<button class="btn btn-secondary btn-sm" onclick="navigate(\'stream-detail-'+Number(streamID||0)+'\')">Telemetri Ekrani</button>';
+  }else if(opts.telemetryMode==='operations'){
+    telemetryAction='<button class="btn btn-secondary btn-sm" onclick="setOperationsCenterTab(\'qoe\')">Telemetri Sekmesini Ac</button>';
+  }
+  return '<div class="card" style="margin-bottom:16px">'+
+    '<div class="card-header"><div class="card-title">Kullanim ve Tanilama Rehberi</div><div style="display:flex;gap:10px;flex-wrap:wrap">'+
+      '<a class="btn btn-secondary btn-sm" href="'+escHtml(u.play||'#')+'" target="_blank" rel="noopener">Tarayici Player</a>'+
+      '<a class="btn btn-secondary btn-sm" href="'+escHtml(dashPlayer||'#')+'" target="_blank" rel="noopener">DASH Player</a>'+
+      '<a class="btn btn-secondary btn-sm" href="'+escHtml(mp4Player||'#')+'" target="_blank" rel="noopener">MP4 Player</a>'+
+      telemetryAction+
+    '</div></div>'+
+    '<div class="card-grid card-grid-2">'+
+      '<div class="card" style="padding:16px">'+
+        '<div class="card-title" style="margin-bottom:12px">Hangi link nerede kullanilir?</div>'+
+        '<div class="form-hint" style="line-height:1.8;margin-bottom:12px">VLC icin en guvenli secim HLS URL\'dir. DASH MPD genelde teshis ve DASH uyumlu player icindir. Ham MP4 cikisi tarayicida dogrudan sekmede her zaman en iyi deneyimi vermez; tarayicida MP4 izlemek icin ustteki <strong>MP4 Player</strong> dugmesini kullan.</div>'+
+        copyField('VLC icin onerilen HLS URL',u.hls||'')+
+        copyField('DASH MPD URL',u.dash||'')+
+        copyField('Ham MP4 URL',u.fmp4||'')+
+      '</div>'+
+      '<div class="card" style="padding:16px">'+
+        '<div class="card-title" style="margin-bottom:12px">Manifest ve Telemetri</div>'+
+        '<div class="form-hint" style="line-height:1.8;margin-bottom:12px">MPD veya HLS manifest dosyasini ham metin olarak acip kontrol edebilirsin. Canli player telemetrisi stream detay ekranindaki <strong>QoE ve Stall Telemetrisi</strong> kartinda gorunur.</div>'+
+        '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">'+
+          '<button class="btn btn-secondary btn-sm" onclick=\'openTextInspectModal("DASH MPD",'+JSON.stringify(u.dash||'')+')\'>MPD XML Goster</button>'+
+          '<button class="btn btn-secondary btn-sm" onclick=\'openTextInspectModal("HLS Master",'+JSON.stringify(u.hls||'')+')\'>HLS Master Goster</button>'+
+          '<button class="btn btn-secondary btn-sm" onclick=\'openTextInspectModal("HLS Media",'+JSON.stringify(u.hls_media||'')+')\'>HLS Media Goster</button>'+
+        '</div>'+
+        '<div class="metric-list">'+
+          '<div class="metric-row"><span>Tarayicida izleme</span><strong>Player URL kullan</strong></div>'+
+          '<div class="metric-row"><span>VLC / harici oynatici</span><strong>HLS URL kullan</strong></div>'+
+          '<div class="metric-row"><span>Manifest kontrolu</span><strong>MPD XML / HLS Master</strong></div>'+
+          '<div class="metric-row"><span>Canli telemetri</span><strong>QoE karti</strong></div>'+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+}
+
 // Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â STREAM DETAIL Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+function setOperationsCenterFilter(filter){
+  operationsCenterState.filter=String(filter||'all');
+  const page=document.getElementById('page-content');
+  if(page)renderOperationsCenter(page);
+}
+function setOperationsCenterSourceType(value){
+  operationsCenterState.sourceType=String(value||'streams');
+  const page=document.getElementById('page-content');
+  if(page)renderOperationsCenter(page);
+}
+function selectOperationsStream(id){
+  operationsCenterState.streamID=Number(id||0);
+  const page=document.getElementById('page-content');
+  if(page)renderOperationsCenter(page);
+}
+function setOperationsCenterStream(value){
+  selectOperationsStream(value);
+}
+function setOperationsCenterTab(tab){
+  operationsCenterState.tab=String(tab||'general');
+  const page=document.getElementById('page-content');
+  if(page)renderOperationsCenter(page);
+}
+function operationsCenterFilterMatches(stream,filter){
+  const st=stream||{};
+  switch(String(filter||'all')){
+    case 'live':
+      return st.status==='live';
+    case 'offline':
+      return st.status!=='live';
+    case 'watched':
+      return Number(st.viewer_count||0)>0;
+    default:
+      return true;
+  }
+}
+function renderOperationsFilterButton(filter,label){
+  const active=operationsCenterState.filter===filter;
+  return '<button class="segment-btn '+(active?'active':'')+'" onclick="setOperationsCenterFilter(\''+filter+'\')">'+label+'</button>';
+}
+function renderOperationsSourceTypeSelect(){
+  return '<select class="form-select" onchange="setOperationsCenterSourceType(this.value)">'+
+    '<option value="streams"'+(operationsCenterState.sourceType==='streams'?' selected':'')+'>Canli Yayinlar / Streamler</option>'+
+    '<option value="playlists" disabled>On-Demand Playlistler (yakinda)</option>'+
+  '</select>';
+}
+function renderOperationsStreamSelect(streams){
+  const items=Array.isArray(streams)?streams:[];
+  if(!items.length){
+    return '<select class="form-select" disabled><option>Gorunur stream yok</option></select>';
+  }
+  return '<select class="form-select" onchange="setOperationsCenterStream(this.value)">'+
+    items.map(function(stream){
+      const selected=Number(stream.id||0)===Number(operationsCenterState.streamID||0)?' selected':'';
+      const label=(stream.name||'Yayin')+' ['+(stream.status==='live'?'CANLI':'Cevrimdisi')+'] - '+(stream.stream_key||'-');
+      return '<option value="'+String(Number(stream.id||0))+'"'+selected+'>'+escHtml(label)+'</option>';
+    }).join('')+
+  '</select>';
+}
+function renderOperationsStreamListItem(stream,selected){
+  const resolution=stream.input_width&&stream.input_height?(stream.input_width+'x'+stream.input_height):'cozunurluk yok';
+  return '<button type="button" class="card" style="width:100%;text-align:left;padding:12px;border:'+(selected?'1px solid var(--accent)':'1px solid var(--border)')+';background:'+(selected?'rgba(59,130,246,.08)':'var(--bg-card)')+';cursor:pointer;box-shadow:none" onclick="selectOperationsStream('+Number(stream.id||0)+')">'+
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px">'+
+      '<div><div style="font-weight:700;margin-bottom:4px">'+escHtml(stream.name||'Yayin')+'</div><div class="form-hint"><code>'+escHtml(shortKey(stream.stream_key||'-'))+'</code></div></div>'+
+      '<span class="badge badge-'+escHtml(stream.status||'offline')+'">'+(stream.status==='live'?'CANLI':'Cevrimdisi')+'</span>'+
+    '</div>'+
+    '<div class="metric-list">'+
+      '<div class="metric-row"><span>Izleyici</span><strong>'+fmtInt(stream.viewer_count||0)+'</strong></div>'+
+      '<div class="metric-row"><span>Codec</span><strong>'+escHtml(stream.input_codec||'-')+'</strong></div>'+
+      '<div class="metric-row"><span>Cozunurluk</span><strong>'+escHtml(resolution)+'</strong></div>'+
+    '</div>'+
+  '</button>';
+}
+function renderOperationsTabButton(tab,label){
+  return '<button class="segment-btn '+(operationsCenterState.tab===tab?'active':'')+'" onclick="setOperationsCenterTab(\''+tab+'\')">'+label+'</button>';
+}
+function renderOperationsQuickActions(stream,urls,previewURLs){
+  const u=urls||{};
+  const preview=previewURLs||{};
+  const playerDebug=withQueryParam(u.play||'','debug','1');
+  const embedDebug=withQueryParam(u.embed||'','debug','1');
+  const dashPlayer=withQueryParam(u.play||'','format','dash');
+  const mp4Player=withQueryParam(u.play||'','format','mp4');
+  const previewDebug=withQueryParam(preview.play||u.play||'','debug','1');
+  return '<div class="card" style="margin-bottom:16px">'+
+    '<div class="card-header"><div><div class="card-title">Hizli Eylemler</div><div class="form-hint">Secili yayin icin hizli linkler ve tanilama gecisleri.</div></div><div><button class="btn btn-secondary btn-sm" onclick="navigate(\'stream-detail-'+Number(stream.id||0)+'\')">Yayin Detayi</button></div></div>'+
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">'+
+      '<a class="btn btn-secondary btn-sm" href="'+escHtml(u.play||'#')+'" target="_blank" rel="noopener">Player</a>'+
+      '<a class="btn btn-secondary btn-sm" href="'+escHtml(u.embed||'#')+'" target="_blank" rel="noopener">Embed</a>'+
+      '<a class="btn btn-secondary btn-sm" href="'+escHtml(dashPlayer||'#')+'" target="_blank" rel="noopener">DASH Player</a>'+
+      '<a class="btn btn-secondary btn-sm" href="'+escHtml(mp4Player||'#')+'" target="_blank" rel="noopener">MP4 Player</a>'+
+      '<a class="btn btn-secondary btn-sm" href="'+escHtml(playerDebug||'#')+'" target="_blank" rel="noopener">Debug Player</a>'+
+      '<a class="btn btn-secondary btn-sm" href="'+escHtml(embedDebug||'#')+'" target="_blank" rel="noopener">Debug Embed</a>'+
+      '<a class="btn btn-secondary btn-sm" href="'+escHtml(previewDebug||'#')+'" target="_blank" rel="noopener">Canli Preview</a>'+
+    '</div>'+
+    '<div class="metric-list">'+
+      '<div class="metric-row"><span>Player URL</span><strong class="mono-wrap">'+escHtml(u.play||'-')+'</strong></div>'+
+      '<div class="metric-row"><span>Embed URL</span><strong class="mono-wrap">'+escHtml(u.embed||'-')+'</strong></div>'+
+      '<div class="metric-row"><span>HLS Master</span><strong class="mono-wrap">'+escHtml(u.hls||'-')+'</strong></div>'+
+      '<div class="metric-row"><span>DASH MPD</span><strong class="mono-wrap">'+escHtml(u.dash||'-')+'</strong></div>'+
+    '</div>'+
+  '</div>';
+}
+function renderOperationsDiagnosticsBody(data,urls){
+  const diag=data||{};
+  const checks=Array.isArray(diag.checks)?diag.checks:[];
+  const telemetry=diag.telemetry||{};
+  const hlsVariants=Number(diag.hls_variant_count||0);
+  const dashRepresentations=Number(diag.dash_representation_count||0);
+  const deliverySummary=diag.delivery_summary||{};
+  const summaryTone='tag-'+(deliverySummary.tone||'yellow');
+  return '<div class="card-grid card-grid-4" style="margin-bottom:16px">'+
+      statCard('blue','bi-collection-play',fmtInt(hlsVariants),'HLS Varyant')+
+      statCard('purple','bi-diagram-3',fmtInt(dashRepresentations),'DASH Representation')+
+      statCard('orange','bi-people-fill',fmtInt(telemetry.active_sessions||0),'Aktif Player')+
+      statCard('red','bi-exclamation-triangle-fill',fmtInt(telemetry.total_stalls||0),'Toplam Stall')+
+    '</div>'+
+    '<div class="card" style="margin-bottom:16px">'+
+      '<div class="card-header"><div><div class="card-title">Teshis Ozeti</div><div class="form-hint">Manifest, cikis ve telemetry sagligi bu bolumde gorunur.</div></div><div><span class="tag '+summaryTone+'">'+escHtml(deliverySummary.label||'Durum bekleniyor')+'</span></div></div>'+
+      '<div class="metric-list" style="margin-bottom:16px">'+
+        '<div class="metric-row"><span>ABR Profil</span><strong>'+escHtml(diag.abr_profile_set||'balanced')+'</strong></div>'+
+        '<div class="metric-row"><span>Player telemetrisi</span><strong>'+fmtInt(telemetry.active_sessions||0)+' aktif / '+fmtInt(telemetry.total_stalls||0)+' stall</strong></div>'+
+        '<div class="metric-row"><span>Teslimat Ozeti</span><strong style="text-align:right">'+escHtml(deliverySummary.description||'-')+'</strong></div>'+
+        '<div class="metric-row"><span>Policy JSON</span><strong class="mono-wrap">'+escHtml(diag.policy_json||'{}')+'</strong></div>'+
+      '</div>'+
+      '<div class="bar-list">'+checks.map(function(check){
+        const tone='tag-'+(check.tone||'red');
+        return '<div class="metric-row"><div><div>'+escHtml(check.description||check.code||'-')+'</div>'+(check.detail?'<div class="form-hint" style="margin-top:4px">'+escHtml(check.detail)+'</div>':'')+'</div><span class="tag '+tone+'">'+escHtml(check.label||'Sorunlu')+'</span></div>';
+      }).join('')+'</div>'+
+      '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">'+
+        '<button class="btn btn-secondary btn-sm" onclick=\'openTextInspectModal("DASH MPD",'+JSON.stringify((urls&&urls.dash)||'')+')\'>MPD XML Goster</button>'+
+        '<button class="btn btn-secondary btn-sm" onclick=\'openTextInspectModal("HLS Master",'+JSON.stringify((urls&&urls.hls)||'')+')\'>HLS Master Goster</button>'+
+        '<button class="btn btn-secondary btn-sm" onclick=\'openTextInspectModal("HLS Media",'+JSON.stringify((urls&&urls.hls_media)||'')+')\'>HLS Media Goster</button>'+
+        '<button class="btn btn-secondary btn-sm" onclick=\'openTextInspectModal("Prometheus Metrics","/metrics")\'>Prometheus Metrics</button>'+
+        '<button class="btn btn-secondary btn-sm" onclick=\'openTextInspectModal("OpenTelemetry JSON","/api/observability/otel")\'>OpenTelemetry JSON</button>'+
+      '</div>'+
+    '</div>';
+}
+async function renderOperationsCenter(c){
+  const streamsRes=await api('/api/streams');
+  const streams=Array.isArray(streamsRes)?streamsRes:[];
+  const filtered=streams.filter(function(stream){
+    return operationsCenterFilterMatches(stream,operationsCenterState.filter);
+  });
+  if(filtered.length&&filtered.findIndex(function(stream){return Number(stream.id||0)===Number(operationsCenterState.streamID||0)})===-1){
+    operationsCenterState.streamID=Number(filtered[0].id||0);
+  }
+  if(!filtered.length)operationsCenterState.streamID=0;
+  let st=null;
+  let settings={};
+  let access={};
+  let urls={};
+  let previewURLs={};
+  let telemetryData=null;
+  let diagnosticsData=null;
+  let policy={};
+  if(operationsCenterState.streamID){
+    const selectedID=Number(operationsCenterState.streamID||0);
+    st=await api('/api/streams/'+selectedID);
+    if(st&&!st.error){
+      settings=await api('/api/settings')||{};
+      access=await getPlaybackAccess(st.stream_key,settings,st.policy_json);
+      urls=getAllURLs(st.stream_key,settings,st.name,access);
+      previewURLs=getPreviewURLs(st.stream_key,settings,st.name,access);
+      const diagAndTelemetry=await Promise.all([
+        api('/api/admin/player/telemetry/stream/'+selectedID),
+        api('/api/diagnostics/stream/'+selectedID)
+      ]);
+      telemetryData=diagAndTelemetry[0];
+      diagnosticsData=diagAndTelemetry[1];
+      policy=parseStreamPolicy(st.policy_json);
+    }
+  }
+  let tabBody='<div class="card"><div class="empty-state"><div class="icon"><i class="bi bi-broadcast"></i></div><h3>Bir yayin secin</h3><p style="color:var(--text-muted)">Listedeki veya secim kutusundaki bir stream secerek operasyon verilerini gorebilirsiniz.</p></div></div>';
+  if(operationsCenterState.sourceType!=='streams'){
+    tabBody='<div class="card"><div class="empty-state"><div class="icon"><i class="bi bi-list-stars"></i></div><h3>On-demand playlist hazirligi tamamlandi</h3><p style="color:var(--text-muted)">Bu secim alani ileride on-demand playlistleri de ayni merkezden yonetmek icin kullanilacak. Bu fazda yalnizca canli streamler aktif durumda.</p></div></div>';
+  }else if(st&&!st.error){
+    const previewDebugURL=withQueryParam(previewURLs.play||urls.play||'','debug','1');
+    const deliveryBody=
+      renderDeliveryUsageCard(st.id,urls,{telemetryMode:'operations'})+
+      urlSection('Video Akis URLleri',[
+        ['HLS',urls.hls],['LL-HLS',urls.ll_hls],['DASH',urls.dash],['HTTP-FLV',urls.http_flv],['fMP4',urls.fmp4],['WebM',urls.webm]
+      ])+
+      urlSection('Ses ve Harici Oynatici',[
+        ['AAC',urls.aac],['MP3',urls.mp3],['HLS Ses',urls.hls_audio],['DASH Ses',urls.dash_audio],['Icecast',urls.icecast]
+      ]);
+    const generalBody=
+      '<div class="card-grid card-grid-4" style="margin-bottom:16px">'+
+        statCard(st.status==='live'?'green':'red','bi-broadcast',st.status==='live'?'CANLI':'Cevrimdisi','Durum')+
+        statCard('blue','bi-people-fill',fmtInt(st.viewer_count||0),'Izleyici')+
+        statCard('purple','bi-badge-hd',st.input_width&&st.input_height?(st.input_width+'x'+st.input_height):'-','Cozunurluk')+
+        statCard('orange','bi-camera-video-fill',st.input_codec||'-','Codec')+
+      '</div>'+
+      '<div class="card" style="margin-bottom:16px">'+
+        '<div class="card-header"><div><div class="card-title">Canli Preview</div><div class="form-hint">Secili stream icin debug destekli canli player onizlemesi.</div></div><div><a class="btn btn-secondary btn-sm" href="'+escHtml(previewDebugURL||'#')+'" target="_blank" rel="noopener">Ayrica Ac</a></div></div>'+
+        '<div style="position:relative;padding-top:56.25%;background:#000;border-radius:12px;overflow:hidden">'+
+          '<iframe src="'+escHtml(previewDebugURL||'#')+'" style="position:absolute;top:0;left:0;width:100%;height:100%;border:none" allowfullscreen></iframe>'+
+        '</div>'+
+      '</div>'+
+      '<div class="card">'+
+        '<div class="card-title" style="margin-bottom:12px">Giris ve Yayin Ozeti</div>'+
+        '<div class="metric-list">'+
+          '<div class="metric-row"><span>Yayin adi</span><strong>'+escHtml(st.name||'-')+'</strong></div>'+
+          '<div class="metric-row"><span>Stream key</span><strong class="mono-wrap">'+escHtml(st.stream_key||'-')+'</strong></div>'+
+          '<div class="metric-row"><span>FPS</span><strong>'+escHtml(String(st.input_fps||'-'))+'</strong></div>'+
+          '<div class="metric-row"><span>Bitrate</span><strong>'+(st.input_bitrate?formatBytes(st.input_bitrate)+'/s':'-')+'</strong></div>'+
+          '<div class="metric-row"><span>OBS RTMP URL</span><strong class="mono-wrap">'+escHtml(getOBSRTMPServerURL(settings)||'-')+'</strong></div>'+
+        '</div>'+
+      '</div>';
+    const trackBody=(telemetryData&&!telemetryData.error)
+      ?renderTrackRuntimeBody(telemetryData,policy,{readOnly:true})+
+        '<div class="card"><div class="form-hint">Varsayilan video ve audio track secimlerini kalici degistirmek icin yayin detay ekranindaki politika kartini kullanabilirsiniz.</div></div>'
+      :'<div class="card"><div class="form-hint">Track runtime verisi henuz gelmedi.</div></div>';
+    const manifestBody=
+      '<div class="card" style="margin-bottom:16px">'+
+        '<div class="card-header"><div><div class="card-title">Manifest ve Ham Veri</div><div class="form-hint">Ham manifest, harici oynatici URLleri ve dosya inceleme dugmeleri burada toplanir.</div></div></div>'+
+        '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">'+
+          '<button class="btn btn-secondary btn-sm" onclick=\'openTextInspectModal("DASH MPD",'+JSON.stringify(urls.dash||'')+')\'>MPD XML Goster</button>'+
+          '<button class="btn btn-secondary btn-sm" onclick=\'openTextInspectModal("HLS Master",'+JSON.stringify(urls.hls||'')+')\'>HLS Master Goster</button>'+
+          '<button class="btn btn-secondary btn-sm" onclick=\'openTextInspectModal("HLS Media",'+JSON.stringify(urls.hls_media||'')+')\'>HLS Media Goster</button>'+
+          '<a class="btn btn-secondary btn-sm" href="'+escHtml(urls.hls||'#')+'" target="_blank" rel="noopener">HLS Master Ac</a>'+
+          '<a class="btn btn-secondary btn-sm" href="'+escHtml(urls.dash||'#')+'" target="_blank" rel="noopener">MPD Ac</a>'+
+        '</div>'+
+        copyField('HLS Master',urls.hls||'')+
+        copyField('HLS Media',urls.hls_media||'')+
+        copyField('DASH MPD',urls.dash||'')+
+        copyField('Ham MP4',urls.fmp4||'')+
+        copyField('Ham WebM',urls.webm||'')+
+      '</div>';
+    const obsBody=
+      renderCreateStreamGuide({mode:policy.mode||'balanced',rtmp_url:getOBSRTMPServerURL(settings),stream_key:st.stream_key,stream_name:st.name})+
+      '<div class="card"><div class="card-title" style="margin-bottom:12px">Ingest Ozeti</div><div class="metric-list">'+
+        '<div class="metric-row"><span>Yayin modu</span><strong>'+escHtml(policy.mode||'balanced')+'</strong></div>'+
+        '<div class="metric-row"><span>ABR</span><strong>'+(policy.enable_abr?'Acik':'Kapali')+'</strong></div>'+
+        '<div class="metric-row"><span>Profil seti</span><strong>'+escHtml(policy.profile_set||'balanced')+'</strong></div>'+
+        '<div class="metric-row"><span>Token gerekli</span><strong>'+(policy.require_playback_token?'Evet':'Hayir')+'</strong></div>'+
+      '</div></div>';
+    const qoeBody=(telemetryData&&!telemetryData.error)
+      ?renderStreamTelemetryBody(telemetryData)
+      :'<div class="card"><div class="form-hint">QoE telemetrisi henuz gelmedi.</div></div>';
+    const diagnosisBody=(diagnosticsData&&!diagnosticsData.error)
+      ?renderOperationsDiagnosticsBody(diagnosticsData,urls)
+      :'<div class="card"><div class="form-hint">Teshis verisi henuz gelmedi.</div></div>';
+    switch(operationsCenterState.tab){
+      case 'delivery':
+        tabBody=deliveryBody;
+        break;
+      case 'qoe':
+        tabBody=qoeBody;
+        break;
+      case 'tracks':
+        tabBody=trackBody+diagnosisBody;
+        break;
+      case 'manifests':
+        tabBody=manifestBody;
+        break;
+      case 'obs':
+        tabBody=obsBody;
+        break;
+      case 'diagnostics':
+        tabBody=diagnosisBody;
+        break;
+      default:
+        tabBody=generalBody;
+        break;
+    }
+  }
+  c.innerHTML=
+    '<div class="page-header"><h1 class="page-title">Canli Izleme ve Tanilama Merkezi</h1><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-secondary btn-sm" onclick="loadPage(\'operations-center\')"><i class="bi bi-arrow-clockwise"></i> Yenile</button><button class="btn btn-primary btn-sm" onclick="navigate(\'streams\')"><i class="bi bi-collection-play"></i> Yayinlar</button></div></div>'+
+    '<div class="card" style="margin-bottom:16px">'+
+      '<div class="card-header"><div><div class="card-title">Kaynak Secimi</div><div class="form-hint">Bu alan gelecekte canli streamlere ek olarak on-demand playlistleri de ayni merkezden secebilecegin bir yapi olacak.</div></div></div>'+
+      '<div class="card-grid card-grid-2" style="margin-bottom:16px">'+
+        '<div class="form-group" style="margin:0"><label class="form-label">Kaynak Turu</label>'+renderOperationsSourceTypeSelect()+'</div>'+
+        '<div class="form-group" style="margin:0"><label class="form-label">Tum Streamler</label>'+renderOperationsStreamSelect(streams)+'</div>'+
+      '</div>'+
+      '<div class="segment-control">'+
+          renderOperationsFilterButton('all','Tum')+
+          renderOperationsFilterButton('live','Canli')+
+          renderOperationsFilterButton('offline','Cevrimdisi')+
+          renderOperationsFilterButton('watched','Izleyicili')+
+      '</div>'+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:minmax(260px,300px) minmax(0,1fr);gap:16px;align-items:start">'+
+      '<div class="card" style="position:sticky;top:16px">'+
+        '<div class="card-header"><div><div class="card-title">Hizli Liste</div><div class="form-hint">Filtreye uyan tum streamler burada kalir. Selectbox ise her zaman tum streamleri listeler.</div></div></div>'+
+        (filtered.length
+          ?'<div style="display:grid;gap:10px;max-height:72vh;overflow:auto;padding-right:4px">'+filtered.map(function(stream){
+            return renderOperationsStreamListItem(stream,Number(stream.id||0)===Number(operationsCenterState.streamID||0));
+          }).join('')+'</div>'
+          :'<div class="empty-state"><div class="icon"><i class="bi bi-search"></i></div><h3>Uygun yayin yok</h3><p style="color:var(--text-muted)">Secili filtrede gorunecek bir stream bulunmuyor.</p></div>')+
+      '</div>'+
+      '<div>'+
+        (st&&!st.error?renderOperationsQuickActions(st,urls,previewURLs):'')+
+        '<div class="card" style="margin-bottom:16px"><div class="segment-control" style="justify-content:flex-start;flex-wrap:wrap">'+
+          renderOperationsTabButton('general','Genel Durum')+
+          renderOperationsTabButton('delivery','Player ve Teslimat')+
+          renderOperationsTabButton('qoe','QoE ve Telemetri')+
+          renderOperationsTabButton('tracks','Track ve ABR')+
+          renderOperationsTabButton('manifests','Manifest ve Ham Veri')+
+          renderOperationsTabButton('obs','OBS ve Ingest')+
+          renderOperationsTabButton('diagnostics','Teshis')+
+        '</div></div>'+
+        tabBody+
+      '</div>'+
+    '</div>';
+  if(currentPage==='operations-center'){
+    schedulePageRefresh('operations-center',8000);
+  }
+}
+
 async function renderStreamDetail(c,id){
   const st=await api('/api/streams/'+id);
   if(!st||st.error){c.innerHTML='<div class="empty-state"><h3>Yayin bulunamadi</h3></div>';return}
@@ -1401,7 +1976,10 @@ async function renderStreamDetail(c,id){
       copyField('Embed URL',u.embed)+
     '</div>'+
 
-    '<div class="card" style="margin-bottom:16px"><div class="card-header"><div class="card-title">QoE ve Stall Telemetrisi</div><div style="display:flex;gap:10px;flex-wrap:wrap"><a class="btn btn-secondary btn-sm" href="'+playerDebugURL+'" target="_blank" rel="noopener">Debug Player</a><a class="btn btn-secondary btn-sm" href="'+embedDebugURL+'" target="_blank" rel="noopener">Debug Embed</a></div></div><div id="stream-qoe-body" style="color:var(--text-muted)">QoE verisi bekleniyor...</div></div>'+
+    renderDeliveryUsageCard(st.id,u,{telemetryMode:'scroll'})+
+
+    '<div class="card" id="stream-qoe-card" style="margin-bottom:16px"><div class="card-header"><div><div class="card-title">QoE ve Stall Telemetrisi</div><div class="form-hint">Canli player oturumlari, buffer, stall ve hata verileri burada gorunur.</div></div><div style="display:flex;gap:10px;flex-wrap:wrap"><a class="btn btn-secondary btn-sm" href="'+playerDebugURL+'" target="_blank" rel="noopener">Debug Player</a><a class="btn btn-secondary btn-sm" href="'+embedDebugURL+'" target="_blank" rel="noopener">Debug Embed</a></div></div><div id="stream-qoe-body" style="color:var(--text-muted)">QoE verisi bekleniyor...</div></div>'+
+    '<div class="card" style="margin-bottom:16px"><div class="card-header"><div class="card-title">Canli Track ve Varsayilan Secim</div><div class="form-hint">Multitrack video ve audio yapisi burada gorunur.</div></div><div id="stream-track-body" style="color:var(--text-muted)">Track verisi bekleniyor...</div></div>'+
 
     (st.status==='live'?
       '<div class="card"><div class="card-title" style="margin-bottom:12px">Onizleme (QoE Debug)</div>'+
@@ -1432,11 +2010,15 @@ async function saveStreamRecordSettings(id){
 async function saveStreamPolicySettings(id){
   const st=window._streamDetailData;
   if(!st)return;
+  const defaultVideoTrackID=parseInt(document.getElementById('sd-default-video-track')?.value||'0',10)||0;
+  const defaultAudioTrackID=parseInt(document.getElementById('sd-default-audio-track')?.value||'0',10)||0;
   const policy={
     mode:document.getElementById('sd-policy-mode')?.value||'balanced',
     enable_abr:document.getElementById('sd-abr-enabled')?.checked||false,
     profile_set:document.getElementById('sd-profile-set')?.value||'balanced',
-    require_playback_token:document.getElementById('sd-token-required')?.checked||false
+    require_playback_token:document.getElementById('sd-token-required')?.checked||false,
+    default_video_track_id:defaultVideoTrackID,
+    default_audio_track_id:defaultAudioTrackID
   };
   const payload=Object.assign({},st,{
     max_viewers:parseInt(document.getElementById('sd-max-viewers')?.value||'0')||0,
@@ -1448,6 +2030,10 @@ async function saveStreamPolicySettings(id){
   });
   const res=await api('/api/streams/'+id,{method:'PUT',body:payload});
   if(res&&res.success){
+    await api('/api/admin/stream/tracks/defaults/'+id,{method:'POST',body:{
+      default_video_track_id:defaultVideoTrackID,
+      default_audio_track_id:defaultAudioTrackID
+    }});
     toast('Politika kaydedildi');
     navigate('stream-detail-'+id);
   }else{
@@ -1488,6 +2074,9 @@ async function renderEmbedCodes(c){
           '</details>'+
           '<details style="margin-top:4px"><summary style="cursor:pointer;font-weight:600;padding:8px 0;color:var(--text-secondary)">Player & Embed (3)</summary>'+
             copyField('Player URL',u.play)+copyField('Audio Player URL',playerURLForFormat(u.play,'aac'))+copyField('Embed URL',u.embed)+
+          '</details>'+
+          '<details style="margin-top:4px"><summary style="cursor:pointer;font-weight:600;padding:8px 0;color:var(--text-secondary)">Kullanim ve Tanilama</summary>'+
+            renderDeliveryUsageCard(s.id,u,{telemetryMode:'navigate'})+
           '</details>'+
         '</div>';
       }).join(''));
@@ -1984,7 +2573,7 @@ async function loadDiagnostics(){
   const telemetry=data.telemetry||{};
   const hlsVariants=Number(data.hls_variant_count||0);
   const dashRepresentations=Number(data.dash_representation_count||0);
-  const multitrackReady=hlsVariants>1&&dashRepresentations>1;
+  const deliverySummary=data.delivery_summary||{};
   out.innerHTML=
     '<div class="metric-list">'+
       '<div class="metric-row"><span>Yayin</span><strong>'+escHtml(data.stream_name||data.stream_key||'-')+'</strong></div>'+
@@ -1992,12 +2581,13 @@ async function loadDiagnostics(){
       '<div class="metric-row"><span>HLS varyant sayisi</span><strong>'+fmtInt(hlsVariants)+'</strong></div>'+
       '<div class="metric-row"><span>DASH representation sayisi</span><strong>'+fmtInt(dashRepresentations)+'</strong></div>'+
       '<div class="metric-row"><span>Player telemetrisi</span><strong>'+fmtInt(telemetry.active_sessions||0)+' aktif / '+fmtInt(telemetry.total_stalls||0)+' stall</strong></div>'+
+      '<div class="metric-row"><span>Teslimat Ozeti</span><strong style="text-align:right">'+escHtml(deliverySummary.description||'-')+'</strong></div>'+
       '<div class="metric-row"><span>Policy JSON</span><span class="mono-wrap">'+escHtml(data.policy_json||'{}')+'</span></div>'+
     '</div>'+
-    '<div style="margin-top:12px">'+(multitrackReady?'<span class="tag tag-green">OBS multitrack HLS ve DASH tarafinda coklu katmanla gorunuyor.</span>':'<span class="tag tag-yellow">Coklu katman sayisi tekli gorunuyor. OBS multitrack yayininda yeniden kontrol edin.</span>')+'</div>'+
+    '<div style="margin-top:12px"><span class="tag tag-'+escHtml(deliverySummary.tone||'yellow')+'">'+escHtml(deliverySummary.label||'Durum bekleniyor')+'</span></div>'+
     '<div class="bar-list" style="margin-top:16px">'+checks.map(function(check){
-      const tone=check.ok?'tag-green':'tag-red';
-      return '<div class="metric-row"><span>'+escHtml(check.description||check.code)+'</span><span class="tag '+tone+'">'+(check.ok?'Hazir':'Yok')+'</span></div>';
+      const tone='tag-'+(check.tone||'red');
+      return '<div class="metric-row"><div><div>'+escHtml(check.description||check.code)+'</div>'+(check.detail?'<div class="form-hint" style="margin-top:4px">'+escHtml(check.detail)+'</div>':'')+'</div><span class="tag '+tone+'">'+escHtml(check.label||'Sorunlu')+'</span></div>';
     }).join('')+'</div>';
 }
 
