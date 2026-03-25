@@ -535,14 +535,13 @@ function renderApp(){
           navItem('settings-abr','bi-badge-hd',t('Teslimat / ABR'))+
           navItem('settings-ssl','bi-shield-lock-fill',t('SSL/TLS'))+
           navItem('settings-security','bi-shield-shaded',t('Guvenlik'))+
-          navItem('settings-storage','bi-hdd-fill',t('Depolama'))+
+          navItem('settings-storage','bi-hdd-fill',t('Depolama ve Arsiv'))+
           navItem('settings-health','bi-heart-pulse-fill',t('Saglik ve Uyari'))+
           navItem('settings-transcode','bi-cpu-fill',t('Transkod'))+
         '</div>'+
         '<div class="nav-section"><div class="nav-section-title">'+t('Izleme')+'</div>'+
           navItem('operations-center','bi-broadcast-pin',t('Operasyon Merkezi'))+
           navItem('analytics','bi-graph-up',t('Analitik'))+
-          navItem('recordings','bi-camera-reels-fill',t('Kayitlar'))+
           navItem('viewers','bi-people-fill',t('Izleyiciler'))+
           navItem('transcode-jobs','bi-cpu',t('Transcode Isleri'))+
           navItem('diagnostics','bi-activity',t('Teshis'))+
@@ -718,7 +717,7 @@ async function loadPage(page){
   else if(page==='player-templates')await renderPlayerTemplates(c);
   else if(page==='embed-advanced')await renderAdvancedEmbed(c);
   else if(page==='analytics')await renderAnalytics(c);
-  else if(page==='recordings')await renderRecordings(c);
+  else if(page==='recordings')await renderSettingsStorage(c);
   else if(page==='viewers')await renderViewers(c);
   else if(page==='maintenance-center')await renderMaintenanceCenter(c);
   else if(page==='license')await renderLicensePage(c);
@@ -1234,7 +1233,7 @@ function renderCreateStream(c){
         '<div class="form-group"><label class="form-label">Acik Cikis Formatlari</label><div class="form-hint" style="margin-bottom:10px">Bu yayinin disariya hangi formatlarda servis edilecegini secin.</div>'+renderOutputSelector(defaultStreamOutputs(),'cs')+'</div>'+
         '<div class="setting-row"><div><div class="setting-label">Yayin kaydedilsin mi?</div><div class="setting-desc">Varsayilan olarak kapali. Kalici kayitlar data/recordings altina yazilir.</div></div>'+
           '<label class="toggle"><input type="checkbox" id="cs-record-enabled" onchange="toggleCreateRecordFormat()"><span class="toggle-slider"></span></label></div>'+
-        '<div class="form-group" style="margin-top:16px"><label class="form-label">Kayit Formati</label><select class="form-select" id="cs-record-format" disabled>'+recordingFormatOptions('ts')+'</select></div>'+
+        '<div class="form-group" style="margin-top:16px"><label class="form-label">Kayit Formati</label><select class="form-select" id="cs-record-format" disabled>'+recordingFormatOptions((runtimeSettings&&runtimeSettings.recording_format)||'mp4')+'</select><div class="form-hint">MP4 secildiginde yayin once guvenli bicimde yakalanir, yayin bitince izlenebilir dosyaya finalize edilir.</div></div>'+
         '<button class="btn btn-primary" onclick="createStream()">Yayin Olustur</button>'+
       '</div>'+
       '<div class="card" id="cs-side-panel">'+
@@ -1256,7 +1255,7 @@ async function createStream(){
   const name=document.getElementById('cs-name').value;
   const desc=document.getElementById('cs-desc').value;
   const recordEnabled=document.getElementById('cs-record-enabled').checked;
-  const recordFormat=document.getElementById('cs-record-format').value||'ts';
+  const recordFormat=document.getElementById('cs-record-format').value||'mp4';
   const outputFormats=collectOutputSelector('cs');
   const policy={
     mode:document.getElementById('cs-mode')?.value||'balanced',
@@ -1462,8 +1461,10 @@ function getOBSRTMPServerURL(s){
   return 'rtmp://'+getConfiguredDomain(s||{})+':'+(((s||{}).rtmp_port)||'1935')+'/live';
 }
 function recordingFormatOptions(selected){
-  selected=selected||'ts';
-  return '<option value="ts"'+(selected==='ts'?' selected':'')+'>MPEG-TS (.ts)</option>'+
+  selected=selected||'mp4';
+  return '<option value="mp4"'+(selected==='mp4'?' selected':'')+'>MP4 (.mp4) - Onerilen</option>'+
+    '<option value="mkv"'+(selected==='mkv'?' selected':'')+'>Matroska (.mkv)</option>'+
+    '<option value="ts"'+(selected==='ts'?' selected':'')+'>MPEG-TS (.ts) - Ham capture</option>'+
     '<option value="flv"'+(selected==='flv'?' selected':'')+'>FLV (.flv)</option>';
 }
 const streamOutputChoices=[
@@ -1977,8 +1978,8 @@ async function renderStreamDetail(c,id){
     '<div class="card" style="margin-bottom:16px"><div class="card-title" style="margin-bottom:12px">Kayit Politikasi</div>'+
       '<div class="setting-row"><div><div class="setting-label">Otomatik kayit</div><div class="setting-desc">Canli yayin basladiginda secili formatta kalici kayit baslatilir. HLS segmentleri kayit sayilmaz.</div></div>'+
       '<label class="toggle"><input type="checkbox" id="sd-record-enabled" '+(st.record_enabled?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
-      '<div class="form-group" style="margin-top:16px"><label class="form-label">Kayit Formati</label><select class="form-select" id="sd-record-format">'+recordingFormatOptions(st.record_format||'ts')+'</select></div>'+
-      '<div class="form-hint">Kalici kayitlar <code>data/recordings</code> altina yazilir. Canli cache dizinleri yayin bitince temizlenir.</div>'+
+      '<div class="form-group" style="margin-top:16px"><label class="form-label">Kayit Formati</label><select class="form-select" id="sd-record-format">'+recordingFormatOptions(st.record_format||'mp4')+'</select></div>'+
+      '<div class="form-hint">Kalici kayitlar <code>data/recordings</code> altina yazilir. MP4 ve MKV secenekleri yayin kapaninca finalize edilir; canli cache dizinleri kayit sayilmaz.</div>'+
       '<div style="margin-top:16px"><button class="btn btn-primary" onclick="saveStreamRecordSettings('+st.id+')">Kayit Ayarlarini Kaydet</button></div>'+
     '</div>'+
 
@@ -2011,7 +2012,7 @@ async function saveStreamRecordSettings(id){
   if(!st)return;
   const payload=Object.assign({},st,{
     record_enabled:document.getElementById('sd-record-enabled')?.checked||false,
-    record_format:document.getElementById('sd-record-format')?.value||'ts'
+    record_format:document.getElementById('sd-record-format')?.value||'mp4'
   });
   const res=await api('/api/streams/'+id,{method:'PUT',body:payload});
   if(res&&res.success){
@@ -2295,50 +2296,202 @@ async function renderSettingsSecurity(c){
 
 // ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â SETTINGS - STORAGE ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â
 async function renderSettingsStorage(c){
-  const [s,report,archivesRes]=await Promise.all([api('/api/settings'),api('/api/health/report'),api('/api/recordings/archives')]);
+  const [s,report,archivesRes,recsRes,streamsRes,savedRes,backupsRes,backupArchivesRes,upgradeRes]=await Promise.all([
+    api('/api/settings'),
+    api('/api/health/report'),
+    api('/api/recordings/archives'),
+    api('/api/recordings'),
+    api('/api/streams'),
+    api('/api/recordings/library'),
+    api('/api/system/backups'),
+    api('/api/system/backups/archives'),
+    api('/api/system/upgrade/plan')
+  ]);
   const archiveSummary=report&&report.storage&&report.storage.archive?report.storage.archive:{};
   const archives=Array.isArray(archivesRes)?archivesRes:[];
+  const recs=Array.isArray(recsRes)?recsRes:[];
+  const streams=Array.isArray(streamsRes)?streamsRes:[];
+  const saved=Array.isArray(savedRes)?savedRes:[];
+  const backups=(backupsRes&&Array.isArray(backupsRes.items))?backupsRes.items:[];
+  const backupArchives=Array.isArray(backupArchivesRes)?backupArchivesRes:[];
+  const archiveMap={};
+  const backupArchiveMap={};
+  archives.forEach(function(item){archiveMap[item.stream_key+'::'+item.filename]=item;});
+  backupArchives.forEach(function(item){backupArchiveMap[item.name]=item;});
+  const archiveEnabled=s&&s.archive_enabled==='true';
+  const backupArchiveEnabled=s&&s.backup_archive_enabled==='true';
+  const commands=(upgradeRes&&upgradeRes.commands)||{};
+  const restoreCmd=commands.backup_restore||'fluxstream backup restore fluxstream-backup-YYYYMMDD-HHMMSS.tar.gz';
   c.innerHTML=
-    '<div class="page-header"><h1 class="page-title">Depolama Ayarlari</h1></div>'+
+    '<div class="page-header"><h1 class="page-title">Depolama ve Arsiv Merkezi</h1><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-primary" onclick="showRecordModal()">Kayit Baslat</button><button class="btn btn-secondary" onclick="createSystemBackupFromStorage(false)">Hafif Yedek Al</button><button class="btn btn-secondary" onclick="createSystemBackupFromStorage(true)">Kayitlarla Yedek Al</button></div></div>'+
+    '<div class="card" style="margin-bottom:16px"><div class="card-title" style="margin-bottom:8px">Kullanim Notu</div><div class="form-hint">Bu merkezde yerel kayitlar, harici arsiv hedefi ve sistem yedekleri birlikte yonetilir. Yerel klasor yapisi korunur; S3, MinIO ve SFTP hedefleri bunun ustune eklenir. MP4 secilen kayitlar yayin boyunca guvenli bicimde yakalanir, yayin bitince izlenebilir dosyaya finalize edilir.</div></div>'+
     '<div class="card-grid card-grid-4" style="margin-bottom:16px">'+
       statCard('blue','bi-hdd-fill',formatBytes((report&&report.storage&&report.storage.recordings_bytes)||0),'Yerel Kayitlar')+
-      statCard('purple','bi-cloud-arrow-up-fill',fmtInt(archives.length),'Arsivlenen Oge')+
-      statCard('orange','bi-database-gear',archiveSummary&&archiveSummary.provider?String(archiveSummary.provider).toUpperCase():'KAPALI','Saglayici')+
-      statCard('green','bi-arrow-repeat',archiveSummary&&archiveSummary.auto_upload?'Acik':'Kapali','Oto Arsiv')+
+      statCard('purple','bi-archive-fill',fmtInt(backups.length),'Yerel Yedekler')+
+      statCard('orange','bi-cloud-arrow-up-fill',fmtInt(archives.length),'Kayit Arsivi')+
+      statCard('green','bi-safe2-fill',fmtInt(backupArchives.length),'Yedek Arsivi')+
     '</div>'+
     '<div class="card-grid card-grid-2">'+
       '<div class="card">'+
-        '<div class="card-title" style="margin-bottom:12px">Yerel Depolama</div>'+
-        settingInput('storage_max_gb','Maksimum Depolama (GB)',s.storage_max_gb||'50','number','Toplam disk kullanim limiti')+
-        settingInput('storage_auto_clean','Otomatik Temizlik (gun)',s.storage_auto_clean||'30','number','Bu sureden eski dosyalar silinir')+
+        '<div class="card-title" style="margin-bottom:12px">Yerel Depolama ve Temizlik</div>'+
+        settingInput('storage_max_gb','Maksimum Depolama (GB)',s.storage_max_gb||'50','number','Toplam kayit ve yedek alanini izlemek icin uyarilarda kullanilir.')+
+        settingInput('storage_auto_clean','Otomatik Temizlik (gun)',s.storage_auto_clean||'30','number','Gecmis davranis uyumlulugu icin korunur.')+
         settingInput('recordings_retention_days','Kayit Saklama Suresi (gun)',s.recordings_retention_days||'30','number','0 verilirse otomatik silme yapilmaz.')+
         settingInput('recordings_keep_latest','Yayin Basina Sakla',s.recordings_keep_latest||'10','number','Her yayinda tutulacak son kayit sayisi.')+
-        '<button class="btn btn-primary" style="margin-top:8px" onclick="saveSettingsCategory(\'storage\')">Depolama Ayarlarini Kaydet</button>'+
+        '<div class="setting-row"><div><div class="setting-label">Otomatik Bakim</div><div class="setting-desc">Kayit, telemetry ve trim bakimlarini periyodik olarak calistirir.</div></div>'+
+          '<label class="toggle"><input type="checkbox" class="setting-input" data-key="maintenance_auto_cleanup" '+(s.maintenance_auto_cleanup!=='false'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+        '<button class="btn btn-primary" style="margin-top:8px" onclick="saveSettingsCategory(\'storage\')">Yerel Ayarlari Kaydet</button>'+
       '</div>'+
       '<div class="card">'+
-        '<div class="card-title" style="margin-bottom:12px">Object Storage / Arsiv</div>'+
-        '<div class="setting-row"><div><div class="setting-label">Arsivleme Etkin</div><div class="setting-desc">Kayit kutuphanesini harici nesne depolamaya tasir.</div></div>'+
-          '<label class="toggle"><input type="checkbox" class="setting-input" data-key="archive_enabled" '+(s.archive_enabled==='true'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
-        '<div class="form-group"><label class="form-label">Saglayici</label><select class="form-select setting-input" data-key="archive_provider"><option value="local" '+((s.archive_provider||'local')==='local'?'selected':'')+'>Lokal Arsiv Klasoru</option><option value="s3" '+((s.archive_provider||'')==='s3'?'selected':'')+'>S3 Uyumlu</option><option value="minio" '+((s.archive_provider||'')==='minio'?'selected':'')+'>MinIO</option></select><div class="form-hint">Dusuk butcede ilk test icin lokal klasor modu, gercek object storage icin S3/MinIO kullanin.</div></div>'+
-        '<div class="setting-row"><div><div class="setting-label">Otomatik Arsivle</div><div class="setting-desc">Kayit kutuphanesindeki yeni dosyalar periyodik olarak arsive gonderilir.</div></div>'+
-          '<label class="toggle"><input type="checkbox" class="setting-input" data-key="archive_auto_upload" '+(s.archive_auto_upload==='true'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
-        '<div class="setting-row"><div><div class="setting-label">Arsiv Sonrasi Yereli Sil</div><div class="setting-desc">Basarili upload sonrasi yerel kaydi silerek diski rahatlatir.</div></div>'+
-          '<label class="toggle"><input type="checkbox" class="setting-input" data-key="archive_delete_local_after_upload" '+(s.archive_delete_local_after_upload==='true'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
-        settingInput('archive_scan_interval_minutes','Tarama Araligi (dk)',s.archive_scan_interval_minutes||'10','number','Otomatik arsivleme kac dakikada bir calissin.')+
-        settingInput('archive_batch_size','Tek Seferde Maksimum Oge',s.archive_batch_size||'3','number','Her senkron turunda kac dosya yuklenecegi.')+
-        settingInput('archive_prefix','Object Key On Eki',s.archive_prefix||'fluxstream','text','Ornek: fluxstream/prod')+
-        settingInput('archive_public_base_url','Public Arsiv Taban URL',s.archive_public_base_url||'','text','Bos degilse panel bu tabandan tiklanabilir arsiv linki uretir.')+
-        settingInput('archive_local_dir','Lokal Arsiv Klasoru',s.archive_local_dir||'','text','Lokal mod secildiginde kayitlar bu klasore kopyalanir.')+
-        settingInput('archive_endpoint','S3 / MinIO Endpoint',s.archive_endpoint||'','text','Ornek: https://s3.eu-central-1.amazonaws.com veya https://minio.domain.tld')+
+        '<div class="card-title" style="margin-bottom:12px">Harici Hedef ve Senkron</div>'+
+        '<div class="form-group"><label class="form-label">Saglayici</label><select class="form-select setting-input" data-key="archive_provider"><option value="local" '+((s.archive_provider||'local')==='local'?'selected':'')+'>Lokal Arsiv Klasoru</option><option value="s3" '+((s.archive_provider||'')==='s3'?'selected':'')+'>S3 Uyumlu</option><option value="minio" '+((s.archive_provider||'')==='minio'?'selected':'')+'>MinIO</option><option value="sftp" '+((s.archive_provider||'')==='sftp'?'selected':'')+'>SFTP / SSH</option></select><div class="form-hint">S3 ve MinIO object storage icindir. SFTP, dusuk butcede harici sunucuya klasor bazli aktarim icin uygundur.</div></div>'+
+        settingInput('archive_prefix','Object Key On Eki',s.archive_prefix||'fluxstream','text','Kayitlar ve yedekler bu kok klasor altina yazilir.')+
+        settingInput('archive_public_base_url','Public Arsiv Taban URL',s.archive_public_base_url||'','text','Varsa panel tiklanabilir genel link uretir.')+
+        settingInput('archive_local_dir','Lokal Arsiv Klasoru',s.archive_local_dir||'','text','Local provider secildiginde dosyalar bu klasore kopyalanir.')+
+        settingInput('archive_endpoint','S3 / MinIO Endpoint',s.archive_endpoint||'','text','Ornek: https://s3.eu-central-1.amazonaws.com')+
         settingInput('archive_region','Region',s.archive_region||'us-east-1','text','S3 imzalama bolgesi')+
-        settingInput('archive_bucket','Bucket',s.archive_bucket||'','text','Arsivlerin yazilacagi bucket')+
+        settingInput('archive_bucket','Bucket',s.archive_bucket||'','text','Object storage bucket adi')+
         settingInput('archive_access_key','Access Key',s.archive_access_key||'','text','S3 / MinIO access key')+
         settingInput('archive_secret_key','Secret Key',s.archive_secret_key||'','password','S3 / MinIO secret key')+
+        settingInput('archive_sftp_host','SFTP Host',s.archive_sftp_host||'','text','SSH ile erisilecek host veya IP')+
+        settingInput('archive_sftp_port','SFTP Port',s.archive_sftp_port||'22','number','Genelde 22')+
+        settingInput('archive_sftp_user','SFTP Kullanici',s.archive_sftp_user||'','text','SSH kullanicisi')+
+        settingInput('archive_sftp_remote_dir','SFTP Uzak Dizin',s.archive_sftp_remote_dir||'','text','Ornek: /srv/fluxstream-archive')+
+        settingInput('archive_sftp_key_path','SFTP Anahtar Yolu',s.archive_sftp_key_path||'','text','Bos ise varsayilan SSH anahtari/agent denenir.')+
+        '<div class="setting-row"><div><div class="setting-label">SFTP Host Key Kontrolunu Gevset</div><div class="setting-desc">Ilk testte kolaylik saglar; production icin kapali tutmak daha guvenlidir.</div></div>'+
+          '<label class="toggle"><input type="checkbox" class="setting-input" data-key="archive_sftp_disable_host_key_check" '+(s.archive_sftp_disable_host_key_check==='true'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
         '<div class="setting-row"><div><div class="setting-label">Path Style URL</div><div class="setting-desc">MinIO ve bazi S3 uyumlu servislerde acik olmali.</div></div>'+
           '<label class="toggle"><input type="checkbox" class="setting-input" data-key="archive_use_path_style" '+(s.archive_use_path_style!=='false'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
-        '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px"><button class="btn btn-primary" onclick="saveSettingsCategory(\'storage\')">Arsiv Ayarlarini Kaydet</button><button class="btn btn-secondary" onclick="runArchiveSync()">Arsiv Senkronu Calistir</button></div>'+
+        '<div class="card" style="margin-top:14px;background:var(--bg-primary)">'+
+          '<div class="card-title" style="margin-bottom:12px">Kayit Arsivi</div>'+
+          '<div class="setting-row"><div><div class="setting-label">Kayit arsivi etkin</div><div class="setting-desc">Yerel kayit kutuphanesini bu hedefe tasir.</div></div><label class="toggle"><input type="checkbox" class="setting-input" data-key="archive_enabled" '+(s.archive_enabled==='true'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+          '<div class="setting-row"><div><div class="setting-label">Otomatik yukle</div><div class="setting-desc">Yeni kayitlar periyodik olarak arsivlenir.</div></div><label class="toggle"><input type="checkbox" class="setting-input" data-key="archive_auto_upload" '+(s.archive_auto_upload==='true'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+          '<div class="setting-row"><div><div class="setting-label">Yukleme sonrasi yereli sil</div><div class="setting-desc">Basarili upload sonrasi diski bosaltir.</div></div><label class="toggle"><input type="checkbox" class="setting-input" data-key="archive_delete_local_after_upload" '+(s.archive_delete_local_after_upload==='true'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+          settingInput('archive_scan_interval_minutes','Tarama Araligi (dk)',s.archive_scan_interval_minutes||'10','number','Kayit arsivi tarama araligi')+
+          settingInput('archive_batch_size','Tek Seferde Maksimum Oge',s.archive_batch_size||'3','number','Bir turda yuklenecek kayit sayisi')+
+          '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px"><button class="btn btn-primary" onclick="saveSettingsCategory(\'storage\')">Hedefi Kaydet</button><button class="btn btn-secondary" onclick="runArchiveSync()">Kayit Arsiv Senkronu</button></div>'+
+        '</div>'+
+        '<div class="card" style="margin-top:14px;background:var(--bg-primary)">'+
+          '<div class="card-title" style="margin-bottom:12px">Sistem Yedegi Arsivi</div>'+
+          '<div class="setting-row"><div><div class="setting-label">Yedek arsivi etkin</div><div class="setting-desc">Olusan sistem yedekleri ayni hedefe aktarilir.</div></div><label class="toggle"><input type="checkbox" class="setting-input" data-key="backup_archive_enabled" '+(s.backup_archive_enabled==='true'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+          '<div class="setting-row"><div><div class="setting-label">Otomatik yukle</div><div class="setting-desc">Yeni backup dosyalari periyodik olarak yuklenir.</div></div><label class="toggle"><input type="checkbox" class="setting-input" data-key="backup_archive_auto_upload" '+(s.backup_archive_auto_upload==='true'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+          '<div class="setting-row"><div><div class="setting-label">Yukleme sonrasi yereli sil</div><div class="setting-desc">Basarili upload sonrasi backup dosyasini yerelden kaldirir.</div></div><label class="toggle"><input type="checkbox" class="setting-input" data-key="backup_archive_delete_local_after_upload" '+(s.backup_archive_delete_local_after_upload==='true'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+          settingInput('backup_archive_scan_interval_minutes','Tarama Araligi (dk)',s.backup_archive_scan_interval_minutes||'30','number','Sistem yedekleri icin tarama araligi')+
+          settingInput('backup_archive_batch_size','Tek Seferde Maksimum Oge',s.backup_archive_batch_size||'2','number','Bir turda yuklenecek backup sayisi')+
+          '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px"><button class="btn btn-primary" onclick="saveSettingsCategory(\'storage\')">Yedek Ayarlarini Kaydet</button><button class="btn btn-secondary" onclick="runBackupArchiveSync()">Yedek Arsiv Senkronu</button></div>'+
+        '</div>'+
       '</div>'+
-    '</div>';
+    '</div>'+
+    '<div class="card-grid card-grid-2" style="margin-top:16px;margin-bottom:16px">'+
+      '<div class="card"><div class="card-header"><h3 class="card-title">Aktif Kayitlar</h3><span class="form-hint">'+fmtInt(recs.length)+' aktif oturum</span></div><div class="card-body"><table class="table"><thead><tr><th>ID</th><th>Yayin</th><th>Format</th><th>Durum</th><th>Boyut</th><th>Islem</th></tr></thead><tbody id="rec-list"></tbody></table></div></div>'+
+      '<div class="card"><div class="card-header"><h3 class="card-title">Secili Kayit Onizleme</h3><span class="form-hint">TS / FLV eski dosyalarda gerekirse MP4 donusumu baslatabilirsiniz.</span></div><div class="card-body"><div id="recording-preview-panel"><div class="empty-state"><div class="icon"><i class="bi bi-film"></i></div><h3>Kayit secin</h3><p style="color:var(--text-muted)">Panel secili kaydi ayni sayfada oynatir.</p></div></div></div></div>'+
+    '</div>'+
+    '<div class="card" style="margin-bottom:16px"><div class="card-header"><h3 class="card-title">Kayit Kutuphanesi</h3><span class="form-hint">Yerelde bulunan dosyalar ve izlenebilir kopyalar</span></div><div class="card-body"><table class="table"><thead><tr><th>Yayin</th><th>Dosya</th><th>Format</th><th>Tarih</th><th>Boyut</th><th>Arsiv</th><th>Islem</th></tr></thead><tbody id="saved-rec-list"></tbody></table></div></div>'+
+    '<div class="card" style="margin-bottom:16px"><div class="card-header"><h3 class="card-title">Kayit Arsiv Kutuphanesi</h3><span class="form-hint">Object storage, MinIO veya SFTP hedefindeki kayitlar</span></div><div class="card-body"><table class="table"><thead><tr><th>Yayin</th><th>Dosya</th><th>Saglayici</th><th>Tarih</th><th>Yerel Durum</th><th>Sonuc</th><th>Islem</th></tr></thead><tbody id="archive-rec-list"></tbody></table></div></div>'+
+    '<div class="card" style="margin-bottom:16px"><div class="card-header"><h3 class="card-title">Sistem Yedekleri</h3><span class="form-hint">Restore komutu: '+escHtml(restoreCmd)+'</span></div><div class="card-body"><table class="table"><thead><tr><th>Dosya</th><th>Boyut</th><th>Tarih</th><th>Tur</th><th>Arsiv</th><th>Islem</th></tr></thead><tbody id="system-backup-list"></tbody></table></div></div>'+
+    '<div class="card" style="margin-bottom:16px"><div class="card-header"><h3 class="card-title">Yedek Arsiv Kutuphanesi</h3><span class="form-hint">Harici hedefte saklanan sistem yedekleri</span></div><div class="card-body"><table class="table"><thead><tr><th>Dosya</th><th>Saglayici</th><th>Tarih</th><th>Yerel Durum</th><th>Sonuc</th><th>Islem</th></tr></thead><tbody id="backup-archive-list"></tbody></table></div></div>'+
+    '<div id="rec-modal" style="display:none"></div>';
+
+  const rl=document.getElementById('rec-list');
+  if(rl){
+    rl.innerHTML=recs.length?recs.map(function(r){
+      return '<tr><td style="font-size:12px">'+r.ID+'</td><td>'+r.StreamKey+'</td><td>'+r.Format+'</td><td><span class="badge badge-'+(r.Status==='recording'?'green':(r.Status==='error'?'red':'gray'))+'">'+r.Status+'</span></td><td>'+fmtBytes(r.Size||0)+'</td><td>'+(r.Status==='recording'?'<button class="btn btn-sm btn-danger" onclick="stopRec(\''+r.ID+'\')">Durdur</button>':'—')+'</td></tr>';
+    }).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">Aktif kayit yok</td></tr>';
+  }
+
+  const srl=document.getElementById('saved-rec-list');
+  if(srl){
+    srl.innerHTML=saved.length?saved.map(function(r){
+      const archiveInfo=archiveMap[r.stream_key+'::'+r.name];
+      const archiveBadge=archiveInfo?renderArchiveStatusBadge(archiveInfo):'<span class="tag tag-blue">Yerelde</span>';
+      const format=String(r.format||'').toLowerCase();
+      const canRemux=format==='ts'||format==='flv'||format==='mkv';
+      return '<tr>'+
+        '<td><code>'+escHtml(r.stream_key)+'</code></td>'+
+        '<td>'+escHtml(r.name)+'</td>'+
+        '<td>'+(r.format||'-').toUpperCase()+'</td>'+
+        '<td>'+fmtLocaleDateTime(r.mod_time)+'</td>'+
+        '<td>'+fmtBytes(r.size||0)+'</td>'+
+        '<td>'+archiveBadge+'</td>'+
+        '<td style="display:flex;gap:8px;flex-wrap:wrap">'+
+          '<button class="btn btn-sm btn-secondary" onclick=\'previewRecordingPanel('+JSON.stringify(r.stream_key)+','+JSON.stringify(r.name)+','+JSON.stringify(r.format||'')+','+JSON.stringify(r.mod_time||'')+','+(r.size||0)+')\'>Onizle</button>'+
+          '<button class="btn btn-sm btn-secondary" onclick=\'downloadRecordingFile('+JSON.stringify(r.stream_key)+','+JSON.stringify(r.name)+')\'>Indir</button>'+
+          (canRemux?'<button class="btn btn-sm btn-secondary" onclick=\'remuxRecordingFile('+JSON.stringify(r.stream_key)+','+JSON.stringify(r.name)+','+JSON.stringify('mp4')+')\'>MP4 Hazirla</button>':'')+
+          (archiveEnabled?'<button class="btn btn-sm btn-secondary" onclick=\'archiveRecordingFile('+JSON.stringify(r.stream_key)+','+JSON.stringify(r.name)+')\'>'+(archiveInfo&&archiveInfo.status==='archived'?'Yeniden Arsivle':'Arsive Gonder')+'</button>':'')+
+          (archiveInfo&&archiveInfo.object_url?'<button class="btn btn-sm btn-secondary" onclick=\'window.open('+JSON.stringify(archiveInfo.object_url)+',"_blank")\'>Arsiv Linki</button>':'')+
+          '<button class="btn btn-sm btn-danger" onclick=\'deleteRecordingFile('+JSON.stringify(r.stream_key)+','+JSON.stringify(r.name)+')\'>Sil</button>'+
+        '</td>'+
+      '</tr>';
+    }).join(''):'<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px">Kaydedilmis dosya yok</td></tr>';
+  }
+
+  const arl=document.getElementById('archive-rec-list');
+  if(arl){
+    arl.innerHTML=archives.length?archives.map(function(item){
+      const localState=item.local_deleted?'<span class="tag tag-yellow">Yerelde yok</span>':'<span class="tag tag-green">Yerelde var</span>';
+      const statusBadge=renderArchiveStatusBadge(item);
+      return '<tr>'+
+        '<td><code>'+escHtml(item.stream_key)+'</code></td>'+
+        '<td>'+escHtml(item.filename)+'</td>'+
+        '<td>'+escHtml(String(item.provider||'-').toUpperCase())+'</td>'+
+        '<td>'+fmtLocaleDateTime(item.archived_at||item.updated_at||item.created_at)+'</td>'+
+        '<td>'+localState+'</td>'+
+        '<td>'+statusBadge+(item.last_error?'<div class="setting-desc" style="max-width:320px">'+escHtml(item.last_error)+'</div>':'')+'</td>'+
+        '<td style="display:flex;gap:8px;flex-wrap:wrap">'+
+          '<button class="btn btn-sm btn-secondary" onclick=\'restoreRecordingArchive('+JSON.stringify(item.stream_key)+','+JSON.stringify(item.filename)+')\'>Geri Yukle</button>'+
+          (item.object_url?'<button class="btn btn-sm btn-secondary" onclick=\'window.open('+JSON.stringify(item.object_url)+',"_blank")\'>Arsiv Linki</button>':'')+
+        '</td>'+
+      '</tr>';
+    }).join(''):'<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px">Arsivlenmis kayit yok</td></tr>';
+  }
+
+  const bl=document.getElementById('system-backup-list');
+  if(bl){
+    bl.innerHTML=backups.length?backups.map(function(item){
+      const archiveInfo=backupArchiveMap[item.name];
+      const archiveBadge=archiveInfo?renderBackupArchiveStatusBadge(archiveInfo):'<span class="tag tag-blue">Yerelde</span>';
+      return '<tr>'+
+        '<td class="mono-wrap">'+escHtml(item.name)+'</td>'+
+        '<td>'+formatBytes(item.size||0)+'</td>'+
+        '<td>'+escHtml(fmtLocaleDateTime(item.mod_time))+'</td>'+
+        '<td>'+(item.include_recordings?'<span class="tag tag-blue">Kayitlar dahil</span>':'<span class="tag tag-green">Hafif</span>')+'</td>'+
+        '<td>'+archiveBadge+'</td>'+
+        '<td style="display:flex;gap:8px;flex-wrap:wrap">'+
+          '<a class="btn btn-sm btn-secondary" href="/api/system/backups/download/'+encodeURIComponent(item.name)+'">Indir</a>'+
+          (backupArchiveEnabled?'<button class="btn btn-sm btn-secondary" onclick=\'archiveSystemBackup('+JSON.stringify(item.name)+')\'>'+(archiveInfo&&archiveInfo.status==='archived'?'Yeniden Arsivle':'Arsive Gonder')+'</button>':'')+
+          '<button class="btn btn-sm btn-danger" onclick="deleteSystemBackup('+JSON.stringify(item.name)+')">Sil</button>'+
+        '</td>'+
+      '</tr>';
+    }).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">Yerel sistem yedegi yok</td></tr>';
+  }
+
+  const bal=document.getElementById('backup-archive-list');
+  if(bal){
+    bal.innerHTML=backupArchives.length?backupArchives.map(function(item){
+      const localState=item.local_deleted?'<span class="tag tag-yellow">Yerelde yok</span>':'<span class="tag tag-green">Yerelde var</span>';
+      const statusBadge=renderBackupArchiveStatusBadge(item);
+      return '<tr>'+
+        '<td class="mono-wrap">'+escHtml(item.name)+'</td>'+
+        '<td>'+escHtml(String(item.provider||'-').toUpperCase())+'</td>'+
+        '<td>'+fmtLocaleDateTime(item.archived_at||item.updated_at||item.created_at)+'</td>'+
+        '<td>'+localState+'</td>'+
+        '<td>'+statusBadge+(item.last_error?'<div class="setting-desc" style="max-width:320px">'+escHtml(item.last_error)+'</div>':'')+'</td>'+
+        '<td style="display:flex;gap:8px;flex-wrap:wrap">'+
+          '<button class="btn btn-sm btn-secondary" onclick=\'restoreSystemBackupArchive('+JSON.stringify(item.name)+')\'>Geri Getir</button>'+
+          (item.object_url?'<button class="btn btn-sm btn-secondary" onclick=\'window.open('+JSON.stringify(item.object_url)+',"_blank")\'>Arsiv Linki</button>':'')+
+        '</td>'+
+      '</tr>';
+    }).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">Arsivlenmis sistem yedegi yok</td></tr>';
+  }
+
+  window._recStreams=streams;
+  window._savedRecordings=saved;
+  window._recordingArchives=archives;
+  window._systemBackups=backups;
+  window._backupArchives=backupArchives;
+  if(saved.length){
+    previewRecordingPanel(saved[0].stream_key,saved[0].name,saved[0].format||'',saved[0].mod_time||'',saved[0].size||0);
+  }
 }
 
 // ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â SETTINGS - TRANSCODE ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â
@@ -2513,6 +2666,8 @@ async function renderSettingsHealth(c){
           '<div class="metric-row"><span>Arsivlenen oge</span><strong>'+fmtInt(archiveSummary&&archiveSummary.items||0)+'</strong></div>'+
           '<div class="metric-row"><span>Hata durumundaki oge</span><strong>'+fmtInt(archiveSummary&&archiveSummary.error_items||0)+'</strong></div>'+
           '<div class="metric-row"><span>Yerelden silinmis oge</span><strong>'+fmtInt(archiveSummary&&archiveSummary.local_deleted_items||0)+'</strong></div>'+
+          '<div class="metric-row"><span>Yedek arsiv ogesi</span><strong>'+fmtInt(archiveSummary&&archiveSummary.backup_items||0)+'</strong></div>'+
+          '<div class="metric-row"><span>Yedek arsiv hatasi</span><strong>'+fmtInt(archiveSummary&&archiveSummary.backup_error_items||0)+'</strong></div>'+
           '<div class="metric-row"><span>Son senkron</span><strong>'+escHtml(archiveSummary&&archiveSummary.last_sync_at?fmtLocaleDateTime(archiveSummary.last_sync_at):'-')+'</strong></div>'+
         '</div>'+
         '<div class="form-hint" style="margin-top:10px;line-height:1.7">'+escHtml((archiveSummary&&archiveSummary.last_error)||'Object storage akisinda yeni hata gorunmuyor.')+'</div>'+
@@ -2658,6 +2813,15 @@ async function runArchiveSync(showToast=true){
     if(currentPage==='recordings'||currentPage==='settings-storage')loadPage(currentPage);
   }else{
     toast((res&&res.message)||'Arsiv senkronu basarisiz','error');
+  }
+}
+async function runBackupArchiveSync(showToast=true){
+  const res=await api('/api/system/backups/archive/sync',{method:'POST'});
+  if(res&&res.success){
+    if(showToast)toast('Yedek arsiv senkronu tamamlandi');
+    if(currentPage==='recordings'||currentPage==='settings-storage'||currentPage==='maintenance-center')loadPage(currentPage);
+  }else{
+    toast((res&&res.message)||'Yedek arsiv senkronu basarisiz','error');
   }
 }
 async function loadDiagnostics(){
@@ -3703,6 +3867,13 @@ function renderArchiveStatusBadge(item){
   if(item.local_deleted)return '<span class="tag tag-yellow">Arsivde</span>';
   return '<span class="tag tag-green">Arsivlendi</span>';
 }
+function renderBackupArchiveStatusBadge(item){
+  if(!item)return '<span class="tag tag-blue">Yerelde</span>';
+  const status=String(item.status||'archived').toLowerCase();
+  if(status==='error')return '<span class="tag tag-red">Hata</span>';
+  if(item.local_deleted)return '<span class="tag tag-yellow">Arsivde</span>';
+  return '<span class="tag tag-green">Arsivlendi</span>';
+}
 let recordingPreviewPlayer=null;
 function recordingFileURL(streamKey,name,download){
   return '/recordings/'+encodeURIComponent(streamKey)+'/'+encodeURIComponent(name)+(download?'?download=1':'');
@@ -3715,7 +3886,10 @@ function destroyRecordingPreviewPlayer(){
     }
   }catch(e){}
 }
-async function stopRec(id){await api('/api/recordings/stop/'+id);navigate('recordings')}
+async function stopRec(id){
+  await api('/api/recordings/stop/'+id);
+  if(currentPage==='recordings'||currentPage==='settings-storage')loadPage(currentPage);else navigate('recordings');
+}
 function showRecordModal(){
   const streams=(window._recStreams||[]).filter(s=>s.status==='live');
   const modal=document.getElementById('rec-modal');
@@ -3726,13 +3900,13 @@ function showRecordModal(){
     '<div class="form-group"><label class="form-label">Yayin</label><select class="form-select" id="rec-key">'+
     (streams.length?streams.map(s=>'<option value="'+s.stream_key+'">'+s.name+'</option>').join(''):'<option>Canli yayin yok</option>')+
     '</select></div>'+ 
-    '<div class="form-group"><label class="form-label">Format</label><select class="form-select" id="rec-fmt">'+recordingFormatOptions('ts')+'</select></div>'+ 
+    '<div class="form-group"><label class="form-label">Format</label><select class="form-select" id="rec-fmt">'+recordingFormatOptions((runtimeSettings&&runtimeSettings.recording_format)||'mp4')+'</select><div class="form-hint">MP4 tarayici ve panel onizlemesi icin onerilir.</div></div>'+ 
     '<button class="btn btn-primary" onclick="startNewRec()" style="width:100%">Kaydi Baslat</button>'+ 
     '</div></div></div>';
 }
 async function startNewRec(){
   const key=document.getElementById('rec-key')?.value;
-  const fmt=document.getElementById('rec-fmt')?.value||'ts';
+  const fmt=document.getElementById('rec-fmt')?.value||'mp4';
   if(!key)return;
   await api('/api/recordings',{method:'POST',body:{stream_key:key,format:fmt}});
   document.getElementById('rec-modal').style.display='none';
@@ -3745,44 +3919,57 @@ async function previewRecordingPanel(streamKey,name,format,mod_time,size){
   if(!panel)return;
   const url=recordingFileURL(streamKey,name,false);
   const ext=(name.split('.').pop()||'').toLowerCase();
-  let html='';
-  html+='<div style="margin-bottom:10px"><strong>'+escHtml(name)+'</strong> ('+fmtBytes(size||0)+')</div>';
+  const canRemux=ext==='ts'||ext==='flv'||ext==='mkv';
+  const header='<div style="margin-bottom:10px"><strong>'+escHtml(name)+'</strong> ('+fmtBytes(size||0)+')</div>';
+  const actions='<div style="margin-top:12px;display:flex;gap:12px;flex-wrap:wrap">'+
+    '<a class="btn btn-sm btn-secondary" href="'+url+'" target="_blank">Direkt Link</a>'+
+    '<a class="btn btn-sm btn-secondary" href="'+recordingFileURL(streamKey,name,true)+'" target="_blank">Indir</a>'+
+    (canRemux?'<button class="btn btn-sm btn-secondary" onclick=\'remuxRecordingFile('+JSON.stringify(streamKey)+','+JSON.stringify(name)+','+JSON.stringify('mp4')+')\'>MP4 Hazirla</button>':'')+
+  '</div>';
+  if(ext==='mp4'||ext==='webm'||ext==='ogg'){
+    panel.innerHTML=header+'<video controls playsinline src="'+url+'" style="width:100%;max-height:60vh;background:#000"></video>'+actions;
+    return;
+  }
+  if(ext==='mp3'||ext==='aac'||ext==='wav'||ext==='flac'){
+    panel.innerHTML=header+'<div style="padding:24px"><audio controls src="'+url+'" style="width:100%"></audio></div>'+actions;
+    return;
+  }
   if(ext==='flv'||ext==='ts'){
-    html+='<video id="rec-preview-video" controls playsinline style="width:100%;max-height:60vh;background:#000"></video>';
+    panel.innerHTML=header+'<video id="rec-preview-video" controls playsinline style="width:100%;max-height:60vh;background:#000"></video>'+actions;
     try{
       await loadEmbedScript('/static/vendor/mpegts.min.js');
-      if(window.mpegts&&window.mpegts.isSupported&&window.mpegts.isSupported()){
+      const video=document.getElementById('rec-preview-video');
+      if(video&&window.mpegts&&window.mpegts.isSupported&&window.mpegts.isSupported()){
         recordingPreviewPlayer=window.mpegts.createPlayer({type:ext==='flv'?'flv':'mpegts',isLive:false,url:url});
-        recordingPreviewPlayer.attachMediaElement(document.getElementById('rec-preview-video'));
+        recordingPreviewPlayer.attachMediaElement(video);
         recordingPreviewPlayer.load();
       }else{
-        html+='<div class="empty-state"><h3>Onizleme desteklenmiyor</h3><p style="color:var(--text-muted)">Bu tarayici kaydi dogrudan oynatamiyor.</p></div>';
+        panel.innerHTML=header+'<div class="empty-state"><h3>Onizleme desteklenmiyor</h3><p style="color:var(--text-muted)">Bu tarayici ham '+escHtml(ext.toUpperCase())+' kaydini dogrudan oynatamiyor. MP4 donusumu baslatabilirsiniz.</p></div>'+actions;
       }
     }catch(e){
-      html+='<div class="empty-state"><h3>Onizleme hazirlanamadi</h3><p style="color:var(--text-muted)">'+escHtml(e.message||'Bilinmeyen hata')+'</p></div>';
+      panel.innerHTML=header+'<div class="empty-state"><h3>Onizleme hazirlanamadi</h3><p style="color:var(--text-muted)">'+escHtml(e.message||'Bilinmeyen hata')+'</p></div>'+actions;
     }
-  }else if(ext==='mp4'||ext==='webm'||ext==='ogg'){
-    html+='<video controls playsinline src="'+url+'" style="width:100%;max-height:60vh;background:#000"></video>';
-  }else if(ext==='mp3'||ext==='aac'||ext==='wav'||ext==='flac'){
-    html+='<div style="padding:24px"><audio controls src="'+url+'" style="width:100%"></audio></div>';
-  }else{
-    html+='<div class="empty-state"><h3>Onizleme yok</h3><p style="color:var(--text-muted)">Bu format panelde dogrudan oynatilamiyor. Dosyayi indirebilirsiniz.</p></div>';
+    return;
   }
-  // Direkt link ve indir butonu
-  html+='<div style="margin-top:12px;display:flex;gap:12px;flex-wrap:wrap">'+
-    '<a class="btn btn-sm btn-secondary" href="'+url+'" target="_blank">Direkt Link</a>'+ 
-    '<a class="btn btn-sm btn-secondary" href="'+recordingFileURL(streamKey,name,true)+'" target="_blank">Indir</a>'+ 
-  '</div>';
-  panel.innerHTML=html;
+  panel.innerHTML=header+'<div class="empty-state"><h3>Onizleme yok</h3><p style="color:var(--text-muted)">Bu format panelde dogrudan oynatilamiyor.</p></div>'+actions;
 }
 function downloadRecordingFile(streamKey,name){
   window.open(recordingFileURL(streamKey,name,true),'_blank');
+}
+async function remuxRecordingFile(streamKey,name,format){
+  const res=await api('/api/recordings/remux',{method:'POST',body:{stream_key:streamKey,filename:name,format:format||'mp4'}});
+  if(res&&res.success){
+    toast('Izlenebilir kopya hazirlandi');
+    if(currentPage==='recordings'||currentPage==='settings-storage')loadPage(currentPage);
+  }else{
+    toast((res&&res.message)||'Donusum basarisiz','error');
+  }
 }
 async function archiveRecordingFile(streamKey,name){
   const res=await api('/api/recordings/archive',{method:'POST',body:{stream_key:streamKey,filename:name}});
   if(res&&res.stream_key){
     toast('Kayit arsive gonderildi');
-    if(currentPage==='recordings')loadPage('recordings');
+    if(currentPage==='recordings'||currentPage==='settings-storage')loadPage(currentPage);
   }else{
     toast((res&&res.message)||'Arsivleme basarisiz','error');
   }
@@ -3791,7 +3978,7 @@ async function restoreRecordingArchive(streamKey,name){
   const res=await api('/api/recordings/restore',{method:'POST',body:{stream_key:streamKey,filename:name}});
   if(res&&res.stream_key){
     toast('Kayit geri yuklendi');
-    if(currentPage==='recordings')loadPage('recordings');
+    if(currentPage==='recordings'||currentPage==='settings-storage')loadPage(currentPage);
   }else{
     toast((res&&res.message)||'Geri yukleme basarisiz','error');
   }
@@ -3801,7 +3988,7 @@ async function deleteRecordingFile(streamKey,name){
   const res=await api('/api/recordings/file',{method:'DELETE',body:{stream_key:streamKey,filename:name}});
   if(res&&res.status==='deleted'){
     toast('Kayit silindi');
-    navigate('recordings');
+    if(currentPage==='recordings'||currentPage==='settings-storage')loadPage(currentPage);else navigate('recordings');
   }else{
     toast((res&&res.message)||'Kayit silinemedi','error');
   }
@@ -4049,9 +4236,32 @@ async function createSystemBackup(includeRecordings){
   const res=await api('/api/system/backups',{method:'POST',body:{include_recordings:!!includeRecordings}});
   if(res&&res.success){
     toast('Backup hazirlandi');
-    loadPage('maintenance-center');
+    if(currentPage==='settings-storage'||currentPage==='recordings'||currentPage==='maintenance-center')loadPage(currentPage);else loadPage('maintenance-center');
   }else{
     toast((res&&res.message)||'Backup olusturulamadi','error');
+  }
+}
+async function createSystemBackupFromStorage(includeRecordings){
+  await createSystemBackup(includeRecordings);
+}
+
+async function archiveSystemBackup(name){
+  const res=await api('/api/system/backups/archive',{method:'POST',body:{name:name}});
+  if(res&&res.success){
+    toast('Sistem yedegi arsive gonderildi');
+    if(currentPage==='settings-storage'||currentPage==='recordings'||currentPage==='maintenance-center')loadPage(currentPage);
+  }else{
+    toast((res&&res.message)||'Yedek arsivleme basarisiz','error');
+  }
+}
+
+async function restoreSystemBackupArchive(name){
+  const res=await api('/api/system/backups/archive/restore',{method:'POST',body:{name:name}});
+  if(res&&res.success){
+    toast('Arsiv yedegi yerel backup klasorune geri getirildi');
+    if(currentPage==='settings-storage'||currentPage==='recordings'||currentPage==='maintenance-center')loadPage(currentPage);
+  }else{
+    toast((res&&res.message)||'Arsiv yedegi geri getirilemedi','error');
   }
 }
 
@@ -4060,7 +4270,7 @@ async function deleteSystemBackup(name){
   const res=await api('/api/system/backups/'+encodeURIComponent(name),{method:'DELETE'});
   if(res&&res.success){
     toast('Backup silindi');
-    loadPage('maintenance-center');
+    if(currentPage==='settings-storage'||currentPage==='recordings'||currentPage==='maintenance-center')loadPage(currentPage);else loadPage('maintenance-center');
   }else{
     toast((res&&res.message)||'Backup silinemedi','error');
   }

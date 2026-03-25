@@ -28,19 +28,22 @@ const (
 
 // Recording represents an active recording
 type Recording struct {
-	ID        string
-	StreamKey string
-	Format    Format
-	FilePath  string
-	StartedAt time.Time
-	Duration  time.Duration
-	Size      int64
-	Status    string // "recording", "completed", "error"
-	file      *os.File
-	tsMuxer   *ts.Muxer
-	subID     string
-	stopCh    chan struct{}
-	mu        sync.Mutex
+	ID          string
+	StreamKey   string
+	Format      Format
+	FilePath    string
+	StartedAt   time.Time
+	Duration    time.Duration
+	Size        int64
+	Status      string // "recording", "completed", "error"
+	file        *os.File
+	tsMuxer     *ts.Muxer
+	subID       string
+	stopCh      chan struct{}
+	mu          sync.Mutex
+	capturePath string
+	finalPath   string
+	finalizeErr string
 }
 
 // SavedRecording represents a completed recording file on disk.
@@ -57,17 +60,22 @@ type SavedRecording struct {
 type Manager struct {
 	streamMgr     *stream.Manager
 	recordingsDir string
+	ffmpegPath    string
 	recordings    map[string]*Recording
 	maxDuration   time.Duration
 	mu            sync.RWMutex
 }
 
 // NewManager creates a new recording manager
-func NewManager(streamMgr *stream.Manager, recordingsDir string) *Manager {
+func NewManager(streamMgr *stream.Manager, recordingsDir, ffmpegPath string) *Manager {
 	os.MkdirAll(recordingsDir, 0755)
+	if strings.TrimSpace(ffmpegPath) == "" {
+		ffmpegPath = "ffmpeg"
+	}
 	return &Manager{
 		streamMgr:     streamMgr,
 		recordingsDir: recordingsDir,
+		ffmpegPath:    ffmpegPath,
 		recordings:    make(map[string]*Recording),
 		maxDuration:   24 * time.Hour,
 	}
@@ -98,8 +106,12 @@ func (m *Manager) StartRecording(streamKey string, format Format) (*Recording, e
 	timestamp := time.Now().Format("2006-01-02_15-04-05")
 	filename := fmt.Sprintf("%s_%s.%s", streamKey, timestamp, format)
 	filePath := filepath.Join(streamDir, filename)
+	capturePath := filePath
+	if format == FormatMP4 || format == FormatMKV {
+		capturePath = filepath.Join(streamDir, fmt.Sprintf("%s_%s.capture.ts", streamKey, timestamp))
+	}
 
-	file, err := os.Create(filePath)
+	file, err := os.Create(capturePath)
 	if err != nil {
 		return nil, fmt.Errorf("create recording file: %w", err)
 	}
@@ -112,15 +124,17 @@ func (m *Manager) StartRecording(streamKey string, format Format) (*Recording, e
 	}
 
 	rec := &Recording{
-		ID:        recID,
-		StreamKey: streamKey,
-		Format:    format,
-		FilePath:  filePath,
-		StartedAt: time.Now(),
-		Status:    "recording",
-		file:      file,
-		tsMuxer:   ts.NewMuxer(),
-		stopCh:    make(chan struct{}),
+		ID:          recID,
+		StreamKey:   streamKey,
+		Format:      format,
+		FilePath:    filePath,
+		StartedAt:   time.Now(),
+		Status:      "recording",
+		file:        file,
+		tsMuxer:     ts.NewMuxer(),
+		stopCh:      make(chan struct{}),
+		capturePath: capturePath,
+		finalPath:   filePath,
 	}
 
 	m.recordings[recID] = rec
@@ -207,6 +221,9 @@ func (m *Manager) ListRecordingFiles(streamKey string) ([]RecordingFile, error) 
 	var files []RecordingFile
 	for _, e := range entries {
 		if e.IsDir() {
+			continue
+		}
+		if strings.HasSuffix(strings.ToLower(e.Name()), ".capture.ts") || strings.HasSuffix(strings.ToLower(e.Name()), ".tmp") {
 			continue
 		}
 		info, err := e.Info()
@@ -299,9 +316,21 @@ func (m *Manager) recordLoop(rec *Recording) {
 	defer func() {
 		rec.mu.Lock()
 		rec.Duration = time.Since(rec.StartedAt)
-		rec.Status = "completed"
 		rec.file.Close()
 		rec.mu.Unlock()
+		if rec.Status != "error" {
+			if err := m.finalizeRecording(rec); err != nil {
+				rec.mu.Lock()
+				rec.finalizeErr = err.Error()
+				rec.Status = "error"
+				rec.mu.Unlock()
+				log.Printf("[REC] Kayit finalize edilemedi: %s (%v)", rec.ID, err)
+			} else {
+				rec.mu.Lock()
+				rec.Status = "completed"
+				rec.mu.Unlock()
+			}
+		}
 		m.mu.Lock()
 		delete(m.recordings, rec.ID)
 		m.mu.Unlock()
@@ -324,7 +353,9 @@ func (m *Manager) recordLoop(rec *Recording) {
 			}
 			n, err := rec.file.Write(data)
 			if err != nil {
+				rec.mu.Lock()
 				rec.Status = "error"
+				rec.mu.Unlock()
 				return
 			}
 			rec.mu.Lock()
@@ -515,12 +546,12 @@ func formatBytes(b int64) string {
 
 func normalizeFormat(format Format) Format {
 	switch Format(strings.ToLower(string(format))) {
+	case FormatMP4:
+		return FormatMP4
+	case FormatMKV:
+		return FormatMKV
 	case FormatFLV:
 		return FormatFLV
-	case FormatMP4:
-		return FormatTS
-	case FormatMKV:
-		return FormatTS
 	case FormatTS:
 		fallthrough
 	default:

@@ -142,6 +142,39 @@ func startMaintenanceLoops(ctxDone <-chan struct{}, cfg *config.Manager, db *sto
 		}()
 	}
 
+	if archiveManager != nil {
+		interval := time.Duration(cfg.GetInt("backup_archive_scan_interval_minutes", 30)) * time.Minute
+		if interval < 5*time.Minute {
+			interval = 5 * time.Minute
+		}
+		go func() {
+			ticker := time.NewTicker(interval)
+			defer ticker.Stop()
+			runBackupArchiveSync := func() {
+				if !cfg.GetBool("backup_archive_enabled", false) || !cfg.GetBool("backup_archive_auto_upload", false) {
+					return
+				}
+				uploaded, err := archiveManager.SyncPendingBackups(context.Background(), cfg.GetInt("backup_archive_batch_size", 2))
+				if err != nil {
+					_ = db.AddLog("WARN", "backup", fmt.Sprintf("Yedek arsiv senkronizasyonu basarisiz: %v", err))
+					return
+				}
+				if uploaded > 0 {
+					_ = db.AddLog("INFO", "backup", fmt.Sprintf("Yeni arsivlenen sistem yedegi sayisi: %d", uploaded))
+				}
+			}
+			runBackupArchiveSync()
+			for {
+				select {
+				case <-ctxDone:
+					return
+				case <-ticker.C:
+					runBackupArchiveSync()
+				}
+			}
+		}()
+	}
+
 	if cfg.GetBool("maintenance_auto_cleanup", true) {
 		intervalHours := cfg.GetInt("maintenance_cleanup_interval", 6)
 		if intervalHours <= 0 {
@@ -311,7 +344,7 @@ func buildHealthReport(cfg *config.Manager, db *storage.SQLiteDB, stats storage.
 		}
 		if cfg.GetBool("archive_enabled", false) {
 			switch {
-			case !archiveSummary.Enabled:
+			case !archiveSummary.Configured:
 				alerts = append(alerts, systemAlert{
 					Level:       "warning",
 					Code:        "archive_config_invalid",
@@ -326,6 +359,26 @@ func buildHealthReport(cfg *config.Manager, db *storage.SQLiteDB, stats storage.
 					Title:       "Arsiv hatalari var",
 					Description: fmt.Sprintf("Kayit arsiv kutugunde %d hata durumundaki oge gorunuyor.", archiveSummary.ErrorItems),
 					Action:      "Kayitlar ekranindaki Arsiv Kutuphanesi tablosunu acip hatali ogeleri yeniden deneyin.",
+				})
+			}
+		}
+		if cfg.GetBool("backup_archive_enabled", false) {
+			switch {
+			case !archiveSummary.Configured:
+				alerts = append(alerts, systemAlert{
+					Level:       "warning",
+					Code:        "backup_archive_config_invalid",
+					Title:       "Yedek arsivi acik ama hedef ayari eksik",
+					Description: "Sistem yedeklerini object storage veya SFTP hedefine tasimak etkin gorunuyor ancak hedef ayarlari tamamlanmadi.",
+					Action:      "Depolama ve Arsiv Merkezi ekranindan provider ve hedef bilgilerini dogrulayin.",
+				})
+			case archiveSummary.BackupErrorItems > 0:
+				alerts = append(alerts, systemAlert{
+					Level:       "warning",
+					Code:        "backup_archive_errors_present",
+					Title:       "Yedek arsiv hatalari var",
+					Description: fmt.Sprintf("Yedek arsiv kutugunde %d hata durumundaki oge gorunuyor.", archiveSummary.BackupErrorItems),
+					Action:      "Depolama ve Arsiv Merkezi ekranindaki Yedek Arsiv Kutuphanesi tablosundan hatali ogeleri yeniden deneyin.",
 				})
 			}
 		}
@@ -388,6 +441,7 @@ func buildHealthReport(cfg *config.Manager, db *storage.SQLiteDB, stats storage.
 		"services":     services,
 		"storage": map[string]interface{}{
 			"recordings_bytes": folderSize(filepath.Join(dataDir, "recordings")),
+			"backups_bytes":    folderSize(filepath.Join(dataDir, "backups")),
 			"hls_bytes":        folderSize(filepath.Join(dataDir, "hls")),
 			"dash_bytes":       folderSize(filepath.Join(dataDir, "dash")),
 			"archive":          archiveSummary,

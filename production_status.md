@@ -66,6 +66,7 @@ Bugun elde olanlar:
 - runtime lisans modeli
 - backup omurgasi
 - object storage / archive omurgasi
+- Depolama ve Arsiv Merkezi
 - Linux servis ve deploy akisi
 
 Karar:
@@ -108,9 +109,26 @@ Kapananlar:
 - recording kutuphanesi icin object storage metadata tablosu
 - lokal arsiv klasoru modu
 - S3 / MinIO uyumlu archive upload / restore akisi
+- SFTP hedefi ile arsiv ve yedek yukleme akisi
 - otomatik arsiv senkronu
 - panelden arsive gonderme ve geri yukleme
 - saglik raporunda arsiv ozet gorunurlugu
+- sistem yedeklerini ayni archive omurgasina baglama
+- kayit / depolama / yedek yonetimini tek `Depolama ve Arsiv Merkezi` ekraninda birlestirme
+
+### 3.5 Kayit ve Depolama Merkezi
+
+Kapananlar:
+
+- varsayilan kayit formati `mp4` olacak sekilde akisi guncelleme
+- `mp4` ve `mkv` secildiginde guvenli `TS capture` alip kapanista `ffmpeg copy remux` ile izlenebilir dosya uretme
+- gecici `.capture.ts` dosyalarini kayit kutuphanesinden gizleme
+- mevcut `TS`, `FLV` ve `MKV` kayitlari panelden `MP4 Hazirla` ile donusturebilme
+- kayit onizleme panelini oynatilabilir formatlara gore daha durust hale getirme
+
+Karar:
+
+- kayit tarafi sadece ham dosya toplamak yerine artik gercek kutuphane ve arsiv mantigina yaklasti
 
 ### 3.4 Linux Urunlestirme
 
@@ -133,7 +151,8 @@ Asagidaki basliklar henuz tam production-ready degil:
 - kalite gecisi ve audio switch verisinin daha ileri alarm otomasyonu ve daha uzun rapor katmanina baglanmasi
 - dusuk bant genisligi icin ABR profil merdiveninin daha uzun benchmarklarla tekrar optimizasyonu
 - multi-node origin-edge cluster mimarisi
-- yeni archive / object storage akisinin gercek S3 ve MinIO sahasinda sertlestirilmesi
+- yeni archive / object storage akisinin gercek S3, MinIO ve SFTP sahasinda sertlestirilmesi
+- kayit finalize/remux akisinin uzun sureli, buyuk dosyali ve servis restart senaryolarinda sertlestirilmesi
 - RBAC, audit log ve SSO
 - DRM, SSAI ve monetizasyon
 - kapsamli yuk testi ve soak testi
@@ -152,6 +171,7 @@ Yerelde:
 - `go test ./...` gecti
 - admin JS sentaks kontrolu gecti
 - lokal arsiv upload / restore akisi sentetik testte gecti
+- lokal kayit remux ve MP4 finalize akisi gecti
 
 Host:
 
@@ -159,7 +179,7 @@ Host:
 - systemd servis: `fluxstream`
 - servis durumu: `active`
 - health: `http://127.0.0.1:8844/api/health` -> `{"status":"ok","version":"2.0.0"}`
-- canli deploy hash: `60abb5c078fd18c007b0ac355ba371481978dd9369c6d6048f0ac21c22af56ec`
+- canli deploy hash: `9df16fdd23936df61b3c2a92a5ea42d679d1454d9b61f2e28acd0259eb648596`
 - canli dogrulama: HLS master `2` video katmani, DASH MPD `3` representation (2 video + 1 audio)
 - yayin dogrulamasi: `test / live_14957742f633b59863173e5a` stream'i ile kontrol edildi
 
@@ -222,5 +242,6 @@ Bana gore bundan sonraki en mantikli sira su:
 1. audio-only DASH davranisini farkli client'larda canli testle sertlestir
 2. Operasyon Merkezi'ni buyuk stream sayisi ve uzun oturumlarla sertlestir
 3. archive / object storage akisina gercek S3 ve MinIO saha testi yap
-4. multi-node origin-edge mimarisini tasarla
-5. RBAC, audit log ve SSO katmanini ekle
+4. archive / object storage akisina SFTP hedefiyle de saha testi yap
+5. multi-node origin-edge mimarisini tasarla
+6. RBAC, audit log ve SSO katmanini ekle

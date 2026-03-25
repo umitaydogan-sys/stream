@@ -1,4 +1,4 @@
-# FluxStream Uygulama Plani
+﻿# FluxStream Uygulama Plani
 
 ## 1. Urun Hedefi
 
@@ -78,6 +78,12 @@ streaming cekirdegi yeterince olgunlastiktan sonra eklenecek.
 - recording kutuphanesi icin object storage / archive yonetimi eklendi
 - lokal arsiv klasoru ve S3/MinIO uyumlu archive akisi ayni panelden yonetilebilir hale geldi
 - arsivlenen kayitlari panelden geri yukleme ve otomatik senkron mantigi eklendi
+- `Depolama ve Arsiv Merkezi` ile kayit yonetimi, depolama ayarlari ve sistem yedekleri ayni ekranda birlestirildi
+- harici hedef seceneklerine `SFTP` de eklendi; ayni merkezden `local`, `S3`, `MinIO`, `SFTP` secilebiliyor
+- recording tarafinda varsayilan format `mp4` oldu; `mp4` ve `mkv` secildiginde yayin once guvenli `TS capture` olarak alinip kapanista `ffmpeg copy remux` ile son dosyaya donusturuluyor
+- kayit kutuphanesi artik gecici `.capture.ts` dosyalarini gostermiyor
+- mevcut `TS`, `FLV` ve `MKV` kayitlari panelden tek tusla `MP4 Hazirla` akisi ile izlenebilir formata donusturulebiliyor
+- sistem yedekleri icin de ayni archive altyapisi kullaniliyor; otomatik yukleme, geri yukleme ve lokal kopyayi silme politikasi ayarlanabiliyor
 
 ## 3. Bu Surecte Neleri Kapatmis Olduk
 
@@ -172,6 +178,8 @@ Bugun hala acik olan gercek eksikler ise sunlar:
 - kalite gecisi ve audio switch verisini daha ileri alarm otomasyonu ve uzun periyot rapor katmanina baglama
 - ABR profil merdivenlerini gercek trafik ve cihaz verisine gore tekrar ince ayarlama
 - dusuk bant sahalarinda uzun sureli soak test ve canli benchmark calistirma
+- archive/object storage akisinda gercek `S3`, `MinIO` ve `SFTP` hedefleriyle uzun sureli saha testi
+- kayit finalize/remux akisinda buyuk dosya, uzun sureli kayit ve beklenmeyen servis restart senaryolarini sertlestirme
 
 ## 6. Rakiplere Gore Bugunku Konum
 
@@ -187,7 +195,7 @@ FluxStream'in bugun guclu oldugu taraflar:
 FluxStream'in bugun zayif veya eksik oldugu taraflar:
 
 - multi-node origin-edge cluster ve autoscaling yok
-- archive/object storage akisi yeni eklense de saha sertlestirmesi henuz yeni
+- archive/object storage ve SFTP hedefleri artik var ama saha sertlestirmesi henuz yeni
 - Prometheus / OpenTelemetry / alarm omurgasi artik var ama daha derin entegrasyon acik
 - RBAC, audit log ve SSO eksik
 - DRM, SSAI ve gelismis monetizasyon eksik
@@ -227,7 +235,7 @@ Bir sonraki dogru kapatma sirasi bence su:
 
 1. audio-only DASH ve farkli client davranislarini canli saha testiyle sertlestir
 2. Operasyon Merkezi ekranini uzun sureli kullanim ve buyuk stream sayisinda sertlestir
-3. archive/object storage akisinda MinIO ve gercek S3 saha testi al
+3. archive/object storage akisinda MinIO, gercek S3 ve SFTP saha testi al
 4. multi-node origin-edge mimarisini tasarla
 5. RBAC, audit log, SSO ve lisans enforcement tarafini sertlestir
 6. ABR profil merdivenini gercek saha benchmarklari ile tekrar optimize et
@@ -275,7 +283,7 @@ Bu fazin ayni teslimat paketi icindeki ikinci zorunlu isi:
 
 - `MP4 preview fix`
 - ham MP4 cikisini korurken, tarayici preview ve panel butonlarini
-  kullaniciya daha durust ve kararlı sekilde sunmak
+  kullaniciya daha durust ve kararli sekilde sunmak
 - `MP4 Player` davranisini operasyon paneli, gelismis embed ve rehber
   metinleriyle tutarli hale getirmek
 
@@ -290,3 +298,4 @@ Streaming cekirdegi yeterince olgunlastiginda siradaki urun katmanlari:
 - yoklama ve katilim
 - breakout room mantigi
 - takim ici mesajlasma
+

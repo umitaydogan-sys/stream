@@ -23,37 +23,60 @@ import (
 )
 
 type Settings struct {
-	Enabled       bool
-	Provider      string
-	LocalDir      string
-	Endpoint      string
-	Region        string
-	Bucket        string
-	AccessKey     string
-	SecretKey     string
-	Prefix        string
-	UsePathStyle  bool
-	PublicBaseURL string
-	AutoUpload    bool
-	DeleteLocal   bool
-	ScanMinutes   int
-	BatchSize     int
+	Enabled                 bool
+	Configured              bool
+	RecordingsEnabled       bool
+	BackupsEnabled          bool
+	Provider                string
+	LocalDir                string
+	Endpoint                string
+	Region                  string
+	Bucket                  string
+	AccessKey               string
+	SecretKey               string
+	SFTPHost                string
+	SFTPPort                int
+	SFTPUser                string
+	SFTPRemoteDir           string
+	SFTPKeyPath             string
+	SFTPDisableHostKeyCheck bool
+	Prefix                  string
+	UsePathStyle            bool
+	PublicBaseURL           string
+	AutoUpload              bool
+	DeleteLocal             bool
+	ScanMinutes             int
+	BatchSize               int
+	BackupAutoUpload        bool
+	BackupDeleteLocal       bool
+	BackupScanMinutes       int
+	BackupBatchSize         int
 }
 
 type Summary struct {
-	Enabled           bool      `json:"enabled"`
-	Provider          string    `json:"provider"`
-	AutoUpload        bool      `json:"auto_upload"`
-	DeleteLocal       bool      `json:"delete_local_after_upload"`
-	LocalDir          string    `json:"local_dir,omitempty"`
-	Endpoint          string    `json:"endpoint,omitempty"`
-	Bucket            string    `json:"bucket,omitempty"`
-	Prefix            string    `json:"prefix,omitempty"`
-	Items             int       `json:"items"`
-	ErrorItems        int       `json:"error_items"`
-	LocalDeletedItems int       `json:"local_deleted_items"`
-	LastSyncAt        time.Time `json:"last_sync_at,omitempty"`
-	LastError         string    `json:"last_error,omitempty"`
+	Enabled                 bool      `json:"enabled"`
+	Configured              bool      `json:"configured"`
+	RecordingsEnabled       bool      `json:"recordings_enabled"`
+	BackupsEnabled          bool      `json:"backups_enabled"`
+	Provider                string    `json:"provider"`
+	AutoUpload              bool      `json:"auto_upload"`
+	DeleteLocal             bool      `json:"delete_local_after_upload"`
+	BackupAutoUpload        bool      `json:"backup_auto_upload"`
+	BackupDeleteLocal       bool      `json:"backup_delete_local_after_upload"`
+	LocalDir                string    `json:"local_dir,omitempty"`
+	Endpoint                string    `json:"endpoint,omitempty"`
+	Bucket                  string    `json:"bucket,omitempty"`
+	Prefix                  string    `json:"prefix,omitempty"`
+	Items                   int       `json:"items"`
+	ErrorItems              int       `json:"error_items"`
+	LocalDeletedItems       int       `json:"local_deleted_items"`
+	BackupItems             int       `json:"backup_items"`
+	BackupErrorItems        int       `json:"backup_error_items"`
+	BackupLocalDeletedItems int       `json:"backup_local_deleted_items"`
+	LastSyncAt              time.Time `json:"last_sync_at,omitempty"`
+	LastError               string    `json:"last_error,omitempty"`
+	LastBackupSyncAt        time.Time `json:"last_backup_sync_at,omitempty"`
+	LastBackupError         string    `json:"last_backup_error,omitempty"`
 }
 
 type Manager struct {
@@ -62,9 +85,11 @@ type Manager struct {
 	recordings *recording.Manager
 	dataDir    string
 
-	mu         sync.RWMutex
-	lastSyncAt time.Time
-	lastError  string
+	mu               sync.RWMutex
+	lastSyncAt       time.Time
+	lastError        string
+	lastBackupSyncAt time.Time
+	lastBackupError  string
 }
 
 type storeObject struct {
@@ -90,24 +115,38 @@ func NewManager(cfg *config.Manager, db *storage.SQLiteDB, recordings *recording
 
 func (m *Manager) Settings() Settings {
 	settings := Settings{
-		Enabled:       m.cfg.GetBool("archive_enabled", false),
-		Provider:      strings.ToLower(strings.TrimSpace(m.cfg.Get("archive_provider", "disabled"))),
-		LocalDir:      strings.TrimSpace(m.cfg.Get("archive_local_dir", filepath.Join(m.dataDir, "archive"))),
-		Endpoint:      strings.TrimRight(strings.TrimSpace(m.cfg.Get("archive_endpoint", "")), "/"),
-		Region:        strings.TrimSpace(m.cfg.Get("archive_region", "us-east-1")),
-		Bucket:        strings.TrimSpace(m.cfg.Get("archive_bucket", "")),
-		AccessKey:     strings.TrimSpace(m.cfg.Get("archive_access_key", "")),
-		SecretKey:     strings.TrimSpace(m.cfg.Get("archive_secret_key", "")),
-		Prefix:        strings.Trim(strings.TrimSpace(m.cfg.Get("archive_prefix", "fluxstream")), "/"),
-		UsePathStyle:  m.cfg.GetBool("archive_use_path_style", true),
-		PublicBaseURL: strings.TrimRight(strings.TrimSpace(m.cfg.Get("archive_public_base_url", "")), "/"),
-		AutoUpload:    m.cfg.GetBool("archive_auto_upload", false),
-		DeleteLocal:   m.cfg.GetBool("archive_delete_local_after_upload", false),
-		ScanMinutes:   m.cfg.GetInt("archive_scan_interval_minutes", 10),
-		BatchSize:     m.cfg.GetInt("archive_batch_size", 3),
+		RecordingsEnabled:       m.cfg.GetBool("archive_enabled", false),
+		BackupsEnabled:          m.cfg.GetBool("backup_archive_enabled", false),
+		Provider:                strings.ToLower(strings.TrimSpace(m.cfg.Get("archive_provider", "disabled"))),
+		LocalDir:                strings.TrimSpace(m.cfg.Get("archive_local_dir", filepath.Join(m.dataDir, "archive"))),
+		Endpoint:                strings.TrimRight(strings.TrimSpace(m.cfg.Get("archive_endpoint", "")), "/"),
+		Region:                  strings.TrimSpace(m.cfg.Get("archive_region", "us-east-1")),
+		Bucket:                  strings.TrimSpace(m.cfg.Get("archive_bucket", "")),
+		AccessKey:               strings.TrimSpace(m.cfg.Get("archive_access_key", "")),
+		SecretKey:               strings.TrimSpace(m.cfg.Get("archive_secret_key", "")),
+		SFTPHost:                strings.TrimSpace(m.cfg.Get("archive_sftp_host", "")),
+		SFTPPort:                m.cfg.GetInt("archive_sftp_port", 22),
+		SFTPUser:                strings.TrimSpace(m.cfg.Get("archive_sftp_user", "")),
+		SFTPRemoteDir:           strings.TrimSpace(m.cfg.Get("archive_sftp_remote_dir", "")),
+		SFTPKeyPath:             strings.TrimSpace(m.cfg.Get("archive_sftp_key_path", "")),
+		SFTPDisableHostKeyCheck: m.cfg.GetBool("archive_sftp_disable_host_key_check", false),
+		Prefix:                  strings.Trim(strings.TrimSpace(m.cfg.Get("archive_prefix", "fluxstream")), "/"),
+		UsePathStyle:            m.cfg.GetBool("archive_use_path_style", true),
+		PublicBaseURL:           strings.TrimRight(strings.TrimSpace(m.cfg.Get("archive_public_base_url", "")), "/"),
+		AutoUpload:              m.cfg.GetBool("archive_auto_upload", false),
+		DeleteLocal:             m.cfg.GetBool("archive_delete_local_after_upload", false),
+		ScanMinutes:             m.cfg.GetInt("archive_scan_interval_minutes", 10),
+		BatchSize:               m.cfg.GetInt("archive_batch_size", 3),
+		BackupAutoUpload:        m.cfg.GetBool("backup_archive_auto_upload", false),
+		BackupDeleteLocal:       m.cfg.GetBool("backup_archive_delete_local_after_upload", false),
+		BackupScanMinutes:       m.cfg.GetInt("backup_archive_scan_interval_minutes", 30),
+		BackupBatchSize:         m.cfg.GetInt("backup_archive_batch_size", 2),
 	}
 	if settings.Provider == "" {
 		settings.Provider = "disabled"
+	}
+	if settings.SFTPPort <= 0 {
+		settings.SFTPPort = 22
 	}
 	if settings.ScanMinutes <= 0 {
 		settings.ScanMinutes = 10
@@ -115,43 +154,54 @@ func (m *Manager) Settings() Settings {
 	if settings.BatchSize <= 0 {
 		settings.BatchSize = 3
 	}
+	if settings.BackupScanMinutes <= 0 {
+		settings.BackupScanMinutes = 30
+	}
+	if settings.BackupBatchSize <= 0 {
+		settings.BackupBatchSize = 2
+	}
 	if settings.Provider == "local" && settings.LocalDir == "" {
 		settings.LocalDir = filepath.Join(m.dataDir, "archive")
 	}
-	if settings.Provider == "disabled" {
-		settings.Enabled = false
-	}
-	if !settings.Enabled {
-		return settings
-	}
 	switch settings.Provider {
 	case "local":
-		settings.Enabled = strings.TrimSpace(settings.LocalDir) != ""
+		settings.Configured = strings.TrimSpace(settings.LocalDir) != ""
 	case "s3", "minio":
-		settings.Enabled = settings.Endpoint != "" && settings.Bucket != "" && settings.AccessKey != "" && settings.SecretKey != ""
+		settings.Configured = settings.Endpoint != "" && settings.Bucket != "" && settings.AccessKey != "" && settings.SecretKey != ""
+	case "sftp":
+		settings.Configured = settings.SFTPHost != "" && settings.SFTPUser != "" && settings.SFTPRemoteDir != ""
 	default:
-		settings.Enabled = false
+		settings.Configured = false
 	}
+	settings.Enabled = settings.Configured && (settings.RecordingsEnabled || settings.BackupsEnabled)
 	return settings
 }
 
 func (m *Manager) Enabled() bool {
-	return m.Settings().Enabled
+	settings := m.Settings()
+	return settings.Configured && settings.RecordingsEnabled
 }
 
 func (m *Manager) Summary() Summary {
 	settings := m.Settings()
 	items, _ := m.db.ListRecordingArchives("", 0)
+	backupItems, _ := m.db.ListBackupArchives(0)
 	summary := Summary{
-		Enabled:     settings.Enabled,
-		Provider:    settings.Provider,
-		AutoUpload:  settings.AutoUpload,
-		DeleteLocal: settings.DeleteLocal,
-		LocalDir:    settings.LocalDir,
-		Endpoint:    settings.Endpoint,
-		Bucket:      settings.Bucket,
-		Prefix:      settings.Prefix,
-		Items:       len(items),
+		Enabled:           settings.Enabled,
+		Configured:        settings.Configured,
+		RecordingsEnabled: settings.RecordingsEnabled,
+		BackupsEnabled:    settings.BackupsEnabled,
+		Provider:          settings.Provider,
+		AutoUpload:        settings.AutoUpload,
+		DeleteLocal:       settings.DeleteLocal,
+		BackupAutoUpload:  settings.BackupAutoUpload,
+		BackupDeleteLocal: settings.BackupDeleteLocal,
+		LocalDir:          settings.LocalDir,
+		Endpoint:          settings.Endpoint,
+		Bucket:            settings.Bucket,
+		Prefix:            settings.Prefix,
+		Items:             len(items),
+		BackupItems:       len(backupItems),
 	}
 	for _, item := range items {
 		if strings.EqualFold(item.Status, "error") {
@@ -161,9 +211,19 @@ func (m *Manager) Summary() Summary {
 			summary.LocalDeletedItems++
 		}
 	}
+	for _, item := range backupItems {
+		if strings.EqualFold(item.Status, "error") {
+			summary.BackupErrorItems++
+		}
+		if item.LocalDeleted {
+			summary.BackupLocalDeletedItems++
+		}
+	}
 	m.mu.RLock()
 	summary.LastSyncAt = m.lastSyncAt
 	summary.LastError = m.lastError
+	summary.LastBackupSyncAt = m.lastBackupSyncAt
+	summary.LastBackupError = m.lastBackupError
 	m.mu.RUnlock()
 	return summary
 }
@@ -174,7 +234,7 @@ func (m *Manager) ListArchives() ([]storage.RecordingArchive, error) {
 
 func (m *Manager) ArchiveRecording(ctx context.Context, streamKey, filename string) (*storage.RecordingArchive, error) {
 	settings := m.Settings()
-	if !settings.Enabled {
+	if !settings.Configured || !settings.RecordingsEnabled {
 		return nil, fmt.Errorf("arsivleme etkin degil")
 	}
 	if m.recordings == nil {
@@ -232,7 +292,7 @@ func (m *Manager) ArchiveRecording(ctx context.Context, streamKey, filename stri
 
 func (m *Manager) RestoreRecording(ctx context.Context, streamKey, filename string) (*storage.RecordingArchive, error) {
 	settings := m.Settings()
-	if !settings.Enabled {
+	if !settings.Configured || !settings.RecordingsEnabled {
 		return nil, fmt.Errorf("arsivleme etkin degil")
 	}
 	streamKey = strings.TrimSpace(streamKey)
@@ -280,7 +340,7 @@ func (m *Manager) RestoreRecording(ctx context.Context, streamKey, filename stri
 
 func (m *Manager) SyncPending(ctx context.Context, limit int) (int, error) {
 	settings := m.Settings()
-	if !settings.Enabled || !settings.AutoUpload || m.recordings == nil {
+	if !settings.Configured || !settings.RecordingsEnabled || !settings.AutoUpload || m.recordings == nil {
 		return 0, nil
 	}
 	if limit <= 0 {
@@ -339,6 +399,16 @@ func (m *Manager) newClient(settings Settings) (storeClient, error) {
 			publicBaseURL: settings.PublicBaseURL,
 			httpClient:    &http.Client{Timeout: 2 * time.Minute},
 		}, nil
+	case "sftp":
+		return &sftpStore{
+			host:                settings.SFTPHost,
+			port:                settings.SFTPPort,
+			user:                settings.SFTPUser,
+			remoteDir:           settings.SFTPRemoteDir,
+			keyPath:             settings.SFTPKeyPath,
+			disableHostKeyCheck: settings.SFTPDisableHostKeyCheck,
+			publicBaseURL:       settings.PublicBaseURL,
+		}, nil
 	default:
 		return nil, fmt.Errorf("desteklenmeyen arsiv saglayicisi: %s", settings.Provider)
 	}
@@ -357,6 +427,22 @@ func (m *Manager) setLastError(err error) {
 	}
 	m.mu.Lock()
 	m.lastError = err.Error()
+	m.mu.Unlock()
+}
+
+func (m *Manager) markBackupSyncSuccess() {
+	m.mu.Lock()
+	m.lastBackupSyncAt = time.Now()
+	m.lastBackupError = ""
+	m.mu.Unlock()
+}
+
+func (m *Manager) setLastBackupError(err error) {
+	if err == nil {
+		return
+	}
+	m.mu.Lock()
+	m.lastBackupError = err.Error()
 	m.mu.Unlock()
 }
 

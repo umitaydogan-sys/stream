@@ -259,7 +259,7 @@ func main() {
 
 	// Recording/DVR
 	recordingsDir := filepath.Join(dataDir, "recordings")
-	recManager := recording.NewManager(streamManager, recordingsDir)
+	recManager := recording.NewManager(streamManager, recordingsDir, cfg.Get("ffmpeg_path", "ffmpeg"))
 	archiveManager := archive.NewManager(cfg, db, recManager, dataDir)
 	log.Println("[INIT] Kayit/DVR sistemi aktif")
 
@@ -705,6 +705,34 @@ func main() {
 		}
 		jsonResp(w, map[string]interface{}{"success": true, "uploaded": uploaded})
 	})
+	webServer.RegisterHandler("/api/recordings/remux", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if !licenseRuntime.allows(licenseFeatureRecording) {
+			http.Error(w, "recording lisans gerektirir", http.StatusForbidden)
+			return
+		}
+		var req struct {
+			StreamKey string `json:"stream_key"`
+			Filename  string `json:"filename"`
+			Format    string `json:"format"`
+		}
+		if err := decodeJSON(r, &req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if strings.TrimSpace(req.Format) == "" {
+			req.Format = "mp4"
+		}
+		item, err := recManager.RemuxSavedRecording(req.StreamKey, req.Filename, recording.Format(req.Format))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		jsonResp(w, map[string]interface{}{"success": true, "item": item})
+	})
 	webServer.RegisterHandler("/api/recordings/file", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "DELETE" {
 			http.Error(w, "Method not allowed", 405)
@@ -949,7 +977,7 @@ func main() {
 		}
 		jsonResp(w, rec)
 	})
-	registerProductAdminRoutes(webServer, cfg, db, dataDir, licenseRuntime)
+	registerProductAdminRoutes(webServer, cfg, db, dataDir, licenseRuntime, archiveManager)
 
 	go func() {
 		if err := webServer.Start(ctx); err != nil {

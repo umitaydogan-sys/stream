@@ -201,3 +201,24 @@ type RecordingArchive struct {
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
+
+// BackupArchive stores archive/object-storage metadata for a system backup file.
+type BackupArchive struct {
+	ID                int64     `json:"id"`
+	Name              string    `json:"name"`
+	Provider          string    `json:"provider"`
+	Bucket            string    `json:"bucket,omitempty"`
+	Endpoint          string    `json:"endpoint,omitempty"`
+	ObjectKey         string    `json:"object_key"`
+	ObjectURL         string    `json:"object_url,omitempty"`
+	ETag              string    `json:"etag,omitempty"`
+	Size              int64     `json:"size"`
+	IncludeRecordings bool      `json:"include_recordings"`
+	Status            string    `json:"status"`
+	LastError         string    `json:"last_error,omitempty"`
+	LocalDeleted      bool      `json:"local_deleted"`
+	ArchivedAt        time.Time `json:"archived_at,omitempty"`
+	RestoredAt        time.Time `json:"restored_at,omitempty"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
+}

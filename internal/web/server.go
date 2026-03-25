@@ -540,7 +540,7 @@ func (s *Server) handleStreams(w http.ResponseWriter, r *http.Request) {
 			req.OutputFormats = `["hls","ll_hls","dash","flv","whep","mp4","webm","mp3","aac","ogg","wav","flac","icecast"]`
 		}
 		if req.RecordFormat == "" {
-			req.RecordFormat = "ts"
+			req.RecordFormat = "mp4"
 		}
 
 		streamKey := generateStreamKey()
@@ -625,7 +625,7 @@ func (s *Server) handleStreamByID(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if req.RecordFormat == "" {
-			req.RecordFormat = "ts"
+			req.RecordFormat = "mp4"
 		}
 		req.ID = id
 		if s.streamMutator != nil {

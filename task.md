@@ -76,6 +76,10 @@
 - [x] alarm esiklerini gercek saha verisine gore ince ayarla
 - [x] track bazli kalite gecisi ve ses izi degisimi raporunu ekle
 - [x] kalite / ses gecisi verisini saglik ve rapor ekranlarinda daha derin kullan
+- [x] `Depolama ve Arsiv Merkezi` menusunu olustur ve kayit / depolama ayarlarini tek ekranda birlestir
+- [x] kayitlari `ham capture + izlenebilir MP4/MKV finalize/remux` modeliyle gercekten oynatilabilir hale getir
+- [x] sistem yedeklerini de ayni depolama ve arsiv merkezi altina bagla
+- [x] harici hedeflerde `S3`, `MinIO`, `SFTP` seceneklerini ayni arayuzden yonetilebilir hale getir
 
 ## 6. Urunlestirme ve Lisans
 
@@ -101,11 +105,15 @@
 
 - [ ] multi-node origin-edge mimarisi
 - [x] S3 / MinIO archive ve restore akisi
+- [x] SFTP tabanli arsiv ve yedek yukleme akisi
+- [x] kayit / yedek / harici hedef yonetimini tek merkezde birlestir
 - [x] Prometheus / OpenTelemetry / alarm sistemi
 - [ ] RBAC, audit log ve SSO
 - [ ] DRM ve gelismis playback guvenligi
 - [ ] SSAI ve monetizasyon omurgasi
 - [ ] uzun sureli soak test ve yuk testi kapsamini artir
+- [ ] gercek S3, MinIO ve SFTP sahasinda uzun sureli arsiv / geri yukleme testi yap
+- [ ] kayit oynatim akisinda buyuk dosya, uzun sure ve kesintili finalize senaryolarini sertlestir
 
 ## 9. Cekirdek Tamamlandiktan Sonra
 

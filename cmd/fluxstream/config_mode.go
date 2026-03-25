@@ -79,7 +79,11 @@ func configCategoryForKey(key string) string {
 		"archive_enabled", "archive_provider", "archive_local_dir", "archive_endpoint", "archive_region",
 		"archive_bucket", "archive_access_key", "archive_secret_key", "archive_prefix", "archive_use_path_style",
 		"archive_public_base_url", "archive_auto_upload", "archive_delete_local_after_upload",
-		"archive_scan_interval_minutes", "archive_batch_size",
+		"archive_scan_interval_minutes", "archive_batch_size", "archive_sftp_host", "archive_sftp_port",
+		"archive_sftp_user", "archive_sftp_remote_dir", "archive_sftp_key_path",
+		"archive_sftp_disable_host_key_check", "backup_archive_enabled", "backup_archive_auto_upload",
+		"backup_archive_delete_local_after_upload", "backup_archive_scan_interval_minutes",
+		"backup_archive_batch_size",
 		"analytics_retention_days", "maintenance_auto_cleanup", "maintenance_cleanup_interval":
 		return "storage"
 	case "analytics_persist_enabled", "analytics_snapshot_interval":

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fluxstream/fluxstream/internal/archive"
 	"github.com/fluxstream/fluxstream/internal/config"
 	"github.com/fluxstream/fluxstream/internal/license"
 	"github.com/fluxstream/fluxstream/internal/storage"
@@ -20,7 +22,7 @@ import (
 const linuxServiceUnit = "fluxstream"
 const windowsServiceUnit = "FluxStream"
 
-func registerProductAdminRoutes(webServer *web.Server, cfg *config.Manager, db *storage.SQLiteDB, dataDir string, runtimeLicense *runtimeLicense) {
+func registerProductAdminRoutes(webServer *web.Server, cfg *config.Manager, db *storage.SQLiteDB, dataDir string, runtimeLicense *runtimeLicense, archiveManager *archive.Manager) {
 	licMgr := license.NewManager(dataDir)
 
 	webServer.RegisterAdminHandler("/api/license/status", func(w http.ResponseWriter, r *http.Request) {
@@ -188,10 +190,102 @@ func registerProductAdminRoutes(webServer *web.Server, cfg *config.Manager, db *
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			jsonResp(w, map[string]interface{}{"success": true, "item": item})
+			var archived *storage.BackupArchive
+			if archiveManager != nil {
+				settings := archiveManager.Settings()
+				if settings.Configured && settings.BackupsEnabled && settings.BackupAutoUpload {
+					archived, _ = archiveManager.ArchiveBackup(r.Context(), item.Name)
+				}
+			}
+			jsonResp(w, map[string]interface{}{"success": true, "item": item, "archived": archived})
 		default:
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
+	})
+
+	webServer.RegisterAdminHandler("/api/system/backups/archives", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if archiveManager == nil {
+			jsonResp(w, []storage.BackupArchive{})
+			return
+		}
+		items, err := archiveManager.ListBackupArchives()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if items == nil {
+			items = []storage.BackupArchive{}
+		}
+		jsonResp(w, items)
+	})
+
+	webServer.RegisterAdminHandler("/api/system/backups/archive", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if archiveManager == nil {
+			http.Error(w, "archive manager hazir degil", http.StatusServiceUnavailable)
+			return
+		}
+		var req struct {
+			Name string `json:"name"`
+		}
+		if err := decodeJSON(r, &req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		item, err := archiveManager.ArchiveBackup(r.Context(), req.Name)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		jsonResp(w, map[string]interface{}{"success": true, "item": item})
+	})
+
+	webServer.RegisterAdminHandler("/api/system/backups/archive/restore", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if archiveManager == nil {
+			http.Error(w, "archive manager hazir degil", http.StatusServiceUnavailable)
+			return
+		}
+		var req struct {
+			Name string `json:"name"`
+		}
+		if err := decodeJSON(r, &req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		item, err := archiveManager.RestoreBackupArchive(r.Context(), req.Name)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		jsonResp(w, map[string]interface{}{"success": true, "item": item})
+	})
+
+	webServer.RegisterAdminHandler("/api/system/backups/archive/sync", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if archiveManager == nil {
+			http.Error(w, "archive manager hazir degil", http.StatusServiceUnavailable)
+			return
+		}
+		uploaded, err := archiveManager.SyncPendingBackups(context.Background(), cfg.GetInt("backup_archive_batch_size", 2))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		jsonResp(w, map[string]interface{}{"success": true, "uploaded": uploaded})
 	})
 
 	webServer.RegisterAdminHandler("/api/system/backups/download/", func(w http.ResponseWriter, r *http.Request) {

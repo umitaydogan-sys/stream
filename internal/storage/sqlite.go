@@ -209,6 +209,26 @@ func (s *SQLiteDB) migrate() error {
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			UNIQUE(stream_key, filename)
 		)`,
+		`CREATE TABLE IF NOT EXISTS backup_archives (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL,
+			provider TEXT NOT NULL DEFAULT 'local',
+			bucket TEXT DEFAULT '',
+			endpoint TEXT DEFAULT '',
+			object_key TEXT NOT NULL DEFAULT '',
+			object_url TEXT DEFAULT '',
+			etag TEXT DEFAULT '',
+			size INTEGER DEFAULT 0,
+			include_recordings INTEGER DEFAULT 0,
+			status TEXT NOT NULL DEFAULT 'archived',
+			last_error TEXT DEFAULT '',
+			local_deleted INTEGER DEFAULT 0,
+			archived_at DATETIME,
+			restored_at DATETIME,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(name)
+		)`,
 		`CREATE INDEX IF NOT EXISTS idx_logs_created ON logs(created_at DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_logs_level ON logs(level)`,
 		`CREATE INDEX IF NOT EXISTS idx_streams_key ON streams(stream_key)`,
@@ -218,6 +238,7 @@ func (s *SQLiteDB) migrate() error {
 		`CREATE INDEX IF NOT EXISTS idx_player_telemetry_stream_created ON player_telemetry_samples(stream_key, created_at DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_track_telemetry_stream_created ON track_telemetry_samples(stream_key, created_at DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_recording_archives_stream ON recording_archives(stream_key, archived_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_backup_archives_archived ON backup_archives(archived_at DESC)`,
 	}
 
 	for _, m := range migrations {
@@ -236,6 +257,11 @@ func (s *SQLiteDB) migrate() error {
 	_ = s.ensureColumn("recording_archives", "object_url", "TEXT NOT NULL DEFAULT ''")
 	_ = s.ensureColumn("recording_archives", "etag", "TEXT NOT NULL DEFAULT ''")
 	_ = s.ensureColumn("recording_archives", "local_deleted", "INTEGER NOT NULL DEFAULT 0")
+	_ = s.ensureColumn("backup_archives", "bucket", "TEXT NOT NULL DEFAULT ''")
+	_ = s.ensureColumn("backup_archives", "endpoint", "TEXT NOT NULL DEFAULT ''")
+	_ = s.ensureColumn("backup_archives", "object_url", "TEXT NOT NULL DEFAULT ''")
+	_ = s.ensureColumn("backup_archives", "etag", "TEXT NOT NULL DEFAULT ''")
+	_ = s.ensureColumn("backup_archives", "local_deleted", "INTEGER NOT NULL DEFAULT 0")
 	return nil
 }
 
@@ -981,6 +1007,195 @@ func (s *SQLiteDB) ListRecordingArchives(streamKey string, limit int) ([]Recordi
 			item.RestoredAt = restoredAt.Time
 		}
 		item.Format = textutil.FixLegacyUTF8String(item.Format)
+		item.Provider = textutil.FixLegacyUTF8String(item.Provider)
+		item.Bucket = textutil.FixLegacyUTF8String(item.Bucket)
+		item.Endpoint = textutil.FixLegacyUTF8String(item.Endpoint)
+		item.ObjectKey = textutil.FixLegacyUTF8String(item.ObjectKey)
+		item.ObjectURL = textutil.FixLegacyUTF8String(item.ObjectURL)
+		item.ETag = textutil.FixLegacyUTF8String(item.ETag)
+		item.Status = textutil.FixLegacyUTF8String(item.Status)
+		item.LastError = textutil.FixLegacyUTF8String(item.LastError)
+		items = append(items, item)
+	}
+	return items, nil
+}
+
+func (s *SQLiteDB) UpsertBackupArchive(item *BackupArchive) error {
+	if item == nil {
+		return nil
+	}
+	item.Name = strings.TrimSpace(item.Name)
+	if item.Name == "" {
+		return fmt.Errorf("backup name gerekli")
+	}
+	item.Provider = textutil.FixLegacyUTF8String(strings.TrimSpace(item.Provider))
+	item.Bucket = textutil.FixLegacyUTF8String(strings.TrimSpace(item.Bucket))
+	item.Endpoint = textutil.FixLegacyUTF8String(strings.TrimSpace(item.Endpoint))
+	item.ObjectKey = textutil.FixLegacyUTF8String(strings.TrimSpace(item.ObjectKey))
+	item.ObjectURL = textutil.FixLegacyUTF8String(strings.TrimSpace(item.ObjectURL))
+	item.ETag = textutil.FixLegacyUTF8String(strings.TrimSpace(item.ETag))
+	item.Status = textutil.FixLegacyUTF8String(strings.TrimSpace(item.Status))
+	item.LastError = textutil.FixLegacyUTF8String(strings.TrimSpace(item.LastError))
+	now := time.Now()
+	if item.ArchivedAt.IsZero() && strings.EqualFold(item.Status, "archived") {
+		item.ArchivedAt = now
+	}
+	if item.CreatedAt.IsZero() {
+		item.CreatedAt = now
+	}
+	item.UpdatedAt = now
+	_, err := s.db.Exec(
+		`INSERT INTO backup_archives
+		(name, provider, bucket, endpoint, object_key, object_url, etag,
+		 size, include_recordings, status, last_error, local_deleted, archived_at, restored_at, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(name) DO UPDATE SET
+		 provider = excluded.provider,
+		 bucket = excluded.bucket,
+		 endpoint = excluded.endpoint,
+		 object_key = excluded.object_key,
+		 object_url = excluded.object_url,
+		 etag = excluded.etag,
+		 size = excluded.size,
+		 include_recordings = excluded.include_recordings,
+		 status = excluded.status,
+		 last_error = excluded.last_error,
+		 local_deleted = excluded.local_deleted,
+		 archived_at = COALESCE(excluded.archived_at, backup_archives.archived_at),
+		 restored_at = excluded.restored_at,
+		 updated_at = excluded.updated_at`,
+		item.Name,
+		item.Provider,
+		item.Bucket,
+		item.Endpoint,
+		item.ObjectKey,
+		item.ObjectURL,
+		item.ETag,
+		item.Size,
+		boolToInt(item.IncludeRecordings),
+		item.Status,
+		item.LastError,
+		boolToInt(item.LocalDeleted),
+		nullTime(item.ArchivedAt),
+		nullTime(item.RestoredAt),
+		item.CreatedAt,
+		item.UpdatedAt,
+	)
+	return err
+}
+
+func (s *SQLiteDB) GetBackupArchive(name string) (*BackupArchive, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, nil
+	}
+	var item BackupArchive
+	var includeRecordings int
+	var localDeleted int
+	var archivedAt sql.NullTime
+	var restoredAt sql.NullTime
+	err := s.db.QueryRow(
+		`SELECT id, name, provider, bucket, endpoint, object_key, object_url, etag,
+		        size, include_recordings, status, last_error, local_deleted, archived_at, restored_at, created_at, updated_at
+		   FROM backup_archives
+		  WHERE name = ?`,
+		name,
+	).Scan(
+		&item.ID,
+		&item.Name,
+		&item.Provider,
+		&item.Bucket,
+		&item.Endpoint,
+		&item.ObjectKey,
+		&item.ObjectURL,
+		&item.ETag,
+		&item.Size,
+		&includeRecordings,
+		&item.Status,
+		&item.LastError,
+		&localDeleted,
+		&archivedAt,
+		&restoredAt,
+		&item.CreatedAt,
+		&item.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	item.IncludeRecordings = includeRecordings == 1
+	item.LocalDeleted = localDeleted == 1
+	if archivedAt.Valid {
+		item.ArchivedAt = archivedAt.Time
+	}
+	if restoredAt.Valid {
+		item.RestoredAt = restoredAt.Time
+	}
+	item.Provider = textutil.FixLegacyUTF8String(item.Provider)
+	item.Bucket = textutil.FixLegacyUTF8String(item.Bucket)
+	item.Endpoint = textutil.FixLegacyUTF8String(item.Endpoint)
+	item.ObjectKey = textutil.FixLegacyUTF8String(item.ObjectKey)
+	item.ObjectURL = textutil.FixLegacyUTF8String(item.ObjectURL)
+	item.ETag = textutil.FixLegacyUTF8String(item.ETag)
+	item.Status = textutil.FixLegacyUTF8String(item.Status)
+	item.LastError = textutil.FixLegacyUTF8String(item.LastError)
+	return &item, nil
+}
+
+func (s *SQLiteDB) ListBackupArchives(limit int) ([]BackupArchive, error) {
+	query := `SELECT id, name, provider, bucket, endpoint, object_key, object_url, etag,
+	                 size, include_recordings, status, last_error, local_deleted, archived_at, restored_at, created_at, updated_at
+	            FROM backup_archives
+	        ORDER BY archived_at DESC, updated_at DESC`
+	args := []interface{}{}
+	if limit > 0 {
+		query += ` LIMIT ?`
+		args = append(args, limit)
+	}
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]BackupArchive, 0, 32)
+	for rows.Next() {
+		var item BackupArchive
+		var includeRecordings int
+		var localDeleted int
+		var archivedAt sql.NullTime
+		var restoredAt sql.NullTime
+		if err := rows.Scan(
+			&item.ID,
+			&item.Name,
+			&item.Provider,
+			&item.Bucket,
+			&item.Endpoint,
+			&item.ObjectKey,
+			&item.ObjectURL,
+			&item.ETag,
+			&item.Size,
+			&includeRecordings,
+			&item.Status,
+			&item.LastError,
+			&localDeleted,
+			&archivedAt,
+			&restoredAt,
+			&item.CreatedAt,
+			&item.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		item.IncludeRecordings = includeRecordings == 1
+		item.LocalDeleted = localDeleted == 1
+		if archivedAt.Valid {
+			item.ArchivedAt = archivedAt.Time
+		}
+		if restoredAt.Valid {
+			item.RestoredAt = restoredAt.Time
+		}
 		item.Provider = textutil.FixLegacyUTF8String(item.Provider)
 		item.Bucket = textutil.FixLegacyUTF8String(item.Bucket)
 		item.Endpoint = textutil.FixLegacyUTF8String(item.Endpoint)
