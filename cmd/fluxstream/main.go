@@ -268,6 +268,8 @@ func main() {
 		}
 	}
 	log.Println("[INIT] Analitik izleyici aktif")
+	playerTelemetry := newPlayerTelemetryCollector()
+	log.Println("[INIT] Player QoE telemetrisi aktif")
 
 	// Security
 	tokenSecret := cfg.Get("token_secret", "")
@@ -444,6 +446,45 @@ func main() {
 	webServer.RegisterHandler("/audio/hls/", audioServer.HandleHLSAudio)
 	webServer.RegisterHandler("/audio/dash/", audioServer.HandleDASHAudio)
 	webServer.RegisterHandler("/icecast/", wrapStreamingPlaybackHandler(analyticsTracker, playbackAuth, "icecast", icecastPlaybackKey, audioServer.HandleIcecast))
+	webServer.RegisterHandler("/api/player/telemetry", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			http.Error(w, "Method not allowed", 405)
+			return
+		}
+		var payload playerTelemetryPayload
+		if err := decodeJSON(r, &payload); err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+		if strings.TrimSpace(payload.StreamKey) == "" || strings.TrimSpace(payload.SessionID) == "" {
+			http.Error(w, "stream_key ve session_id gerekli", 400)
+			return
+		}
+		if st, err := db.GetStreamByKey(payload.StreamKey); err == nil && st != nil {
+			playerTelemetry.Record(payload, r.RemoteAddr, r.UserAgent())
+		}
+		w.WriteHeader(http.StatusAccepted)
+	})
+	webServer.RegisterAdminHandler("/api/admin/player/telemetry/stream/", func(w http.ResponseWriter, r *http.Request) {
+		idStr := strings.TrimPrefix(r.URL.Path, "/api/admin/player/telemetry/stream/")
+		var id int64
+		fmt.Sscanf(idStr, "%d", &id)
+		st, err := db.GetStreamByID(id)
+		if err != nil || st == nil {
+			http.Error(w, "Stream bulunamadi", 404)
+			return
+		}
+		if streamManager.IsLive(st.StreamKey) {
+			st.Status = "live"
+		}
+		jsonResp(w, map[string]interface{}{
+			"stream_id":   st.ID,
+			"stream_key":  st.StreamKey,
+			"stream_name": st.Name,
+			"status":      st.Status,
+			"telemetry":   playerTelemetry.Snapshot(st.StreamKey),
+		})
+	})
 	webServer.RegisterAdminHandler("/api/system/restart", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
 			http.Error(w, "Method not allowed", 405)
@@ -722,7 +763,10 @@ func main() {
 			http.Error(w, "Stream bulunamadi", 404)
 			return
 		}
-		jsonResp(w, buildStreamDiagnostics(st, cfg, dataDir, tcManager))
+		payload := buildStreamDiagnostics(st, cfg, dataDir, tcManager)
+		payload["telemetry"] = playerTelemetry.Snapshot(st.StreamKey)
+		payload["live_now"] = streamManager.IsLive(st.StreamKey)
+		jsonResp(w, payload)
 	})
 
 	// Viewer stats API

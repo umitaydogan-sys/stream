@@ -122,9 +122,12 @@ video{width:100%%;height:100%%;object-fit:contain;background:#000}
 const streamKey = %q;
 const queryParams = new URLSearchParams(location.search);
 const preferredFormat = (queryParams.get('format') || %q).toLowerCase();
+const embedded = %t;
 const debugEnabled = queryParams.get('debug') === '1' || queryParams.get('debug') === 'true';
 const autoplay = queryParams.has('autoplay') ? (queryParams.get('autoplay') === '1' || queryParams.get('autoplay') === 'true') : %t;
 const muted = queryParams.has('muted') ? (queryParams.get('muted') === '1' || queryParams.get('muted') === 'true') : %t;
+const telemetryEndpoint = location.origin + '/api/player/telemetry';
+const telemetrySessionKey = 'fluxstream_qoe_' + streamKey;
 const video = document.getElementById('video');
 const offline = document.getElementById('offline');
 const qoeDebug = document.getElementById('qoe-debug');
@@ -146,6 +149,9 @@ let lastErrorMessage = '-';
 let reconnectState = 'idle';
 let retryAt = 0;
 let qoeTimer = null;
+let telemetryTimer = null;
+let telemetryInflight = false;
+let telemetryDirty = false;
 const qoeState = {
   preferredFormat: preferredFormat || 'auto',
   sourceOverride: 'auto',
@@ -161,9 +167,39 @@ const qoeState = {
 video.autoplay = autoplay;
 video.muted = muted;
 
+function createTelemetrySessionID() {
+  try {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+  } catch (e) {}
+  return 'qoe_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+function getTelemetrySessionID() {
+  try {
+    const current = sessionStorage.getItem(telemetrySessionKey);
+    if (current) return current;
+    const created = createTelemetrySessionID();
+    sessionStorage.setItem(telemetrySessionKey, created);
+    return created;
+  } catch (e) {
+    return createTelemetrySessionID();
+  }
+}
+
+const telemetrySessionID = getTelemetrySessionID();
+
 function formatSeconds(value) {
   if (!Number.isFinite(value)) return '-';
   return value.toFixed(1) + 's';
+}
+
+function getBufferedSeconds() {
+  try {
+    if (video.buffered && video.buffered.length) {
+      return Math.max(0, video.buffered.end(video.buffered.length - 1) - (video.currentTime || 0));
+    }
+  } catch (e) {}
+  return 0;
 }
 
 function updateQualityLabel() {
@@ -209,6 +245,57 @@ function renderQOEDebug() {
     '<div class="qoe-debug-row"><span>Hata</span><span>' + qoeState.lastError + '</span></div>';
 }
 
+function buildTelemetryPayload() {
+  updateQualityLabel();
+  return {
+    stream_key: streamKey,
+    session_id: telemetrySessionID,
+    page: embedded ? 'embed' : 'player',
+    preferred_format: preferredFormat || 'auto',
+    active_source_kind: activeSourceKind || '-',
+    source_override: sourceOverride || 'auto',
+    quality: qoeState.quality || '-',
+    playback_seconds: Number(video.currentTime || 0),
+    buffer_seconds: Number(getBufferedSeconds()),
+    stall_count: Number(qoeState.stallCount || 0),
+    recoveries: Number(stallRecoveries || 0),
+    last_error: lastErrorMessage || '-',
+    reconnect: reconnectState || 'idle',
+    offline: !!(offline && offline.style.display !== 'none'),
+    waiting: reconnectState === 'waiting' || reconnectState === 'stalled' || reconnectState === 'retrying' || reconnectState === 'recovering',
+    debug_enabled: debugEnabled
+  };
+}
+
+function sendTelemetry() {
+  if (!streamKey) return;
+  if (telemetryInflight) {
+    telemetryDirty = true;
+    return;
+  }
+  telemetryInflight = true;
+  telemetryDirty = false;
+  fetch(telemetryEndpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    cache: 'no-store',
+    keepalive: true,
+    body: JSON.stringify(buildTelemetryPayload())
+  }).catch(function() {}).finally(function() {
+    telemetryInflight = false;
+    if (telemetryDirty) {
+      telemetryDirty = false;
+      sendTelemetry();
+    }
+  });
+}
+
+function startTelemetryLoop() {
+  if (telemetryTimer) return;
+  sendTelemetry();
+  telemetryTimer = setInterval(sendTelemetry, 5000);
+}
+
 function startQOEDebugLoop() {
   if (!debugEnabled || qoeTimer) return;
   renderQOEDebug();
@@ -218,6 +305,7 @@ function startQOEDebugLoop() {
 function setLastError(message) {
   lastErrorMessage = message || '-';
   renderQOEDebug();
+  sendTelemetry();
 }
 
 function passthroughURL(url) {
@@ -458,6 +546,8 @@ function markReady() {
   renderQOEDebug();
   ensurePlaybackWatchdog();
   startQOEDebugLoop();
+  startTelemetryLoop();
+  sendTelemetry();
   tryAutoplay();
 }
 
@@ -470,6 +560,7 @@ function scheduleRetry() {
   reconnectState = 'retrying';
   cleanupPlayers();
   renderQOEDebug();
+  sendTelemetry();
   retryTimer = setTimeout(function() {
     retryTimer = null;
     reconnectState = 'retry-now';
@@ -482,6 +573,7 @@ function startNative(url) {
   activeSourceKind = 'native';
   reconnectState = 'native';
   renderQOEDebug();
+  sendTelemetry();
   video.src = url;
   video.load();
 }
@@ -495,7 +587,7 @@ function startHLS(url) {
       maxBufferLength: preferredFormat === 'll_hls' ? 12 : 20,
       maxMaxBufferLength: preferredFormat === 'll_hls' ? 20 : 40,
       backBufferLength: 30,
-      startLevel: 0,
+      startLevel: -1,
       abrEwmaDefaultEstimate: preferredFormat === 'll_hls' ? 450000 : 300000,
       abrBandWidthFactor: 0.7,
       abrBandWidthUpFactor: 0.5,
@@ -514,12 +606,14 @@ function startHLS(url) {
       if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
         reconnectState = 'hls-network-retry';
         renderQOEDebug();
+        sendTelemetry();
         hls.startLoad();
         return;
       }
       if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
         reconnectState = 'hls-media-recover';
         renderQOEDebug();
+        sendTelemetry();
         hls.recoverMediaError();
         return;
       }
@@ -560,6 +654,8 @@ async function tryPlay() {
   cleanupPlayers();
   reconnectState = 'probing';
   renderQOEDebug();
+  startTelemetryLoop();
+  sendTelemetry();
   const source = await resolveSource();
   if (source.kind === 'dash') {
     startDASH(source.url);
@@ -588,6 +684,7 @@ video.addEventListener('stalled', function() {
   qoeState.stallCount += 1;
   reconnectState = 'stalled';
   renderQOEDebug();
+  sendTelemetry();
   if (activeSourceKind === 'dash' || preferredFormat === 'dash') {
     tryHLSMasterFallback();
     return;
@@ -600,19 +697,30 @@ video.addEventListener('waiting', function() {
   }
   reconnectState = 'waiting';
   renderQOEDebug();
+  sendTelemetry();
 });
 video.addEventListener('pause', function() {
   if (offline && offline.style.display === 'none') showResumeButton();
   reconnectState = 'paused';
   renderQOEDebug();
+  sendTelemetry();
 });
 video.addEventListener('error', function() {
   setLastError('video:' + ((video.error && video.error.message) || (video.error && video.error.code) || 'unknown'));
+  sendTelemetry();
   scheduleRetry();
+});
+
+window.addEventListener('pagehide', function() {
+  if (!navigator.sendBeacon) return;
+  try {
+    navigator.sendBeacon(telemetryEndpoint, new Blob([JSON.stringify(buildTelemetryPayload())], { type: 'application/json' }));
+  } catch (e) {}
 });
 
 applySkin();
 startQOEDebugLoop();
+startTelemetryLoop();
 tryPlay();
 </script>
 </body>
@@ -624,6 +732,7 @@ tryPlay();
 		footer,
 		streamKey,
 		format,
+		embedded,
 		autoplay,
 		muted,
 	)

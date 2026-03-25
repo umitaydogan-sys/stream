@@ -280,7 +280,7 @@ func (h *Handler) handleVideoData(msg *Message) error {
 	if err != nil {
 		return err
 	}
-	if pkt == nil || pkt.TrackID != 0 {
+	if pkt == nil {
 		return nil
 	}
 	pkt.StreamKey = h.streamKey
@@ -299,7 +299,7 @@ func (h *Handler) handleAudioData(msg *Message) error {
 	if err != nil {
 		return err
 	}
-	if pkt == nil || pkt.TrackID != 0 {
+	if pkt == nil {
 		return nil
 	}
 	pkt.StreamKey = h.streamKey

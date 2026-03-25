@@ -84,6 +84,8 @@ type Manager struct {
 	jobs       map[string]*Job
 	liveJobs   map[string]*Job
 	liveDash   map[string]*Job
+	liveDirect map[string]*liveDirectSession
+	liveBoot   map[string]*liveTrackBootstrap
 	streamOpts map[string]LiveOptions
 	mu         sync.RWMutex
 }
@@ -113,6 +115,8 @@ func NewManager(ffmpegPath string, gpuAccel GPUAccel, outputDir string) *Manager
 		jobs:       make(map[string]*Job),
 		liveJobs:   make(map[string]*Job),
 		liveDash:   make(map[string]*Job),
+		liveDirect: make(map[string]*liveDirectSession),
+		liveBoot:   make(map[string]*liveTrackBootstrap),
 		streamOpts: make(map[string]LiveOptions),
 	}
 }
@@ -476,8 +480,17 @@ func (m *Manager) StopLiveHLS(streamKey string) {
 	if exists {
 		delete(m.liveJobs, streamKey)
 	}
+	direct := m.liveDirect[streamKey]
+	if direct != nil {
+		delete(m.liveDirect, streamKey)
+	}
+	delete(m.liveBoot, streamKey)
 	m.mu.Unlock()
 
+	if direct != nil {
+		direct.close()
+		_ = os.RemoveAll(filepath.Join(m.GetLiveOutputDir(), streamKey))
+	}
 	if !exists {
 		return
 	}
@@ -541,11 +554,27 @@ func (m *Manager) GetJobs() []*Job {
 
 // WriteLivePacket feeds a live packet to an active live HLS job.
 func (m *Manager) WriteLivePacket(streamKey string, pkt *media.Packet) {
+	if pkt == nil {
+		return
+	}
+
+	boot := m.cacheLiveBootstrap(streamKey, pkt)
+	if session := m.getLiveDirectSession(streamKey); session != nil {
+		session.writePacket(pkt)
+		return
+	}
+	if session := m.tryActivateDirectMultitrackSession(streamKey, pkt, boot); session != nil {
+		session.writePacket(pkt)
+		return
+	}
+	if pkt.TrackID != 0 {
+		return
+	}
+
 	m.mu.RLock()
 	job := m.liveJobs[streamKey]
 	m.mu.RUnlock()
-
-	if job == nil || job.packetCh == nil || pkt == nil {
+	if job == nil || job.packetCh == nil {
 		return
 	}
 
@@ -1007,11 +1036,12 @@ func (m *Manager) buildLiveDASHArgs(inputURL, _ string) []string {
 		"-reconnect_streamed", "1",
 		"-reconnect_delay_max", "2",
 		"-i", inputURL,
-		"-map", "0:v:0",
+		// Map every available video representation so OBS multitrack HLS can
+		// flow into DASH as a real multi-representation manifest.
+		"-map", "0:v",
 		"-map", "0:a:0?",
 		"-c:v", "copy",
 		"-tag:v", "avc1",
-		"-b:v", "2500k",
 		"-c:a", "aac",
 		"-b:a", "128k",
 		"-ar", "48000",
@@ -1244,8 +1274,13 @@ func (m *Manager) StopAll() {
 			j.cancel()
 		}
 	}
+	for _, session := range m.liveDirect {
+		session.close()
+	}
 	m.liveJobs = make(map[string]*Job)
 	m.liveDash = make(map[string]*Job)
+	m.liveDirect = make(map[string]*liveDirectSession)
+	m.liveBoot = make(map[string]*liveTrackBootstrap)
 	m.streamOpts = make(map[string]LiveOptions)
 }
 

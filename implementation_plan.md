@@ -114,6 +114,76 @@ Sonraki fazda bu izleri gercek ABR cikislarina baglayacagiz.
 - gerekmiyorsa sunucu tarafi yeniden encode maliyetini dusur
 - transcode ile OBS katmanlari arasinda karma mod ekle
 
+### 5.2.1 Bu Turda Kapanan Parca
+
+Bu turda OBS tarafindan gelen cok kanalli video izleri,
+live HLS override klasorunde dogrudan varyant playlist olarak yazilmaya baslandi.
+
+Yeni davranis:
+
+- `TrackID != 0` paketler artik ingest tarafinda tamamen atilmiyor
+- live transcode katmani bu paketleri bootstrap olarak bellekte tutuyor
+- cok kanalli video algilanirsa `ffmpeg` tabanli tek giris ABR yerine
+  dogrudan multitrack HLS session aktif oluyor
+- birincil OBS video izi kok `index.m3u8` olarak kalirken
+  diger izler alt varyant dizinlerine yaziliyor
+- kok `master.m3u8` bu varyantlari gercek ABR playlist olarak sunuyor
+
+Bu sayede OBS'ten gelen kalite katmanlari ilk kez gercekten
+HLS master playlist tarafina baglanmis oldu.
+
+### 5.2.2 Bu Turda Kapanan Parca
+
+Bu turda multitrack akis sadece HLS tarafinda birakilmadi.
+DASH repack ve player izleme tarafi da buna gore guclendirildi.
+
+Yeni davranis:
+
+- canli DASH repack artik HLS master icindeki tum video izlerini mapliyor
+- boylece OBS multitrack HLS kaynagi varsa DASH manifest tarafinda da
+  coklu representation uretilebiliyor
+- diagnostics ekranina `HLS varyant sayisi` ve
+  `DASH representation sayisi` alanlari eklendi
+- player sayfasi 5 saniyelik heartbeat ile QoE telemetrisi gonderiyor
+- stall, toparlanma, buffer, aktif kaynak, reconnect ve hata bilgisi
+  sunucu tarafinda runtime olarak toplanıyor
+- stream detay ekranina admin tarafinda canli `QoE ve Stall Telemetrisi`
+  karti eklendi
+- admin preview iframe'leri `debug=1` ile acilarak overlay
+  dogrudan panel icinde de gorulebilir hale geldi
+
+Bu sayede bir sonraki OBS testinde sadece "goruntu var mi yok mu"
+degil, HLS ve DASH tarafinda kac katman olustugu ile
+player tarafinda stall davranisinin nasil aktigi da ayni anda izlenebilir.
+
+### 5.2.3 Canli Testte Ortaya Cikan Yeni Durum
+
+Canli VPS testinde OBS multitrack yayininda yeni bir dar bogaz netlesti.
+
+Bugun icin durum soyle:
+
+- kok HLS `index.m3u8` akisi kararlilastirildi
+- player tarafinda siyah ekran ve sahte `offline` dongusu buyuk oranda azaltildi
+- fakat `1080p` multitrack varyanti halen mikro segmentler uretiyor
+- bu varyantta `0.010`, `0.011`, `0.016` saniye gibi bozuk `EXTINF` degerleri goruluyor
+- ayni sorun DASH `SegmentTimeline` tarafina da yansiyor
+- player kalite yukseltince `bufferSeekOverHole` ve `bufferStalledError`
+  hatalariyla tekrar donabiliyor
+
+Bu nedenle gecici guvenli mod uygulandi:
+
+- multitrack direct HLS master playlist su an yalnizca stabil ana kati ilan ediyor
+- player bu sayede bozuk ust kalite varyanta cikamiyor
+- yayin akiciligi korunuyor, fakat tam adaptif cok katman davranisi
+  gecici olarak sinirlanmis oluyor
+
+Bir sonraki teknik hedef artik nettir:
+
+- `1080p` multitrack track icin bozuk segment sinirlarini kokten bul
+- Enhanced RTMP `timestamp / CTS / keyframe` hattini dogrula
+- HLS muxer segment bolme mantigini track bazinda yeniden gozden gecir
+- DASH uretimini bozuk HLS varyantindan etkilenmeyecek hale getir
+
 ### 5.3 Faz 4
 
 - cok izli audio secimi
@@ -129,6 +199,7 @@ Yerelde:
 - yeni Enhanced RTMP parser testleri eklendi
 - `go build ./cmd/fluxstream/` gecti
 - `go build ./cmd/fluxstream-license/` gecti
+- admin panel JS sentaks kontrolu gecti
 
 Windows:
 

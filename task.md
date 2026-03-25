@@ -27,6 +27,17 @@
 - [x] `production_status.md` dosyasini guncelle
 - [x] `implementation_plan.md` dosyasini yeni duruma gore guncelle
 - [x] `task.md` dosyasini yeni duruma gore guncelle
+- [x] OBS multitrack video paketlerini ingest tarafinda tam gecir
+- [x] live transcode katmaninda multitrack bootstrap bellegi ekle
+- [x] OBS multitrack algilaninca dogrudan HLS varyant session ac
+- [x] kok `master.m3u8` dosyasina OBS kaynakli gercek varyantlari yaz
+- [x] cok kanalli ses paketlerini aktif varyantlara dagit
+- [x] canli DASH repack icinde tum video izlerini maple
+- [x] player tarafina heartbeat tabanli QoE telemetrisi ekle
+- [x] admin stream detay ekranina canli QoE karti ekle
+- [x] diagnostics ekranina HLS varyant ve DASH representation sayaci ekle
+- [x] admin preview iframe'lerini `debug=1` ile ac
+- [x] admin panel JS sentaks kontrolu calistir
 
 ## 2. Bu Tur Sonunda Kesinlesen Durum
 
@@ -47,19 +58,33 @@
 - [ ] admin panelde gelen track listesi goster
 - [ ] varsayilan video izi secimi ekle
 - [ ] varsayilan audio izi secimi ekle
-- [ ] player tarafina QoE / stall telemetry katmani ekle
 - [ ] dusuk bant genisligi icin ABR profil merdivenini olcumle optimize et
 
 ## 4. Gercek Multitrack ABR Faz
 
-- [ ] OBS'ten gelen kalite katmanlarini HLS varyantlarina dogrudan bagla
-- [ ] HLS master playlist icinde track kaynakli varyantlar yaz
+- [x] OBS'ten gelen kalite katmanlarini HLS varyantlarina dogrudan bagla
+- [x] HLS master playlist icinde track kaynakli varyantlar yaz
+- [x] DASH repack tarafinda tum video izlerini maple
+- [x] player'in bozuk ust varyanta cikmasini gecici guvenli mod ile engelle
 - [ ] transcode ile OBS varyantlarini karma kullan
 - [ ] gereksiz yeniden encode maliyetini dusur
 - [ ] track bazli bitrate / cozumunurluk analytics'i ekle
 - [ ] cok kanalli audio track secimini player tarafina tasi
+- [ ] `1080p` multitrack varyantinda mikro segment olusma kok nedenini kapat
+- [ ] bozuk `EXTINF` ve DASH `SegmentTimeline` uretimini kalici olarak duzelt
 
-## 5. Urunlestirme ve Lisans
+## 5. QoE ve Telemetri
+
+- [x] player heartbeat telemetrisi topla
+- [x] stall / toparlanma / reconnect bilgisini runtime bellekte sakla
+- [x] admin stream detay ekraninda canli QoE karti goster
+- [x] diagnostics ekraninda multitrack HLS / DASH sayaclarini goster
+- [x] `bufferSeekOverHole` ve `bufferStalledError` davranisini canli testte ayristir
+- [ ] telemetrileri kalici depolamaya al
+- [ ] telemetrileri grafik ve zaman serisi olarak goster
+- [ ] Prometheus / OpenTelemetry cikisi uret
+
+## 6. Urunlestirme ve Lisans
 
 - [x] runtime lisans modeli ABR / RTMPS / recording / branding tarafina baglandi
 - [x] Linux servis yonetimi panel ve CLI tarafinda hazirlandi
@@ -70,7 +95,7 @@
 - [ ] rollback guvenli Linux upgrade akisini sertlestir
 - [ ] `.deb` / paketli Linux dagitimini tamamla
 
-## 6. Arayuz ve Dokumantasyon
+## 7. Arayuz ve Dokumantasyon
 
 - [x] dokuman dosyalarini Turkce tut
 - [ ] admin panelde kalan `de`, `es`, `fr` ceviri eksiklerini kapat
@@ -78,7 +103,7 @@
 - [x] OBS ayar orneklerini yardim ekranina ekle
 - [ ] `production_status.md` dosyasini her ana faz sonunda guncel tut
 
-## 7. Uretim Seviyesi Buyuk Eksikler
+## 8. Uretim Seviyesi Buyuk Eksikler
 
 - [ ] multi-node origin-edge mimarisi
 - [ ] S3 / MinIO archive ve restore akisi
@@ -87,7 +112,7 @@
 - [ ] DRM ve gelismis playback guvenligi
 - [ ] SSAI ve monetizasyon omurgasi
 
-## 8. Cekirdek Tamamlandiktan Sonra
+## 9. Cekirdek Tamamlandiktan Sonra
 
 - [ ] konferans odalari
 - [ ] canli chat
