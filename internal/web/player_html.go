@@ -537,6 +537,7 @@ function markReady() {
     clearTimeout(retryTimer);
     retryTimer = null;
   }
+  lastErrorMessage = '-';
   retryAt = 0;
   video.style.display = 'block';
   if (offline) offline.style.display = 'none';

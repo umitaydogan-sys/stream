@@ -25,6 +25,7 @@ import (
 	"github.com/fluxstream/fluxstream/internal/config"
 	"github.com/fluxstream/fluxstream/internal/storage"
 	"github.com/fluxstream/fluxstream/internal/stream"
+	"github.com/fluxstream/fluxstream/internal/textutil"
 	"github.com/fluxstream/fluxstream/internal/tlsutil"
 )
 
@@ -784,7 +785,7 @@ func jsonError(w http.ResponseWriter, message string, code int) {
 	w.WriteHeader(code)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"error":   true,
-		"message": message,
+		"message": textutil.FixLegacyUTF8String(message),
 	})
 }
 

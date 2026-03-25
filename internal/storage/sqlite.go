@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fluxstream/fluxstream/internal/textutil"
 	_ "modernc.org/sqlite"
 )
 
@@ -475,6 +476,9 @@ func (s *SQLiteDB) UpdateViewerCount(key string, count int) error {
 // ─── Log Operations ──────────────────────────────────────────
 
 func (s *SQLiteDB) AddLog(level, component, message string) error {
+	level = textutil.FixLegacyUTF8String(level)
+	component = textutil.FixLegacyUTF8String(component)
+	message = textutil.FixLegacyUTF8String(message)
 	_, err := s.db.Exec(
 		"INSERT INTO logs (level, component, message) VALUES (?, ?, ?)",
 		level, component, message,
@@ -509,6 +513,9 @@ func (s *SQLiteDB) GetLogs(limit int, level, component string) ([]LogEntry, erro
 		if err := rows.Scan(&l.ID, &l.Level, &l.Component, &l.Message, &l.CreatedAt); err != nil {
 			return nil, err
 		}
+		l.Level = textutil.FixLegacyUTF8String(l.Level)
+		l.Component = textutil.FixLegacyUTF8String(l.Component)
+		l.Message = textutil.FixLegacyUTF8String(l.Message)
 		logs = append(logs, l)
 	}
 	return logs, nil
