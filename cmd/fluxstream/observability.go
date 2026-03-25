@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -105,19 +106,35 @@ func buildQoEAlerts(cfg *config.Manager, streamName string, snapshot playerTelem
 		}
 	}
 
-	alerts := make([]systemAlert, 0, 4)
-	if threshold := cfg.GetInt("alerts_qoe_stalls_threshold", 6); threshold > 0 && maxStalls >= threshold {
+	stallThreshold := cfg.GetInt("alerts_qoe_stalls_threshold", 4)
+	bufferWarn := cfg.GetFloat("alerts_qoe_buffer_warn_seconds", float64(cfg.GetInt("alerts_qoe_buffer_seconds", 1)))
+	bufferCritical := cfg.GetFloat("alerts_qoe_buffer_critical_seconds", math.Max(0.6, bufferWarn*0.5))
+	waitingBase := cfg.GetInt("alerts_qoe_waiting_sessions", 2)
+	waitingRatio := cfg.GetInt("alerts_qoe_waiting_ratio_percent", 35)
+	offlineBase := cfg.GetInt("alerts_qoe_offline_sessions", 1)
+	offlineRatio := cfg.GetInt("alerts_qoe_offline_ratio_percent", 20)
+	transitionRatioThreshold := cfg.GetInt("alerts_qoe_transition_ratio_threshold", 4)
+
+	waitingThreshold := maxInt(waitingBase, int(math.Ceil(float64(snapshot.ActiveSessions)*float64(waitingRatio)/100.0)))
+	offlineThreshold := maxInt(offlineBase, int(math.Ceil(float64(snapshot.ActiveSessions)*float64(offlineRatio)/100.0)))
+
+	alerts := make([]systemAlert, 0, 5)
+	if stallThreshold > 0 && maxStalls >= stallThreshold {
+		level := "warning"
+		if maxStalls >= stallThreshold*2 {
+			level = "critical"
+		}
 		alerts = append(alerts, systemAlert{
-			Level:       "warning",
+			Level:       level,
 			Code:        "qoe_stalls_high",
 			Title:       "QoE stall sayisi yuksek",
 			Description: fmt.Sprintf("%s yayininda tek bir oturumda stall sayisi %d degerine ulasti.", label, maxStalls),
 			Action:      "ABR profilini hafifletin, HLS/DASH cikislarini ve istemci tarafindaki aktif kaliteyi kontrol edin.",
 		})
 	}
-	if threshold := cfg.GetInt("alerts_qoe_buffer_seconds", 1); threshold > 0 && snapshot.AverageBufferSeconds > 0 && snapshot.AverageBufferSeconds <= float64(threshold) {
+	if bufferWarn > 0 && snapshot.AverageBufferSeconds > 0 && snapshot.AverageBufferSeconds <= bufferWarn {
 		level := "warning"
-		if snapshot.AverageBufferSeconds <= 0.4 {
+		if snapshot.AverageBufferSeconds <= bufferCritical {
 			level = "critical"
 		}
 		alerts = append(alerts, systemAlert{
@@ -128,22 +145,31 @@ func buildQoEAlerts(cfg *config.Manager, streamName string, snapshot playerTelem
 			Action:      "Segment suresi, ABR merdiveni ve kaynak CPU kullanimi kontrol edilmeli.",
 		})
 	}
-	if threshold := cfg.GetInt("alerts_qoe_waiting_sessions", 2); threshold > 0 && snapshot.WaitingSessions >= threshold {
+	if waitingThreshold > 0 && snapshot.WaitingSessions >= waitingThreshold {
 		alerts = append(alerts, systemAlert{
 			Level:       "warning",
 			Code:        "qoe_waiting_sessions",
 			Title:       "Bekleyen player oturumlari artti",
-			Description: fmt.Sprintf("%s yayininda %d player bekleme durumunda gorunuyor.", label, snapshot.WaitingSessions),
+			Description: fmt.Sprintf("%s yayininda %d player bekleme durumunda gorunuyor. Esik %d oturum olarak hesaplandi.", label, snapshot.WaitingSessions, waitingThreshold),
 			Action:      "Player QoE paneli ve stream teslimat katmanlari kontrol edilmelidir.",
 		})
 	}
-	if threshold := cfg.GetInt("alerts_qoe_offline_sessions", 1); threshold > 0 && snapshot.OfflineSessions >= threshold {
+	if offlineThreshold > 0 && snapshot.OfflineSessions >= offlineThreshold {
 		alerts = append(alerts, systemAlert{
 			Level:       "warning",
 			Code:        "qoe_offline_sessions",
 			Title:       "Offline gorunen player oturumlari var",
-			Description: fmt.Sprintf("%s yayininda %d player offline ekranina dustu.", label, snapshot.OfflineSessions),
+			Description: fmt.Sprintf("%s yayininda %d player offline ekranina dustu. Esik %d oturum olarak hesaplandi.", label, snapshot.OfflineSessions, offlineThreshold),
 			Action:      "Manifest surekliligi ve istemci fallback davranisi incelenmelidir.",
+		})
+	}
+	if transitionRatioThreshold > 0 && snapshot.ActiveSessions > 0 && snapshot.TotalQualityTransitions >= int64(snapshot.ActiveSessions*transitionRatioThreshold) && snapshot.AverageBufferSeconds > 0 && snapshot.AverageBufferSeconds <= (bufferWarn+0.8) {
+		alerts = append(alerts, systemAlert{
+			Level:       "warning",
+			Code:        "qoe_quality_flapping",
+			Title:       "Kalite gecisleri siklasti",
+			Description: fmt.Sprintf("%s yayininda kalite gecisi sayisi %d oldu. Bu deger aktif oturum sayisina gore yuksek gorunuyor.", label, snapshot.TotalQualityTransitions),
+			Action:      "Dusuk bant profiline gecin, ABR merdivenini hafifletin ve istemcinin hizli yukselmesini sinirlayin.",
 		})
 	}
 	return alerts
@@ -181,6 +207,10 @@ func buildPrometheusMetrics(version string, tracker *analytics.Tracker, streamMg
 	b.WriteString("# TYPE fluxstream_player_average_buffer_seconds gauge\n")
 	b.WriteString("# HELP fluxstream_player_total_stalls Toplam stall sayisi.\n")
 	b.WriteString("# TYPE fluxstream_player_total_stalls gauge\n")
+	b.WriteString("# HELP fluxstream_player_total_quality_transitions Toplam kalite gecisi sayisi.\n")
+	b.WriteString("# TYPE fluxstream_player_total_quality_transitions gauge\n")
+	b.WriteString("# HELP fluxstream_player_total_audio_switches Toplam audio track degisimi sayisi.\n")
+	b.WriteString("# TYPE fluxstream_player_total_audio_switches gauge\n")
 	b.WriteString("# HELP fluxstream_track_bitrate_bps Canli track bitrate degeri.\n")
 	b.WriteString("# TYPE fluxstream_track_bitrate_bps gauge\n")
 	b.WriteString("# HELP fluxstream_track_packets_total Track paket sayisi.\n")
@@ -195,6 +225,8 @@ func buildPrometheusMetrics(version string, tracker *analytics.Tracker, streamMg
 		b.WriteString(fmt.Sprintf("fluxstream_player_offline_sessions{%s} %d\n", labels, item.Telemetry.OfflineSessions))
 		b.WriteString(fmt.Sprintf("fluxstream_player_average_buffer_seconds{%s} %.3f\n", labels, item.Telemetry.AverageBufferSeconds))
 		b.WriteString(fmt.Sprintf("fluxstream_player_total_stalls{%s} %d\n", labels, item.Telemetry.TotalStalls))
+		b.WriteString(fmt.Sprintf("fluxstream_player_total_quality_transitions{%s} %d\n", labels, item.Telemetry.TotalQualityTransitions))
+		b.WriteString(fmt.Sprintf("fluxstream_player_total_audio_switches{%s} %d\n", labels, item.Telemetry.TotalAudioSwitches))
 		for _, track := range item.Tracks.VideoTracks {
 			trackLabels := fmt.Sprintf("%s,kind=%q,track_id=%q,display_label=%q", labels, track.Kind, fmt.Sprintf("%d", track.TrackID), track.DisplayLabel)
 			b.WriteString(fmt.Sprintf("fluxstream_track_bitrate_bps{%s} %d\n", trackLabels, track.Bitrate))
@@ -233,6 +265,8 @@ func buildOpenTelemetryPayload(version string, tracker *analytics.Tracker, strea
 	waitingPoints := make([]map[string]interface{}, 0, len(items))
 	bufferPoints := make([]map[string]interface{}, 0, len(items))
 	stallPoints := make([]map[string]interface{}, 0, len(items))
+	qualityTransitionPoints := make([]map[string]interface{}, 0, len(items))
+	audioSwitchPoints := make([]map[string]interface{}, 0, len(items))
 	trackBitratePoints := make([]map[string]interface{}, 0, len(items)*4)
 	for _, item := range items {
 		attrs := otelAttributes(
@@ -244,6 +278,8 @@ func buildOpenTelemetryPayload(version string, tracker *analytics.Tracker, strea
 		waitingPoints = append(waitingPoints, otelNumberPoint(attrs, nowUnixNano, float64(item.Telemetry.WaitingSessions)))
 		bufferPoints = append(bufferPoints, otelNumberPoint(attrs, nowUnixNano, item.Telemetry.AverageBufferSeconds))
 		stallPoints = append(stallPoints, otelNumberPoint(attrs, nowUnixNano, float64(item.Telemetry.TotalStalls)))
+		qualityTransitionPoints = append(qualityTransitionPoints, otelNumberPoint(attrs, nowUnixNano, float64(item.Telemetry.TotalQualityTransitions)))
+		audioSwitchPoints = append(audioSwitchPoints, otelNumberPoint(attrs, nowUnixNano, float64(item.Telemetry.TotalAudioSwitches)))
 		for _, track := range item.Tracks.VideoTracks {
 			trackBitratePoints = append(trackBitratePoints, otelNumberPoint(otelAttributes(
 				"stream.key", item.StreamKey,
@@ -270,6 +306,8 @@ func buildOpenTelemetryPayload(version string, tracker *analytics.Tracker, strea
 			buildOTELGaugeMetric("fluxstream.player.waiting_sessions", "1", waitingPoints),
 			buildOTELGaugeMetric("fluxstream.player.average_buffer_seconds", "s", bufferPoints),
 			buildOTELGaugeMetric("fluxstream.player.total_stalls", "1", stallPoints),
+			buildOTELGaugeMetric("fluxstream.player.total_quality_transitions", "1", qualityTransitionPoints),
+			buildOTELGaugeMetric("fluxstream.player.total_audio_switches", "1", audioSwitchPoints),
 		)
 	}
 	if len(trackBitratePoints) > 0 {

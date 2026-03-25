@@ -67,6 +67,12 @@ streaming cekirdegi yeterince olgunlastiktan sonra eklenecek.
 - QoE retention, esik tabanli uyarilar ve saglik raporu entegrasyonu aktif
 - Operasyon Merkezi teshis bolumu artik opsiyonel cikislari gereksiz yere kirmizi gostermiyor
 - `Hazir / Bekliyor / Kapali / Opsiyonel / Sorunlu` ayrimi ile daha durust teshis mantigi eklendi
+- DASH preview tarafinda daha stabil buffer, yeniden deneme ve gec fallback mantigi eklendi
+- player telemetrisi kalite gecisi ve audio track degisimi sayaclarini da tasiyor
+- stream detay ve Operasyon Merkezi ekranlari artik kalite gecisi, ses izi degisimi ve secili audio track dagilimini gosterebiliyor
+- QoE uyari esikleri aktif oturum oranina gore daha akilli hesaplanabiliyor
+- dusuk bant icin `resilient` ABR profil seti eklendi, `balanced` ve `mobile` merdivenleri daha korumaci hale getirildi
+- canli dogrulamada HLS master 2 video katmani, DASH MPD ise 2 video + 1 audio representation ile dogrulandi
 
 ## 3. Bu Surecte Neleri Kapatmis Olduk
 
@@ -94,6 +100,8 @@ streaming cekirdegi yeterince olgunlastiktan sonra eklenecek.
 - telemetri ornekleri SQLite icinde kalici olarak saklanmaya baslandi
 - admin stream detay ekranina temel zaman serisi grafikler eklendi
 - stream detay ekraninda canli track listesi ve varsayilan secim karti eklendi
+- kalite gecisi ve ses izi degisimi artik player oturum bazinda raporlanabiliyor
+- telemetry history icinde kalite gecisi ve audio switch trendleri de birikiyor
 
 ### 3.4 Log ve Metin Tarafi
 
@@ -155,10 +163,10 @@ Bugun artik asagidaki maddeler kapanmis sayilmali:
 
 Bugun hala acik olan gercek eksikler ise sunlar:
 
-- DASH tarafinda coklu audio adaptation setinin canli testle dogrulanmasi
-- track bazli kalite gecisi, audio track degisimi ve codec davranisinin raporlastirilmasi
-- QoE alarm esiklerinin gercek saha verisiyle ince ayarlanmasi
-- dusuk bant genisligi icin ABR profil merdiveninin olcumle daha da optimize edilmemis olmasi
+- DASH audio-only cikisi ve audio selector davranisinin farkli oynaticilarla daha genis saha testi
+- kalite gecisi ve audio switch raporlarini uzun sureli raporlama / alarm katmanina baglama
+- ABR profil merdivenlerini gercek trafik ve cihaz verisine gore tekrar ince ayarlama
+- dusuk bant sahalarinda uzun sureli soak test ve canli benchmark calistirma
 
 ## 6. Rakiplere Gore Bugunku Konum
 
@@ -212,14 +220,13 @@ demek icin erken:
 
 Bir sonraki dogru kapatma sirasi bence su:
 
-1. Operasyon Merkezi ekranini canli kullanimla sertlestir
-2. DASH tarafinda coklu audio ve uzun sureli preview davranisini canli testle dogrula
-3. track bazli kalite gecisi, ses izi degisimi ve codec analytics raporlarini ekle
-4. QoE alarm esiklerini saha verisine gore ince ayarla
-5. S3 veya MinIO archive / restore akisini ekle
-6. multi-node origin-edge mimarisini tasarla
-7. RBAC, audit log, SSO ve lisans enforcement tarafini sertlestir
-8. ABR profil merdivenini olcum ve yuk testleriyle optimize et
+1. audio-only DASH ve farkli client davranislarini canli saha testiyle sertlestir
+2. kalite gecisi / audio switch verilerini alarm ve rapor ekranlarina daha derin bagla
+3. Operasyon Merkezi ekranini uzun sureli kullanim ve buyuk stream sayisinda sertlestir
+4. S3 veya MinIO archive / restore akisini ekle
+5. multi-node origin-edge mimarisini tasarla
+6. RBAC, audit log, SSO ve lisans enforcement tarafini sertlestir
+7. ABR profil merdivenini gercek saha benchmarklari ile tekrar optimize et
 
 ## 9. Operasyon Merkezi Fazinin Uygulama Taslagi
 

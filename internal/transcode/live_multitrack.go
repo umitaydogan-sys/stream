@@ -616,6 +616,67 @@ func (s *liveDirectSession) resolveAudioPlaylistPath(trackID uint8) string {
 	return "audio.m3u8"
 }
 
+func (s *liveDirectSession) dashInputPlaylistPaths() ([]string, []string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	type videoItem struct {
+		trackID   uint8
+		path      string
+		bandwidth int
+		height    int
+	}
+	videoItems := make([]videoItem, 0, len(s.variants))
+	for _, variant := range s.variants {
+		if variant == nil {
+			continue
+		}
+		target := filepath.Join(s.outputDir, filepath.FromSlash(variant.playlistPath))
+		if !playlistReady(target) {
+			continue
+		}
+		videoItems = append(videoItems, videoItem{
+			trackID:   variant.trackID,
+			path:      variant.playlistPath,
+			bandwidth: variant.bandwidthEstimate(),
+			height:    variant.height,
+		})
+	}
+	sort.Slice(videoItems, func(i, j int) bool {
+		if videoItems[i].bandwidth == videoItems[j].bandwidth {
+			if videoItems[i].height == videoItems[j].height {
+				return videoItems[i].trackID < videoItems[j].trackID
+			}
+			return videoItems[i].height < videoItems[j].height
+		}
+		return videoItems[i].bandwidth < videoItems[j].bandwidth
+	})
+
+	audioItems := make([]string, 0, len(s.audioVariants))
+	trackIDs := make([]int, 0, len(s.audioVariants))
+	for trackID := range s.audioVariants {
+		trackIDs = append(trackIDs, int(trackID))
+	}
+	sort.Ints(trackIDs)
+	for _, rawTrackID := range trackIDs {
+		variant := s.audioVariants[uint8(rawTrackID)]
+		if variant == nil {
+			continue
+		}
+		target := filepath.Join(s.outputDir, filepath.FromSlash(variant.playlistPath))
+		if !playlistReady(target) {
+			continue
+		}
+		audioItems = append(audioItems, variant.playlistPath)
+	}
+
+	videoPaths := make([]string, 0, len(videoItems))
+	for _, item := range videoItems {
+		videoPaths = append(videoPaths, item.path)
+	}
+	return videoPaths, audioItems
+}
+
 func playlistLooksStable(path string) bool {
 	data, err := os.ReadFile(path)
 	if err != nil {

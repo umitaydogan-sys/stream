@@ -75,6 +75,11 @@ type liveTimestampState struct {
 	audioStarted    bool
 }
 
+type liveDASHInputs struct {
+	Video []string
+	Audio []string
+}
+
 // Manager manages FFmpeg transcoding
 type Manager struct {
 	ffmpegPath string
@@ -95,10 +100,10 @@ type Manager struct {
 // DefaultProfiles returns standard ABR profiles
 func DefaultProfiles() []Profile {
 	return []Profile{
-		{Name: "1080p", Width: 1920, Height: 1080, Bitrate: "4500k", MaxBitrate: "5000k", BufSize: "9000k", Preset: "fast", FPS: 30, AudioRate: "192k"},
-		{Name: "720p", Width: 1280, Height: 720, Bitrate: "2500k", MaxBitrate: "3000k", BufSize: "5000k", Preset: "fast", FPS: 30, AudioRate: "128k"},
-		{Name: "480p", Width: 854, Height: 480, Bitrate: "1000k", MaxBitrate: "1200k", BufSize: "2000k", Preset: "fast", FPS: 30, AudioRate: "96k"},
-		{Name: "360p", Width: 640, Height: 360, Bitrate: "600k", MaxBitrate: "700k", BufSize: "1200k", Preset: "fast", FPS: 25, AudioRate: "64k"},
+		{Name: "1080p", Width: 1920, Height: 1080, Bitrate: "3600k", MaxBitrate: "4200k", BufSize: "7200k", Preset: "fast", FPS: 30, AudioRate: "160k"},
+		{Name: "720p", Width: 1280, Height: 720, Bitrate: "1900k", MaxBitrate: "2300k", BufSize: "3800k", Preset: "fast", FPS: 30, AudioRate: "128k"},
+		{Name: "480p", Width: 854, Height: 480, Bitrate: "900k", MaxBitrate: "1100k", BufSize: "1800k", Preset: "fast", FPS: 30, AudioRate: "96k"},
+		{Name: "360p", Width: 640, Height: 360, Bitrate: "450k", MaxBitrate: "600k", BufSize: "900k", Preset: "fast", FPS: 24, AudioRate: "64k"},
 	}
 }
 
@@ -1030,34 +1035,74 @@ func sanitizeProfileName(name string) string {
 	return b.String()
 }
 
-func (m *Manager) buildLiveDASHArgs(inputURL, _ string) []string {
-	return []string{
+func (m *Manager) buildLiveDASHArgs(inputs liveDASHInputs, _ string) []string {
+	appendInput := func(args []string, inputURL string) []string {
+		return append(args,
+			"-user_agent", "FluxStreamInternal/2.0",
+			"-fflags", "+genpts+igndts+discardcorrupt",
+			"-thread_queue_size", "8192",
+			"-probesize", "4M",
+			"-analyzeduration", "4M",
+			"-reconnect", "1",
+			"-reconnect_streamed", "1",
+			"-reconnect_on_network_error", "1",
+			"-reconnect_delay_max", "2",
+			"-i", inputURL,
+		)
+	}
+
+	args := []string{
 		"-hide_banner",
 		"-loglevel", "warning",
-		"-user_agent", "FluxStreamInternal/2.0",
-		"-fflags", "+genpts+igndts+discardcorrupt",
-		"-reconnect", "1",
-		"-reconnect_streamed", "1",
-		"-reconnect_delay_max", "2",
-		"-i", inputURL,
-		// Map every available video representation so OBS multitrack HLS can
-		// flow into DASH as a real multi-representation manifest.
-		"-map", "0:v",
-		"-map", "0:a:0?",
+	}
+
+	if len(inputs.Video) == 0 && len(inputs.Audio) == 0 {
+		return args
+	}
+
+	if len(inputs.Video) <= 1 && len(inputs.Audio) == 0 {
+		args = appendInput(args, inputs.Video[0])
+		args = append(args,
+			"-map", "0:v",
+			"-map", "0:a?",
+		)
+	} else {
+		for _, inputURL := range inputs.Video {
+			args = appendInput(args, inputURL)
+		}
+		for _, inputURL := range inputs.Audio {
+			args = appendInput(args, inputURL)
+		}
+		for i := range inputs.Video {
+			args = append(args, "-map", fmt.Sprintf("%d:v:0", i))
+		}
+		audioOffset := len(inputs.Video)
+		for i := range inputs.Audio {
+			args = append(args, "-map", fmt.Sprintf("%d:a:0", audioOffset+i))
+		}
+	}
+
+	args = append(args,
 		"-c:v", "copy",
 		"-tag:v", "avc1",
-		"-c:a", "aac",
-		"-b:a", "128k",
-		"-ar", "48000",
-		"-ac", "2",
-		"-af", "aresample=async=1:min_hard_comp=0.100:first_pts=0,asetpts=N/SR/TB",
+	)
+	if len(inputs.Audio) > 0 || len(inputs.Video) <= 1 {
+		args = append(args,
+			"-c:a", "aac",
+			"-b:a", "128k",
+			"-ar", "48000",
+			"-ac", "2",
+			"-af", "aresample=async=1:min_hard_comp=0.100:first_pts=0,asetpts=N/SR/TB",
+		)
+	}
+	args = append(args,
 		"-avoid_negative_ts", "make_zero",
 		"-f", "dash",
 		"-seg_duration", "2",
 		"-streaming", "1",
 		"-remove_at_exit", "0",
-		"-window_size", "6",
-		"-extra_window_size", "0",
+		"-window_size", "8",
+		"-extra_window_size", "2",
 		"-use_template", "1",
 		"-use_timeline", "0",
 		"-ldash", "1",
@@ -1065,7 +1110,8 @@ func (m *Manager) buildLiveDASHArgs(inputURL, _ string) []string {
 		"-init_seg_name", "init-$RepresentationID$.m4s",
 		"-media_seg_name", "chunk-$RepresentationID$-$Number%05d$.m4s",
 		"manifest.mpd",
-	}
+	)
+	return args
 }
 
 func cleanupLiveOutputDir(dir string) {
@@ -1236,15 +1282,15 @@ func (m *Manager) configureLiveDASHCommand(job *Job) error {
 	if err != nil {
 		return err
 	}
-	inputURL := m.GetLiveManifestURL(job.StreamKey)
-	if inputURL == "" {
+	inputs := m.resolveLiveDASHInputs(job.StreamKey)
+	if len(inputs.Video) == 0 && len(inputs.Audio) == 0 {
 		return fmt.Errorf("hazir live hls girisi bulunamadi")
 	}
 	ctx := job.ctx
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	args := m.buildLiveDASHArgs(inputURL, job.OutputDir)
+	args := m.buildLiveDASHArgs(inputs, job.OutputDir)
 	cmd := exec.CommandContext(ctx, ffPath, args...)
 	cmd.Dir = job.OutputDir
 	if job.logFile != nil {
@@ -1256,6 +1302,58 @@ func (m *Manager) configureLiveDASHCommand(job *Job) error {
 	}
 	job.cmd = cmd
 	return nil
+}
+
+func (m *Manager) resolveLiveDASHInputs(streamKey string) liveDASHInputs {
+	if m.httpPort <= 0 {
+		return liveDASHInputs{}
+	}
+	streamKey = strings.TrimSpace(streamKey)
+	if streamKey == "" {
+		return liveDASHInputs{}
+	}
+
+	m.mu.RLock()
+	direct := m.liveDirect[streamKey]
+	m.mu.RUnlock()
+
+	if direct != nil {
+		videoPaths, audioPaths := direct.dashInputPlaylistPaths()
+		inputs := liveDASHInputs{
+			Video: make([]string, 0, len(videoPaths)),
+			Audio: make([]string, 0, len(audioPaths)),
+		}
+		for _, path := range videoPaths {
+			if url := m.buildLocalLivePlaylistURL(streamKey, path); url != "" {
+				inputs.Video = append(inputs.Video, url)
+			}
+		}
+		for _, path := range audioPaths {
+			if url := m.buildLocalLivePlaylistURL(streamKey, path); url != "" {
+				inputs.Audio = append(inputs.Audio, url)
+			}
+		}
+		if len(inputs.Video) > 0 {
+			return inputs
+		}
+	}
+
+	if url := m.GetLiveManifestURL(streamKey); url != "" {
+		return liveDASHInputs{Video: []string{url}}
+	}
+	return liveDASHInputs{}
+}
+
+func (m *Manager) buildLocalLivePlaylistURL(streamKey, playlistPath string) string {
+	if m.httpPort <= 0 {
+		return ""
+	}
+	streamKey = strings.TrimSpace(streamKey)
+	playlistPath = strings.TrimLeft(filepath.ToSlash(strings.TrimSpace(playlistPath)), "/")
+	if streamKey == "" || playlistPath == "" {
+		return ""
+	}
+	return fmt.Sprintf("http://127.0.0.1:%d/hls/%s/%s", m.httpPort, streamKey, playlistPath)
 }
 
 func playlistReady(path string) bool {

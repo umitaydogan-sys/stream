@@ -8,12 +8,12 @@ FluxStream artik prototip seviyesini asti.
 Bugun itibariyla tek sunucuda kurulabilen, admin paneli olan,
 cok protokollu ingest alabilen, HLS ve DASH dagitabilen,
 OBS multitrack ile calisabilen, player/embed/template uretebilen
-ve temel operasyon gozlugu sunan bir medya sunucusu haline geldi.
+ve operasyon merkezi sunan bir medya sunucusu haline geldi.
 
 Kisa karar:
 
 - tek node webcast, kurum ici TV, radyo ve markali player dagitimi icin kullanilabilir seviyede
-- ama tam enterprise, clusterli ve cok node’lu dagitim urunu demek icin hala erken
+- ama tam enterprise, clusterli ve cok node'lu dagitim urunu demek icin hala erken
 
 ## 2. Bugun Production'a En Yakin Alanlar
 
@@ -38,17 +38,17 @@ Bu tur itibariyla:
 - OBS normal RTMP baglantisi calisiyor
 - OBS `Cok kanalli Video` baglantisi calisiyor
 - multitrack video katmanlari HLS varyantlarina baglanabiliyor
-- DASH representation uretimi calisiyor
-- RTMP chunk timestamp kok nedeni kapatildigi icin mikro segment sorunu temizlendi
-- panelde OBS icin kopyalanabilir JSON ve kurulum rehberi var
-- varsayilan video ve audio track secimi policy ve runtime seviyesinde uygulanabiliyor
 - HLS master alternate-audio group uretebiliyor
+- DASH preview daha gec fallback yapan ve uzun izleme icin daha stabil ayarlarla calisiyor
+- player QoE telemetrisi kalite gecisi ve audio switch sayaclarini da topluyor
+- canli dogrulamada DASH MPD artik 2 video + 1 audio representation uretiyor
+- varsayilan video ve audio track secimi policy ve runtime seviyesinde uygulanabiliyor
 - player tarafinda audio track secici cikabiliyor
 
 Karar:
 
-- OBS multitrack artik “ilk faz demo” degil, gercek urun omurgasina yaklasti
-- ama DASH tarafinda coklu audio uyumunun saha testi ve daha genis codec denemesi hala gerekli
+- OBS multitrack artik ilk faz demo degil, gercek urun omurgasina yaklasti
+- ama audio-only DASH davranisi ve daha genis codec / oynatici saha testi hala gerekli
 
 ### 2.3 Yonetim ve Operasyon
 
@@ -64,7 +64,7 @@ Bugun elde olanlar:
 - kullanim ve tanilama rehberleri
 - runtime lisans modeli
 - backup omurgasi
-- Linux servis ve temiz kurulum akisi
+- Linux servis ve deploy akisi
 
 Karar:
 
@@ -80,6 +80,7 @@ Kapananlar:
 - template preview hizalama
 - framing, `403` ve sahte `offline` sorunlari
 - MP4 preview davranisinin panelde daha dogru konumlandirilmasi
+- DASH preview icin daha stabil retry ve fallback mantigi
 
 ### 3.2 QoE ve Observability
 
@@ -90,10 +91,11 @@ Kapananlar:
 - SQLite kalici telemetry ornekleri
 - stream detay ve Operasyon Merkezi grafik kartlari
 - track bazli bitrate / runtime ornekleri
+- kalite gecisi ve ses izi degisimi raporlari
 - Prometheus `/metrics` cikisi
 - OTel-benzeri `/api/observability/otel` cikisi
 - retention cleanup
-- esik tabanli QoE uyari mantigi
+- aktif oturum oranina gore ayarlanan daha akilli QoE esikleri
 - Teshis ekraninda opsiyonel cikislari gereksiz kirmizi gostermeyen daha dogru durum mantigi
 
 ### 3.3 Linux Urunlestirme
@@ -102,22 +104,20 @@ Kapananlar:
 
 - systemd servisi
 - servis kullanicisi ile calisma
-- temiz kurulum akisi
-- `api/health` ile saglik dogrulamasi
-- `api/setup/status` ile sifir kurulum dogrulamasi
+- health endpoint ile servis dogrulamasi
+- canli binary degistirip servis restart etme akisi
 
 Karar:
 
-- Linux tarafinda artik “kur, kontrol et, test et” akisi tekrar edilebilir durumda
+- Linux tarafinda artik kur, deploy et, health kontrolu al akisi tekrar edilebilir durumda
 
 ## 4. Bugun Hala Beta veya Sertlestirme Gerektiren Alanlar
 
 Asagidaki basliklar henuz tam production-ready degil:
 
-- DASH tarafinda coklu audio uyumunun canli saha dogrulamasi
-- track bazli kalite gecisi ve audio track secim raporlari
-- alarm esiklerinin gercek saha verisine gore ince ayari
-- dusuk bant genisligi icin ABR profil merdiveni optimizasyonu
+- audio-only DASH davranisinin farkli client'larda saha dogrulamasi
+- kalite gecisi ve audio switch verisinin daha derin alarm / rapor katmanina baglanmasi
+- dusuk bant genisligi icin ABR profil merdiveninin daha uzun benchmarklarla tekrar optimizasyonu
 - multi-node origin-edge cluster mimarisi
 - S3 veya MinIO archive / restore akisi
 - RBAC, audit log ve SSO
@@ -144,13 +144,14 @@ Host:
 - systemd servis: `fluxstream`
 - servis durumu: `active`
 - health: `http://127.0.0.1:8844/api/health` -> `{"status":"ok","version":"2.0.0"}`
-- setup durumu: `http://127.0.0.1:8844/api/setup/status` -> `{"language":"tr","setup_completed":false}`
-- temiz kurulum tekrar yapildi
+- canli deploy hash: `f9f54483229f3c04379efb436a8f6fc468d9a09b283665cc2b8352acfd5f290c`
+- canli dogrulama: HLS master `2` video katmani, DASH MPD `3` representation (2 video + 1 audio)
+- yayin dogrulamasi: `test / live_14957742f633b59863173e5a` stream'i ile kontrol edildi
 
 Karar:
 
-- temiz Linux kurulum senaryosu calisiyor
-- sistem sifirdan yeniden test edilmeye hazir durumda
+- canli deploy ve servis guncelleme akisi calisiyor
+- DASH/HLS multitrack zinciri artik sahada daha guven verici durumda
 
 ## 6. Rakiplere Gore Bugunku Konum
 
@@ -160,7 +161,7 @@ FluxStream'in bugun guclu oldugu taraflar:
 - ayni urunde admin paneli + stream CRUD + embed + template + operasyon merkezi
 - zengin output matrisi ve ses cikis cesitliligi
 - OBS multitrack icin panel destekli kullanim rehberi
-- tek node urunlesme hissi veren pratik kurulum ve yönetim akisi
+- tek node urunlesme hissi veren pratik kurulum ve yonetim akisi
 
 FluxStream'in bugun zayif oldugu taraflar:
 
@@ -174,8 +175,8 @@ FluxStream'in bugun zayif oldugu taraflar:
 
 Benim bugunku gorusum su:
 
-Evet, FluxStream artik “iyi bir medya sunucusu” oldu.
-Hatta bugun icin daha dogru tanim:
+Evet, FluxStream artik iyi bir medya sunucusu oldu.
+Daha dogru tanim:
 
 - iyi bir tek-node medya sunucusu
 - urunlesmis bir yayin cekirdegi
@@ -190,7 +191,7 @@ Su alanlar icin artik ciddi bicimde kullanilabilir:
 
 Ama bugun hala su cumleyi kurmam:
 
-- “Wowza / Ant / Red5 / Nimble sinifinda tam enterprise dengi oldu”
+- Wowza / Ant / Red5 / Nimble sinifinda tam enterprise dengi oldu
 
 Bunu demek icin su basliklarin kapanmasi gerekiyor:
 
@@ -204,10 +205,9 @@ Bunu demek icin su basliklarin kapanmasi gerekiyor:
 
 Bana gore bundan sonraki en mantikli sira su:
 
-1. DASH coklu audio ve uzun sureli preview davranisini canli testle sertlestir
-2. track bazli kalite gecisi ve ses izi degisimi raporlarini ekle
-3. QoE alarm esiklerini saha verisine gore ince ayarla
-4. ABR profil merdivenini dusuk bant icin optimize et
-5. S3 / MinIO archive ve restore akisini getir
-6. multi-node origin-edge mimarisini tasarla
-7. RBAC, audit log ve SSO katmanini ekle
+1. audio-only DASH davranisini farkli client'larda canli testle sertlestir
+2. kalite gecisi ve audio switch verisini alarm / rapor ekranlarina daha derin bagla
+3. Operasyon Merkezi'ni buyuk stream sayisi ve uzun oturumlarla sertlestir
+4. S3 / MinIO archive ve restore akisini getir
+5. multi-node origin-edge mimarisini tasarla
+6. RBAC, audit log ve SSO katmanini ekle

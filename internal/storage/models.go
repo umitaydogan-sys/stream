@@ -139,21 +139,25 @@ type AnalyticsSnapshot struct {
 
 // PlayerTelemetrySample stores a persisted QoE snapshot for a stream.
 type PlayerTelemetrySample struct {
-	ID                     int64     `json:"id"`
-	StreamKey              string    `json:"stream_key"`
-	ActiveSessions         int       `json:"active_sessions"`
-	WaitingSessions        int       `json:"waiting_sessions"`
-	OfflineSessions        int       `json:"offline_sessions"`
-	DebugSessions          int       `json:"debug_sessions"`
-	TotalStalls            int64     `json:"total_stalls"`
-	TotalRecoveries        int64     `json:"total_recoveries"`
-	AverageBufferSeconds   float64   `json:"average_buffer_seconds"`
-	AveragePlaybackSeconds float64   `json:"average_playback_seconds"`
-	LastError              string    `json:"last_error"`
-	SourcesJSON            string    `json:"sources_json"`
-	FormatsJSON            string    `json:"formats_json"`
-	PagesJSON              string    `json:"pages_json"`
-	CreatedAt              time.Time `json:"created_at"`
+	ID                      int64     `json:"id"`
+	StreamKey               string    `json:"stream_key"`
+	ActiveSessions          int       `json:"active_sessions"`
+	WaitingSessions         int       `json:"waiting_sessions"`
+	OfflineSessions         int       `json:"offline_sessions"`
+	DebugSessions           int       `json:"debug_sessions"`
+	TotalStalls             int64     `json:"total_stalls"`
+	TotalRecoveries         int64     `json:"total_recoveries"`
+	TotalQualityTransitions int64     `json:"total_quality_transitions"`
+	TotalAudioSwitches      int64     `json:"total_audio_switches"`
+	AverageBufferSeconds    float64   `json:"average_buffer_seconds"`
+	AveragePlaybackSeconds  float64   `json:"average_playback_seconds"`
+	LastError               string    `json:"last_error"`
+	SourcesJSON             string    `json:"sources_json"`
+	FormatsJSON             string    `json:"formats_json"`
+	PagesJSON               string    `json:"pages_json"`
+	QualitiesJSON           string    `json:"qualities_json"`
+	AudioTracksJSON         string    `json:"audio_tracks_json"`
+	CreatedAt               time.Time `json:"created_at"`
 }
 
 // TrackTelemetrySample stores a persisted bitrate and runtime snapshot for a live track.

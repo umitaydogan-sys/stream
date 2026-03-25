@@ -51,10 +51,10 @@
 - [x] mevcut `Kullanim ve Tanilama Rehberi`, `QoE ve Stall Telemetrisi` ve `Canli Track` kartlarini bu yeni merkeze daha gelismis sekilde tasi
 - [x] `MP4 preview fix` isini ayni fazda kapat
 - [x] Teshis ekraninda opsiyonel cikislari gereksiz `Sorunlu` gostermeyen akilli durum etiketlerini ekle
-- [ ] DASH preview fallback davranisini uzun canli testte yeniden dogrula
+- [x] DASH preview fallback davranisini uzun canli testte yeniden dogrula
 - [x] multitrack audio secimini son kullanici player tarafina tasi
 - [x] HLS alternate audio group yapisini ekle
-- [ ] dusuk bant genisligi icin ABR profil merdivenini olcumle optimize et
+- [x] dusuk bant genisligi icin ABR profil merdivenini olcumle optimize et
 
 ## 5. QoE ve Gozlemlenebilirlik
 
@@ -71,9 +71,9 @@
 - [x] Prometheus / OpenTelemetry cikisi uret
 - [x] retention, alarm ve esik tabanli QoE uyarilari ekle
 - [x] Teshis ekraninda `Hazir / Bekliyor / Kapali / Opsiyonel / Sorunlu` ayrimini ekle
-- [ ] DASH tarafinda coklu audio adaptation setini canli testle dogrula
-- [ ] alarm esiklerini gercek saha verisine gore ince ayarla
-- [ ] track bazli kalite gecisi ve ses izi degisimi raporunu ekle
+- [x] DASH tarafinda coklu audio adaptation setini canli testle dogrula
+- [x] alarm esiklerini gercek saha verisine gore ince ayarla
+- [x] track bazli kalite gecisi ve ses izi degisimi raporunu ekle
 
 ## 6. Urunlestirme ve Lisans
 
@@ -93,13 +93,13 @@
 - [x] multitrack ingest icin panelde kopyalanabilir JSON ver
 - [x] `Operasyon Merkezi` icin rehber metinleri ve kullanim aciklamalarini ekle
 - [ ] admin panelde kalan `de`, `es`, `fr` ceviri eksiklerini kapat
-- [ ] `production_status.md` dosyasini yeni milestone'a gore guncelle
+- [x] `production_status.md` dosyasini yeni milestone'a gore guncelle
 
 ## 8. Uretim Seviyesi Buyuk Eksikler
 
 - [ ] multi-node origin-edge mimarisi
 - [ ] S3 / MinIO archive ve restore akisi
-- [ ] Prometheus / OpenTelemetry / alarm sistemi
+- [x] Prometheus / OpenTelemetry / alarm sistemi
 - [ ] RBAC, audit log ve SSO
 - [ ] DRM ve gelismis playback guvenligi
 - [ ] SSAI ve monetizasyon omurgasi

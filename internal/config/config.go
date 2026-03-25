@@ -21,15 +21,21 @@ func NewManager(db *storage.SQLiteDB) *Manager {
 func (m *Manager) LoadDefaults() error {
 	defaultABRProfiles, _ := json.Marshal(map[string][]map[string]interface{}{
 		"balanced": {
-			{"name": "1080p", "width": 1920, "height": 1080, "bitrate": "4500k", "max_bitrate": "5000k", "buf_size": "9000k", "preset": "fast", "fps": 30, "audio_rate": "192k"},
-			{"name": "720p", "width": 1280, "height": 720, "bitrate": "2500k", "max_bitrate": "3000k", "buf_size": "5000k", "preset": "fast", "fps": 30, "audio_rate": "128k"},
-			{"name": "480p", "width": 854, "height": 480, "bitrate": "1000k", "max_bitrate": "1200k", "buf_size": "2000k", "preset": "fast", "fps": 30, "audio_rate": "96k"},
-			{"name": "360p", "width": 640, "height": 360, "bitrate": "600k", "max_bitrate": "700k", "buf_size": "1200k", "preset": "fast", "fps": 25, "audio_rate": "64k"},
+			{"name": "1080p", "width": 1920, "height": 1080, "bitrate": "3600k", "max_bitrate": "4200k", "buf_size": "7200k", "preset": "fast", "fps": 30, "audio_rate": "160k"},
+			{"name": "720p", "width": 1280, "height": 720, "bitrate": "1900k", "max_bitrate": "2300k", "buf_size": "3800k", "preset": "fast", "fps": 30, "audio_rate": "128k"},
+			{"name": "480p", "width": 854, "height": 480, "bitrate": "900k", "max_bitrate": "1100k", "buf_size": "1800k", "preset": "fast", "fps": 30, "audio_rate": "96k"},
+			{"name": "360p", "width": 640, "height": 360, "bitrate": "450k", "max_bitrate": "600k", "buf_size": "900k", "preset": "fast", "fps": 24, "audio_rate": "64k"},
 		},
 		"mobile": {
-			{"name": "720p", "width": 1280, "height": 720, "bitrate": "1800k", "max_bitrate": "2200k", "buf_size": "3600k", "preset": "fast", "fps": 30, "audio_rate": "128k"},
-			{"name": "480p", "width": 854, "height": 480, "bitrate": "900k", "max_bitrate": "1100k", "buf_size": "1800k", "preset": "fast", "fps": 30, "audio_rate": "96k"},
-			{"name": "360p", "width": 640, "height": 360, "bitrate": "500k", "max_bitrate": "650k", "buf_size": "1000k", "preset": "fast", "fps": 25, "audio_rate": "64k"},
+			{"name": "720p", "width": 1280, "height": 720, "bitrate": "1400k", "max_bitrate": "1700k", "buf_size": "2800k", "preset": "fast", "fps": 30, "audio_rate": "128k"},
+			{"name": "480p", "width": 854, "height": 480, "bitrate": "700k", "max_bitrate": "900k", "buf_size": "1400k", "preset": "fast", "fps": 25, "audio_rate": "96k"},
+			{"name": "360p", "width": 640, "height": 360, "bitrate": "380k", "max_bitrate": "520k", "buf_size": "760k", "preset": "fast", "fps": 24, "audio_rate": "64k"},
+			{"name": "240p", "width": 426, "height": 240, "bitrate": "220k", "max_bitrate": "320k", "buf_size": "440k", "preset": "fast", "fps": 20, "audio_rate": "48k"},
+		},
+		"resilient": {
+			{"name": "540p", "width": 960, "height": 540, "bitrate": "1000k", "max_bitrate": "1200k", "buf_size": "2000k", "preset": "fast", "fps": 25, "audio_rate": "96k"},
+			{"name": "360p", "width": 640, "height": 360, "bitrate": "420k", "max_bitrate": "560k", "buf_size": "840k", "preset": "fast", "fps": 24, "audio_rate": "64k"},
+			{"name": "240p", "width": 426, "height": 240, "bitrate": "240k", "max_bitrate": "340k", "buf_size": "480k", "preset": "fast", "fps": 20, "audio_rate": "48k"},
 		},
 		"radio": {
 			{"name": "audio", "width": 0, "height": 0, "bitrate": "0", "max_bitrate": "0", "buf_size": "0", "preset": "fast", "fps": 0, "audio_rate": "128k"},
@@ -191,22 +197,27 @@ func (m *Manager) LoadDefaults() error {
 		"embed_use_https":  {"false", "embed"},
 
 		// Analytics / Health / Diagnostics
-		"analytics_persist_enabled":       {"true", "analytics"},
-		"analytics_snapshot_interval":     {"60", "analytics"},
-		"track_analytics_enabled":         {"true", "analytics"},
-		"track_analytics_interval":        {"20", "analytics"},
-		"player_telemetry_retention_days": {"30", "analytics"},
-		"track_analytics_retention_days":  {"30", "analytics"},
-		"alerts_enabled":                  {"true", "health"},
-		"alerts_disk_threshold_gb":        {"5", "health"},
-		"alerts_memory_threshold_mb":      {"2048", "health"},
-		"alerts_cert_days":                {"21", "health"},
-		"alerts_qoe_stalls_threshold":     {"6", "health"},
-		"alerts_qoe_buffer_seconds":       {"1", "health"},
-		"alerts_qoe_waiting_sessions":     {"2", "health"},
-		"alerts_qoe_offline_sessions":     {"1", "health"},
-		"diagnostics_enabled":             {"true", "health"},
-		"guided_mode_enabled":             {"true", "general"},
+		"analytics_persist_enabled":             {"true", "analytics"},
+		"analytics_snapshot_interval":           {"60", "analytics"},
+		"track_analytics_enabled":               {"true", "analytics"},
+		"track_analytics_interval":              {"20", "analytics"},
+		"player_telemetry_retention_days":       {"30", "analytics"},
+		"track_analytics_retention_days":        {"30", "analytics"},
+		"alerts_enabled":                        {"true", "health"},
+		"alerts_disk_threshold_gb":              {"5", "health"},
+		"alerts_memory_threshold_mb":            {"2048", "health"},
+		"alerts_cert_days":                      {"21", "health"},
+		"alerts_qoe_stalls_threshold":           {"4", "health"},
+		"alerts_qoe_buffer_seconds":             {"1", "health"},
+		"alerts_qoe_buffer_warn_seconds":        {"1.4", "health"},
+		"alerts_qoe_buffer_critical_seconds":    {"0.7", "health"},
+		"alerts_qoe_waiting_sessions":           {"2", "health"},
+		"alerts_qoe_waiting_ratio_percent":      {"35", "health"},
+		"alerts_qoe_offline_sessions":           {"1", "health"},
+		"alerts_qoe_offline_ratio_percent":      {"20", "health"},
+		"alerts_qoe_transition_ratio_threshold": {"4", "health"},
+		"diagnostics_enabled":                   {"true", "health"},
+		"guided_mode_enabled":                   {"true", "general"},
 	}
 
 	for key, d := range defaults {
@@ -241,6 +252,19 @@ func (m *Manager) GetInt(key string, defaultVal int) int {
 		return defaultVal
 	}
 	n, err := strconv.Atoi(val)
+	if err != nil {
+		return defaultVal
+	}
+	return n
+}
+
+// GetFloat returns a config value as float64.
+func (m *Manager) GetFloat(key string, defaultVal float64) float64 {
+	val := m.Get(key, "")
+	if val == "" {
+		return defaultVal
+	}
+	n, err := strconv.ParseFloat(val, 64)
 	if err != nil {
 		return defaultVal
 	}

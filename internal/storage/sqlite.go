@@ -158,12 +158,16 @@ func (s *SQLiteDB) migrate() error {
 			debug_sessions INTEGER DEFAULT 0,
 			total_stalls INTEGER DEFAULT 0,
 			total_recoveries INTEGER DEFAULT 0,
+			total_quality_transitions INTEGER DEFAULT 0,
+			total_audio_switches INTEGER DEFAULT 0,
 			average_buffer_seconds REAL DEFAULT 0,
 			average_playback_seconds REAL DEFAULT 0,
 			last_error TEXT DEFAULT '',
 			sources_json TEXT DEFAULT '{}',
 			formats_json TEXT DEFAULT '{}',
 			pages_json TEXT DEFAULT '{}',
+			qualities_json TEXT DEFAULT '{}',
+			audio_tracks_json TEXT DEFAULT '{}',
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		)`,
 		`CREATE TABLE IF NOT EXISTS track_telemetry_samples (
@@ -201,6 +205,10 @@ func (s *SQLiteDB) migrate() error {
 	}
 	// Backward-compatible additive migrations for existing installs.
 	_ = s.ensureColumn("streams", "policy_json", "TEXT NOT NULL DEFAULT ''")
+	_ = s.ensureColumn("player_telemetry_samples", "total_quality_transitions", "INTEGER NOT NULL DEFAULT 0")
+	_ = s.ensureColumn("player_telemetry_samples", "total_audio_switches", "INTEGER NOT NULL DEFAULT 0")
+	_ = s.ensureColumn("player_telemetry_samples", "qualities_json", "TEXT NOT NULL DEFAULT '{}'")
+	_ = s.ensureColumn("player_telemetry_samples", "audio_tracks_json", "TEXT NOT NULL DEFAULT '{}'")
 	return nil
 }
 
@@ -566,9 +574,10 @@ func (s *SQLiteDB) SavePlayerTelemetrySample(sample *PlayerTelemetrySample) erro
 	_, err := s.db.Exec(
 		`INSERT INTO player_telemetry_samples
 		(stream_key, active_sessions, waiting_sessions, offline_sessions, debug_sessions,
-		 total_stalls, total_recoveries, average_buffer_seconds, average_playback_seconds,
-		 last_error, sources_json, formats_json, pages_json, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		 total_stalls, total_recoveries, total_quality_transitions, total_audio_switches,
+		 average_buffer_seconds, average_playback_seconds, last_error, sources_json,
+		 formats_json, pages_json, qualities_json, audio_tracks_json, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		sample.StreamKey,
 		sample.ActiveSessions,
 		sample.WaitingSessions,
@@ -576,12 +585,16 @@ func (s *SQLiteDB) SavePlayerTelemetrySample(sample *PlayerTelemetrySample) erro
 		sample.DebugSessions,
 		sample.TotalStalls,
 		sample.TotalRecoveries,
+		sample.TotalQualityTransitions,
+		sample.TotalAudioSwitches,
 		sample.AverageBufferSeconds,
 		sample.AveragePlaybackSeconds,
 		lastError,
 		sample.SourcesJSON,
 		sample.FormatsJSON,
 		sample.PagesJSON,
+		sample.QualitiesJSON,
+		sample.AudioTracksJSON,
 		time.Now(),
 	)
 	return err
@@ -597,8 +610,9 @@ func (s *SQLiteDB) GetPlayerTelemetrySamples(streamKey string, limit int) ([]Pla
 	}
 	rows, err := s.db.Query(
 		`SELECT id, stream_key, active_sessions, waiting_sessions, offline_sessions, debug_sessions,
-		        total_stalls, total_recoveries, average_buffer_seconds, average_playback_seconds,
-		        last_error, sources_json, formats_json, pages_json, created_at
+		        total_stalls, total_recoveries, total_quality_transitions, total_audio_switches,
+		        average_buffer_seconds, average_playback_seconds, last_error, sources_json,
+		        formats_json, pages_json, qualities_json, audio_tracks_json, created_at
 		   FROM player_telemetry_samples
 		  WHERE stream_key = ?
 		  ORDER BY created_at DESC
@@ -622,12 +636,16 @@ func (s *SQLiteDB) GetPlayerTelemetrySamples(streamKey string, limit int) ([]Pla
 			&sample.DebugSessions,
 			&sample.TotalStalls,
 			&sample.TotalRecoveries,
+			&sample.TotalQualityTransitions,
+			&sample.TotalAudioSwitches,
 			&sample.AverageBufferSeconds,
 			&sample.AveragePlaybackSeconds,
 			&sample.LastError,
 			&sample.SourcesJSON,
 			&sample.FormatsJSON,
 			&sample.PagesJSON,
+			&sample.QualitiesJSON,
+			&sample.AudioTracksJSON,
 			&sample.CreatedAt,
 		); err != nil {
 			return nil, err

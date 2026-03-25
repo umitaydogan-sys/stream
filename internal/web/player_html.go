@@ -167,6 +167,13 @@ let hlsAudioTracks = [];
 let dashAudioTracks = [];
 let preferredAudioTrack = (queryParams.get('audio_track') || '').trim();
 let preferredAudioTrackApplied = false;
+let qualityTransitionCount = 0;
+let audioSwitchCount = 0;
+let lastQualitySignature = '';
+let lastSelectedAudioSignature = '';
+let selectedAudioTrackID = '';
+let selectedAudioTrackLabel = '-';
+let dashRetryCount = 0;
 const qoeState = {
   preferredFormat: preferredFormat || 'auto',
   sourceOverride: 'auto',
@@ -219,20 +226,74 @@ function getBufferedSeconds() {
 }
 
 function updateQualityLabel() {
-  if (hls && hls.levels && hls.levels.length) {
-    const levelIndex = hls.currentLevel >= 0 ? hls.currentLevel : hls.loadLevel;
-    const level = levelIndex >= 0 ? hls.levels[levelIndex] : null;
-    qoeState.quality = level ? ((level.height || '?') + 'p @ ' + Math.round((level.bitrate || 0) / 1000) + ' kbps') : 'auto';
+  const hlsInfo = getHLSQualityInfo();
+  if (hlsInfo) {
+    qoeState.quality = hlsInfo.label;
     return;
   }
-  if (dashPlayer && typeof dashPlayer.getQualityFor === 'function' && typeof dashPlayer.getBitrateInfoListFor === 'function') {
-    const idx = dashPlayer.getQualityFor('video');
-    const list = dashPlayer.getBitrateInfoListFor('video') || [];
-    const info = idx >= 0 ? list[idx] : null;
-    qoeState.quality = info ? ((info.height || '?') + 'p @ ' + Math.round((info.bitrate || 0) / 1000) + ' kbps') : 'auto';
+  const dashInfo = getDashQualityInfo();
+  if (dashInfo) {
+    qoeState.quality = dashInfo.label;
     return;
   }
   qoeState.quality = activeSourceKind || '-';
+}
+
+function getHLSQualityInfo() {
+  if (!hls || !hls.levels || !hls.levels.length) return null;
+  const levelIndex = hls.currentLevel >= 0 ? hls.currentLevel : hls.loadLevel;
+  const level = levelIndex >= 0 ? hls.levels[levelIndex] : null;
+  if (!level) return null;
+  return {
+    id: String(levelIndex),
+    label: (level.height || '?') + 'p @ ' + Math.round((level.bitrate || 0) / 1000) + ' kbps'
+  };
+}
+
+function getDashQualityInfo() {
+  if (!dashPlayer || typeof dashPlayer.getQualityFor !== 'function' || typeof dashPlayer.getBitrateInfoListFor !== 'function') {
+    return null;
+  }
+  const idx = dashPlayer.getQualityFor('video');
+  const list = dashPlayer.getBitrateInfoListFor('video') || [];
+  const info = idx >= 0 ? list[idx] : null;
+  if (!info) return null;
+  return {
+    id: String(info.id != null ? info.id : idx),
+    label: (info.height || '?') + 'p @ ' + Math.round((info.bitrate || 0) / 1000) + ' kbps'
+  };
+}
+
+function rememberQualityInfo(info, allowTransition) {
+  if (!info) return;
+  qoeState.quality = info.label || 'auto';
+  const nextSignature = String(info.id || info.label || '');
+  if (!nextSignature) return;
+  if (!lastQualitySignature) {
+    lastQualitySignature = nextSignature;
+    return;
+  }
+  if (allowTransition && nextSignature !== lastQualitySignature) {
+    qualityTransitionCount += 1;
+  }
+  lastQualitySignature = nextSignature;
+}
+
+function rememberSelectedAudioTrack(id, label, allowTransition) {
+  const nextID = String(id || '').trim();
+  const nextLabel = String(label || nextID || '-').trim() || '-';
+  selectedAudioTrackID = nextID;
+  selectedAudioTrackLabel = nextLabel;
+  const nextSignature = nextID + '|' + nextLabel;
+  if (!nextSignature.trim()) return;
+  if (!lastSelectedAudioSignature) {
+    lastSelectedAudioSignature = nextSignature;
+    return;
+  }
+  if (allowTransition && nextSignature !== lastSelectedAudioSignature) {
+    audioSwitchCount += 1;
+  }
+  lastSelectedAudioSignature = nextSignature;
 }
 
 function renderQOEDebug() {
@@ -253,10 +314,13 @@ function renderQOEDebug() {
     '<div class="qoe-debug-row"><span>Kaynak</span><span>' + qoeState.activeSourceKind + '</span></div>' +
     '<div class="qoe-debug-row"><span>Override</span><span>' + qoeState.sourceOverride + '</span></div>' +
     '<div class="qoe-debug-row"><span>Kalite</span><span>' + qoeState.quality + '</span></div>' +
+    '<div class="qoe-debug-row"><span>Ses</span><span>' + (selectedAudioTrackLabel || '-') + '</span></div>' +
     '<div class="qoe-debug-row"><span>Sure</span><span>' + formatSeconds(video.currentTime || 0) + '</span></div>' +
     '<div class="qoe-debug-row"><span>Buffer</span><span>' + formatSeconds((video.buffered && video.buffered.length) ? (video.buffered.end(video.buffered.length - 1) - (video.currentTime || 0)) : 0) + '</span></div>' +
     '<div class="qoe-debug-row"><span>Stall</span><span>' + qoeState.stallCount + '</span></div>' +
     '<div class="qoe-debug-row"><span>Toparlanma</span><span>' + qoeState.recoveries + '</span></div>' +
+    '<div class="qoe-debug-row"><span>Kalite Gecisi</span><span>' + qualityTransitionCount + '</span></div>' +
+    '<div class="qoe-debug-row"><span>Audio Gecisi</span><span>' + audioSwitchCount + '</span></div>' +
     '<div class="qoe-debug-row"><span>Reconnect</span><span>' + qoeState.reconnect + '</span></div>' +
     '<div class="qoe-debug-row"><span>Gecis</span><span>' + qoeState.fallback + '</span></div>' +
     '<div class="qoe-debug-row"><span>Offline</span><span>' + qoeState.offline + '</span></div>' +
@@ -273,10 +337,14 @@ function buildTelemetryPayload() {
     active_source_kind: activeSourceKind || '-',
     source_override: sourceOverride || 'auto',
     quality: qoeState.quality || '-',
+    selected_audio_track: selectedAudioTrackID || '-',
+    selected_audio_label: selectedAudioTrackLabel || '-',
     playback_seconds: Number(video.currentTime || 0),
     buffer_seconds: Number(getBufferedSeconds()),
     stall_count: Number(qoeState.stallCount || 0),
     recoveries: Number(stallRecoveries || 0),
+    quality_transitions: Number(qualityTransitionCount || 0),
+    audio_switches: Number(audioSwitchCount || 0),
     last_error: getVisibleError(),
     reconnect: reconnectState || 'idle',
     offline: !!(offline && offline.style.display !== 'none'),
@@ -418,7 +486,7 @@ function renderAudioTrackSelector(items, selectedIndex, applyFn) {
   };
 }
 
-function syncHLSAudioTracks() {
+function syncHLSAudioTracks(allowTransition) {
   if (!hls || !Array.isArray(hls.audioTracks)) {
     hideAudioTrackSelector();
     return;
@@ -440,17 +508,24 @@ function syncHLSAudioTracks() {
     }
   }
   const selectedIndex = hls.audioTrack >= 0 ? hls.audioTrack : hlsAudioTracks.findIndex(function(track) { return trackMatchesPreferred(track, preferredAudioTrack); });
-  renderAudioTrackSelector(hlsAudioTracks, selectedIndex >= 0 ? selectedIndex : 0, function(nextIndex) {
+  const currentIndex = selectedIndex >= 0 ? selectedIndex : 0;
+  if (hlsAudioTracks[currentIndex]) {
+    rememberSelectedAudioTrack(hlsAudioTracks[currentIndex].id, hlsAudioTracks[currentIndex].label, !!allowTransition);
+  }
+  renderAudioTrackSelector(hlsAudioTracks, currentIndex, function(nextIndex) {
     if (!hls) return;
     try { hls.audioTrack = nextIndex; } catch (e) {}
     const selected = hlsAudioTracks[nextIndex];
-    if (selected) preferredAudioTrack = String(selected.id || nextIndex + 1);
+    if (selected) {
+      preferredAudioTrack = String(selected.id || nextIndex + 1);
+      rememberSelectedAudioTrack(selected.id, selected.label, true);
+    }
     renderQOEDebug();
     sendTelemetry();
   });
 }
 
-function syncDashAudioTracks() {
+function syncDashAudioTracks(allowTransition) {
   if (!dashPlayer || typeof dashPlayer.getTracksFor !== 'function') {
     hideAudioTrackSelector();
     return;
@@ -485,10 +560,14 @@ function syncDashAudioTracks() {
       preferredAudioTrackApplied = true;
     }
   }
+  if (dashAudioTracks[selectedIndex]) {
+    rememberSelectedAudioTrack(dashAudioTracks[selectedIndex].id, dashAudioTracks[selectedIndex].label, !!allowTransition);
+  }
   renderAudioTrackSelector(dashAudioTracks, selectedIndex, function(nextIndex) {
     if (!dashPlayer || typeof dashPlayer.setCurrentTrack !== 'function' || !dashAudioTracks[nextIndex]) return;
     try { dashPlayer.setCurrentTrack(dashAudioTracks[nextIndex].raw); } catch (e) {}
     preferredAudioTrack = String(dashAudioTracks[nextIndex].id || nextIndex + 1);
+    rememberSelectedAudioTrack(dashAudioTracks[nextIndex].id, dashAudioTracks[nextIndex].label, true);
     renderQOEDebug();
     sendTelemetry();
   });
@@ -606,6 +685,8 @@ function cleanupPlayers() {
   try { if (dashPlayer) { dashPlayer.reset(); dashPlayer = null; } } catch (e) {}
   hlsAudioTracks = [];
   dashAudioTracks = [];
+  selectedAudioTrackID = '';
+  selectedAudioTrackLabel = '-';
   hideAudioTrackSelector();
   activeSourceKind = '';
   reconnectState = 'idle';
@@ -640,6 +721,36 @@ async function tryHLSMediaFallback() {
 
 async function tryHLSMasterFallback() {
   await trySourceFallback('hls');
+}
+
+function handleHLSLevelChange(allowTransition) {
+  rememberQualityInfo(getHLSQualityInfo(), !!allowTransition);
+  renderQOEDebug();
+  sendTelemetry();
+}
+
+function handleDashQualityChange(allowTransition) {
+  rememberQualityInfo(getDashQualityInfo(), !!allowTransition);
+  renderQOEDebug();
+  sendTelemetry();
+}
+
+function retryDASHSource(url, reason) {
+  if (dashRetryCount >= 2) {
+    tryHLSMasterFallback();
+    return;
+  }
+  dashRetryCount += 1;
+  reconnectState = 'dash-retry-' + dashRetryCount;
+  fallbackNote = reason || 'dash retry';
+  renderQOEDebug();
+  sendTelemetry();
+  setTimeout(function() {
+    cleanupPlayers();
+    reconnectState = 'dash-retrying';
+    renderQOEDebug();
+    startDASH(url);
+  }, 900);
 }
 
 function ensurePlaybackWatchdog() {
@@ -727,13 +838,13 @@ function startHLS(url) {
     hls = new Hls({
       liveSyncDurationCount: preferredFormat === 'll_hls' ? 3 : 4,
       liveMaxLatencyDurationCount: preferredFormat === 'll_hls' ? 6 : 10,
-      maxBufferLength: preferredFormat === 'll_hls' ? 12 : 20,
-      maxMaxBufferLength: preferredFormat === 'll_hls' ? 20 : 40,
-      backBufferLength: 30,
-      startLevel: -1,
-      abrEwmaDefaultEstimate: preferredFormat === 'll_hls' ? 450000 : 300000,
-      abrBandWidthFactor: 0.7,
-      abrBandWidthUpFactor: 0.5,
+      maxBufferLength: preferredFormat === 'll_hls' ? 14 : 24,
+      maxMaxBufferLength: preferredFormat === 'll_hls' ? 24 : 48,
+      backBufferLength: 45,
+      startLevel: 0,
+      abrEwmaDefaultEstimate: preferredFormat === 'll_hls' ? 380000 : 240000,
+      abrBandWidthFactor: 0.65,
+      abrBandWidthUpFactor: 0.45,
       capLevelToPlayerSize: true,
       capLevelOnFPSDrop: true,
       enableWorker: true,
@@ -741,10 +852,14 @@ function startHLS(url) {
     });
     hls.loadSource(url);
     hls.attachMedia(video);
-    hls.on(Hls.Events.MANIFEST_PARSED, function() { syncHLSAudioTracks(); markReady(); });
-    hls.on(Hls.Events.LEVEL_SWITCHED, renderQOEDebug);
-    hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, syncHLSAudioTracks);
-    hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, syncHLSAudioTracks);
+    hls.on(Hls.Events.MANIFEST_PARSED, function() {
+      syncHLSAudioTracks(false);
+      handleHLSLevelChange(false);
+      markReady();
+    });
+    hls.on(Hls.Events.LEVEL_SWITCHED, function() { handleHLSLevelChange(true); });
+    hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, function() { syncHLSAudioTracks(false); });
+    hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, function() { syncHLSAudioTracks(true); });
     hls.on(Hls.Events.ERROR, function(event, data) {
       setLastError('hls:' + ((data && data.details) || (data && data.type) || 'unknown'), 'hls');
       if (!data || !data.fatal) return;
@@ -784,22 +899,68 @@ function startDASH(url) {
   }
   activeSourceKind = 'dash';
   dashPlayer = window.dashjs.MediaPlayer().create();
-  dashPlayer.updateSettings({ streaming: { lowLatencyEnabled: true } });
-  dashPlayer.on(window.dashjs.MediaPlayer.events.STREAM_INITIALIZED, function() { syncDashAudioTracks(); markReady(); });
-  dashPlayer.on(window.dashjs.MediaPlayer.events.QUALITY_CHANGE_RENDERED, renderQOEDebug);
+  dashPlayer.updateSettings({
+    streaming: {
+      lowLatencyEnabled: false,
+      liveDelay: 10,
+      liveCatchup: { enabled: true },
+      buffer: {
+        fastSwitchEnabled: true,
+        stableBufferTime: 10,
+        bufferTimeAtTopQuality: 12,
+        bufferTimeAtTopQualityLongForm: 20
+      },
+      gaps: {
+        jumpGaps: true,
+        smallGapLimit: 1.5
+      },
+      retryIntervals: {
+        MPD: 700,
+        InitializationSegment: 1000,
+        MediaSegment: 1000
+      },
+      retryAttempts: {
+        MPD: 5,
+        InitializationSegment: 4,
+        MediaSegment: 6
+      },
+      abr: {
+        autoSwitchBitrate: { video: true, audio: true },
+        initialBitrate: { video: 350, audio: 64 }
+      }
+    }
+  });
+  dashPlayer.on(window.dashjs.MediaPlayer.events.STREAM_INITIALIZED, function() {
+    dashRetryCount = 0;
+    syncDashAudioTracks(false);
+    handleDashQualityChange(false);
+    markReady();
+  });
+  dashPlayer.on(window.dashjs.MediaPlayer.events.QUALITY_CHANGE_RENDERED, function() { handleDashQualityChange(true); });
   if (window.dashjs.MediaPlayer.events.TRACK_CHANGE_RENDERED) {
-    dashPlayer.on(window.dashjs.MediaPlayer.events.TRACK_CHANGE_RENDERED, syncDashAudioTracks);
+    dashPlayer.on(window.dashjs.MediaPlayer.events.TRACK_CHANGE_RENDERED, function() { syncDashAudioTracks(true); });
   }
   dashPlayer.initialize(video, url, autoplay);
   renderQOEDebug();
   dashPlayer.on(window.dashjs.MediaPlayer.events.ERROR, function(evt) {
-    setLastError('dash:' + (((evt && evt.error && evt.error.message) || (evt && evt.event && evt.event.message) || (evt && evt.message) || 'unknown')), 'dash');
+    const message = ((evt && evt.error && evt.error.message) || (evt && evt.event && evt.event.message) || (evt && evt.message) || 'unknown');
+    const normalized = String(message || '').toLowerCase();
+    setLastError('dash:' + message, 'dash');
+    if (normalized.indexOf('nostreamscomposed') !== -1 || normalized.indexOf('no periods') !== -1 || normalized.indexOf('buffer') !== -1 || normalized.indexOf('segment') !== -1 || normalized.indexOf('manifest') !== -1) {
+      retryDASHSource(url, 'dash recovery');
+      return;
+    }
+    if (dashRetryCount < 1) {
+      retryDASHSource(url, 'dash retry');
+      return;
+    }
     tryHLSMasterFallback();
   });
 }
 
 async function tryPlay() {
   cleanupPlayers();
+  dashRetryCount = 0;
   reconnectState = 'probing';
   fallbackNote = '-';
   renderQOEDebug();

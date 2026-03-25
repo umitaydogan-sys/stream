@@ -918,13 +918,16 @@ function renderTelemetryPills(values,emptyText){
 function renderTelemetrySessionsTable(items){
   const sessions=Array.isArray(items)?items:[];
   if(!sessions.length)return '<div class="form-hint">Henuz aktif player telemetrisi gelmedi.</div>';
-  return '<div style="overflow:auto"><table class="viewer-table"><thead><tr><th>Oturum</th><th>Sayfa</th><th>Kaynak</th><th>Kalite</th><th>Buffer</th><th>Stall</th><th>Durum</th><th>Son Gorus</th></tr></thead><tbody>'+
+  return '<div style="overflow:auto"><table class="viewer-table"><thead><tr><th>Oturum</th><th>Sayfa</th><th>Kaynak</th><th>Kalite</th><th>Kalite Gecisi</th><th>Ses</th><th>Ses Gecisi</th><th>Buffer</th><th>Stall</th><th>Durum</th><th>Son Gorus</th></tr></thead><tbody>'+
     sessions.map(function(item){
       return '<tr>'+
         '<td>'+escHtml(shortKey(item.session_id||'-'))+'</td>'+
         '<td>'+escHtml(item.page||'-')+'</td>'+
         '<td>'+escHtml(item.active_source_kind||'-')+'</td>'+
         '<td>'+escHtml(item.quality||'-')+'</td>'+
+        '<td>'+escHtml(String(item.quality_transitions||0))+'</td>'+
+        '<td>'+escHtml(item.selected_audio_label||item.selected_audio_track||'-')+'</td>'+
+        '<td>'+escHtml(String(item.audio_switches||0))+'</td>'+
         '<td>'+escHtml(formatShortSeconds(item.buffer_seconds))+'</td>'+
         '<td>'+escHtml(String(item.stall_count||0))+'</td>'+
         '<td>'+escHtml(item.reconnect||'-')+(item.offline?' / offline':'')+'</td>'+
@@ -1115,6 +1118,8 @@ function renderStreamTelemetryBody(payload){
       statCard('orange','bi-hourglass-split',fmtInt(telemetry.waiting_sessions||0),'Bekleyen')+
       statCard('red','bi-exclamation-triangle-fill',fmtInt(telemetry.total_stalls||0),'Toplam Stall')+
       statCard('green','bi-arrow-repeat',fmtInt(telemetry.total_recoveries||0),'Toparlanma')+
+      statCard('purple','bi-shuffle',fmtInt(telemetry.total_quality_transitions||0),'Kalite Gecisi')+
+      statCard('blue','bi-music-note-list',fmtInt(telemetry.total_audio_switches||0),'Ses Gecisi')+
     '</div>'+
     '<div class="card-grid card-grid-2" style="margin-bottom:16px">'+
       '<div class="card" style="padding:16px">'+
@@ -1125,20 +1130,24 @@ function renderStreamTelemetryBody(payload){
           '<div class="metric-row"><span>Ortalama oynatma suresi</span><strong>'+escHtml(formatShortSeconds(telemetry.average_playback_seconds))+'</strong></div>'+
           '<div class="metric-row"><span>Offline oturum</span><strong>'+fmtInt(telemetry.offline_sessions||0)+'</strong></div>'+
           '<div class="metric-row"><span>Debug acik</span><strong>'+fmtInt(telemetry.debug_sessions||0)+'</strong></div>'+
-          '<div class="metric-row"><span>Son hata</span><strong style="text-align:right">'+escHtml(lastError)+'</strong></div>'+
-        '</div>'+
+        '<div class="metric-row"><span>Son hata</span><strong style="text-align:right">'+escHtml(lastError)+'</strong></div>'+
+      '</div>'+
       '</div>'+
       '<div class="card" style="padding:16px">'+
         '<div class="card-title" style="margin-bottom:12px">Dagilim</div>'+
         '<div class="form-hint" style="margin-bottom:8px">Kaynak</div>'+renderTelemetryPills(telemetry.sources,'Kaynak verisi yok')+
         '<div class="form-hint" style="margin:14px 0 8px">Format</div>'+renderTelemetryPills(telemetry.formats,'Format verisi yok')+
         '<div class="form-hint" style="margin:14px 0 8px">Sayfa</div>'+renderTelemetryPills(telemetry.pages,'Sayfa verisi yok')+
+        '<div class="form-hint" style="margin:14px 0 8px">Kalite</div>'+renderTelemetryPills(telemetry.qualities,'Kalite verisi yok')+
+        '<div class="form-hint" style="margin:14px 0 8px">Ses Track</div>'+renderTelemetryPills(telemetry.audio_tracks,'Ses track verisi yok')+
       '</div>'+
     '</div>'+
     '<div class="card-grid card-grid-3" style="margin-bottom:16px">'+
       renderTelemetryTrendChart(history,'active_sessions','var(--accent)','Aktif Player Trendi',fmtInt)+
       renderTelemetryTrendChart(history,'average_buffer_seconds','var(--warning)','Buffer Trendi',formatShortSeconds)+
       renderTelemetryTrendChart(history,'total_stalls','var(--danger)','Stall Birikimi',fmtInt)+
+      renderTelemetryTrendChart(history,'total_quality_transitions','var(--accent-hover)','Kalite Gecisi Trendi',fmtInt)+
+      renderTelemetryTrendChart(history,'total_audio_switches','var(--success)','Ses Gecisi Trendi',fmtInt)+
     '</div>'+
     '<div class="card" style="padding:16px">'+
       '<div class="card-title" style="margin-bottom:12px">Son Aktif Oturumlar</div>'+
@@ -1210,10 +1219,10 @@ function renderCreateStream(c){
       '<div class="card">'+
         '<div class="form-group"><label class="form-label">Yayin Adi *</label><input class="form-input" id="cs-name" placeholder="Orn: Konser Canli Yayin"></div>'+
         '<div class="form-group"><label class="form-label">Aciklama</label><input class="form-input" id="cs-desc" placeholder="Kisa aciklama"></div>'+
-        '<div class="form-group"><label class="form-label">Yayin Modu</label><select class="form-select" id="cs-mode" onchange="updateCreateStreamGuide()"><option value="balanced">TV / Dengeli</option><option value="mobile">Mobil / Hafif</option><option value="radio">Radyo / Audio</option></select><div class="form-hint">Bu secim ABR, cikis ve kaynak kullanimini belirleyen baslangic davranisini tanimlar.</div></div>'+
+        '<div class="form-group"><label class="form-label">Yayin Modu</label><select class="form-select" id="cs-mode" onchange="updateCreateStreamGuide()"><option value="balanced">TV / Dengeli</option><option value="mobile">Mobil / Hafif</option><option value="resilient">Dusuk Bant / Dayanikli</option><option value="radio">Radyo / Audio</option></select><div class="form-hint">Bu secim ABR, cikis ve kaynak kullanimini belirleyen baslangic davranisini tanimlar.</div></div>'+
         '<div class="setting-row"><div><div class="setting-label">Adaptif Bitrate</div><div class="setting-desc">Acilirsa izleyicinin baglantisina gore kalite otomatik degisir.</div></div>'+
           '<label class="toggle"><input type="checkbox" id="cs-abr-enabled"><span class="toggle-slider"></span></label></div>'+
-        '<div class="form-group" style="margin-top:16px"><label class="form-label">ABR Profil Seti</label><select class="form-select" id="cs-profile-set"><option value="balanced">Dengeli</option><option value="mobile">Mobil</option><option value="radio">Radyo</option></select></div>'+
+        '<div class="form-group" style="margin-top:16px"><label class="form-label">ABR Profil Seti</label><select class="form-select" id="cs-profile-set"><option value="balanced">Dengeli</option><option value="mobile">Mobil</option><option value="resilient">Dayanikli</option><option value="radio">Radyo</option></select></div>'+
         '<div class="setting-row"><div><div class="setting-label">Playback Token Gerekli</div><div class="setting-desc">Bu yayini izlemek icin token aranir.</div></div>'+
           '<label class="toggle"><input type="checkbox" id="cs-token-required"><span class="toggle-slider"></span></label></div>'+
         '<div class="form-group" style="margin-top:16px"><label class="form-label">Domain Kilidi</label><input class="form-input" id="cs-domain-lock" placeholder="Orn: mysite.com, embed.partner.com"><div class="form-hint">Bossa her yerde acilir. Doluysa sadece bu domainlerden gelen embed/referer kabul edilir.</div></div>'+
@@ -1309,6 +1318,11 @@ function getOBSMultitrackOverrideObject(mode){
     mobile:[
       {type:'obs_x264',width:1280,height:720,framerate:{numerator:30,denominator:1},settings:{rate_control:'CBR',bitrate:2800,keyint_sec:2,preset:'veryfast',profile:'high',tune:'zerolatency'},canvas_index:0},
       {type:'obs_x264',width:640,height:360,framerate:{numerator:30,denominator:1},settings:{rate_control:'CBR',bitrate:900,keyint_sec:2,preset:'veryfast',profile:'main',tune:'zerolatency'},canvas_index:0}
+    ],
+    resilient:[
+      {type:'obs_x264',width:960,height:540,framerate:{numerator:25,denominator:1},settings:{rate_control:'CBR',bitrate:1500,keyint_sec:2,preset:'veryfast',profile:'main',tune:'zerolatency'},canvas_index:0},
+      {type:'obs_x264',width:640,height:360,framerate:{numerator:24,denominator:1},settings:{rate_control:'CBR',bitrate:650,keyint_sec:2,preset:'veryfast',profile:'baseline',tune:'zerolatency'},canvas_index:0},
+      {type:'obs_x264',width:426,height:240,framerate:{numerator:20,denominator:1},settings:{rate_control:'CBR',bitrate:320,keyint_sec:2,preset:'veryfast',profile:'baseline',tune:'zerolatency'},canvas_index:0}
     ],
     radio:[
       {type:'obs_x264',width:1280,height:720,framerate:{numerator:25,denominator:1},settings:{rate_control:'CBR',bitrate:1800,keyint_sec:2,preset:'veryfast',profile:'main',tune:'zerolatency'},canvas_index:0},
@@ -1946,10 +1960,10 @@ async function renderStreamDetail(c,id){
     ])+
 
     '<div class="card" style="margin-bottom:16px"><div class="card-title" style="margin-bottom:12px">Teslimat ve Guvenlik Politikasi</div>'+
-      '<div class="form-group"><label class="form-label">Yayin Modu</label><select class="form-select" id="sd-policy-mode"><option value="balanced" '+((policy.mode||'balanced')==='balanced'?'selected':'')+'>TV / Dengeli</option><option value="mobile" '+((policy.mode||'')==='mobile'?'selected':'')+'>Mobil / Hafif</option><option value="radio" '+((policy.mode||'')==='radio'?'selected':'')+'>Radyo / Audio</option></select><div class="form-hint">Bu, yayin icin secilen genel davranis profilidir.</div></div>'+
+      '<div class="form-group"><label class="form-label">Yayin Modu</label><select class="form-select" id="sd-policy-mode"><option value="balanced" '+((policy.mode||'balanced')==='balanced'?'selected':'')+'>TV / Dengeli</option><option value="mobile" '+((policy.mode||'')==='mobile'?'selected':'')+'>Mobil / Hafif</option><option value="resilient" '+((policy.mode||'')==='resilient'?'selected':'')+'>Dusuk Bant / Dayanikli</option><option value="radio" '+((policy.mode||'')==='radio'?'selected':'')+'>Radyo / Audio</option></select><div class="form-hint">Bu, yayin icin secilen genel davranis profilidir.</div></div>'+
       '<div class="setting-row"><div><div class="setting-label">Adaptif Bitrate</div><div class="setting-desc">Acik oldugunda izleyiciye baglanti hizina gore farkli kalite katmanlari sunulur.</div></div>'+
       '<label class="toggle"><input type="checkbox" id="sd-abr-enabled" '+(policy.enable_abr?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
-      '<div class="form-group" style="margin-top:16px"><label class="form-label">ABR Profil Seti</label><select class="form-select" id="sd-profile-set"><option value="balanced" '+((policy.profile_set||'balanced')==='balanced'?'selected':'')+'>Dengeli</option><option value="mobile" '+((policy.profile_set||'')==='mobile'?'selected':'')+'>Mobil</option><option value="radio" '+((policy.profile_set||'')==='radio'?'selected':'')+'>Radyo</option></select></div>'+
+      '<div class="form-group" style="margin-top:16px"><label class="form-label">ABR Profil Seti</label><select class="form-select" id="sd-profile-set"><option value="balanced" '+((policy.profile_set||'balanced')==='balanced'?'selected':'')+'>Dengeli</option><option value="mobile" '+((policy.profile_set||'')==='mobile'?'selected':'')+'>Mobil</option><option value="resilient" '+((policy.profile_set||'')==='resilient'?'selected':'')+'>Dayanikli</option><option value="radio" '+((policy.profile_set||'')==='radio'?'selected':'')+'>Radyo</option></select></div>'+
       '<div class="setting-row"><div><div class="setting-label">Playback Token Gerekli</div><div class="setting-desc">Acilirsa bu yayin icin token olmadan izleme baslamaz.</div></div>'+
       '<label class="toggle"><input type="checkbox" id="sd-token-required" '+(policy.require_playback_token?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
       '<div class="form-group" style="margin-top:16px"><label class="form-label">Domain Kilidi</label><input class="form-input" id="sd-domain-lock" value="'+escHtml(st.domain_lock||'')+'" placeholder="mysite.com, partner.com"><div class="form-hint">Bos ise tum domainlerden acilir.</div></div>'+
@@ -2321,6 +2335,7 @@ async function renderGuidedSettings(c){
       '<div class="card-grid card-grid-3">'+
         presetCard('TV / Dengeli','Canli TV, YouTube benzeri genel kullanim. Adaptif kalite merdiveni acilir, 1080p-360p katmanlari kullanilir.','balanced','bi-broadcast-pin')+
         presetCard('Mobil / Hafif','Zayif baglantilar ve daha dusuk CPU kullanimi icin. Daha kucuk bitrate merdiveni kullanilir.','mobile','bi-phone')+
+        presetCard('Dusuk Bant / Dayanikli','Kesinti riskini azaltmak ve agresif kalite cikislarini sinirlamak icin. Dusuk bitrate merdiveni kullanilir.','resilient','bi-wifi-off')+
         presetCard('Radyo / Audio','Ses yayinlarina uygun sade ayar. Video gerekmiyorsa depolama ve transcode yukunu azaltir.','radio','bi-mic-fill')+
       '</div>'+
     '</div>'+
@@ -2374,7 +2389,7 @@ async function applyDeliveryPreset(preset){
     updates.abr_enabled='false';
     updates.mp3_enabled='true';
     updates.aac_out_enabled='true';
-  }else if(preset==='mobile'){
+  }else if(preset==='mobile' || preset==='resilient'){
     updates.hls_ll_enabled='true';
   }else{
     updates.dash_enabled='true';
@@ -2393,7 +2408,7 @@ async function renderSettingsABR(c){
       '<label class="toggle"><input type="checkbox" class="setting-input" data-key="abr_enabled" '+(s.abr_enabled==='true'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
       '<div class="setting-row"><div><div class="setting-label">Master Playlist Uret</div><div class="setting-desc">Player once master playlist arar. Yoksa index.m3u8 fallback kullanilir.</div></div>'+
       '<label class="toggle"><input type="checkbox" class="setting-input" data-key="abr_master_enabled" '+(s.abr_master_enabled!=='false'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
-      '<div class="form-group" style="margin-top:16px"><label class="form-label">Hazir Profil Seti</label><select class="form-select setting-input" data-key="abr_profile_set"><option value="balanced" '+((s.abr_profile_set||'balanced')==='balanced'?'selected':'')+'>TV / Dengeli</option><option value="mobile" '+((s.abr_profile_set||'')==='mobile'?'selected':'')+'>Mobil / Hafif</option><option value="radio" '+((s.abr_profile_set||'')==='radio'?'selected':'')+'>Radyo / Audio</option></select><div class="form-hint">Dengeli cogu video yayin icin en iyi baslangic noktasidir.</div></div>'+
+      '<div class="form-group" style="margin-top:16px"><label class="form-label">Hazir Profil Seti</label><select class="form-select setting-input" data-key="abr_profile_set"><option value="balanced" '+((s.abr_profile_set||'balanced')==='balanced'?'selected':'')+'>TV / Dengeli</option><option value="mobile" '+((s.abr_profile_set||'')==='mobile'?'selected':'')+'>Mobil / Hafif</option><option value="resilient" '+((s.abr_profile_set||'')==='resilient'?'selected':'')+'>Dusuk Bant / Dayanikli</option><option value="radio" '+((s.abr_profile_set||'')==='radio'?'selected':'')+'>Radyo / Audio</option></select><div class="form-hint">Dengeli cogu video yayin icin en iyi baslangic noktasidir.</div></div>'+
       '<div class="form-group"><label class="form-label">ABR Profil JSON</label><textarea class="form-textarea setting-input" data-key="abr_profiles_json" style="min-height:220px">'+escHtml(s.abr_profiles_json||'')+'</textarea><div class="form-hint">Gelistirilmis kullanim icin. Hazir setler yukaridan secilebilir.</div></div>'+
       '<button class="btn btn-primary" onclick="saveSettingsCategory(\'outputs\')">ABR Ayarlarini Kaydet</button>'+
     '</div>';

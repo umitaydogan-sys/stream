@@ -15,22 +15,26 @@ const playerTelemetryTTL = 45 * time.Second
 const playerTelemetryPersistEvery = 15 * time.Second
 
 type playerTelemetryPayload struct {
-	StreamKey        string  `json:"stream_key"`
-	SessionID        string  `json:"session_id"`
-	Page             string  `json:"page"`
-	PreferredFormat  string  `json:"preferred_format"`
-	ActiveSourceKind string  `json:"active_source_kind"`
-	SourceOverride   string  `json:"source_override"`
-	Quality          string  `json:"quality"`
-	PlaybackSeconds  float64 `json:"playback_seconds"`
-	BufferSeconds    float64 `json:"buffer_seconds"`
-	StallCount       int     `json:"stall_count"`
-	Recoveries       int     `json:"recoveries"`
-	LastError        string  `json:"last_error"`
-	Reconnect        string  `json:"reconnect"`
-	Offline          bool    `json:"offline"`
-	Waiting          bool    `json:"waiting"`
-	DebugEnabled     bool    `json:"debug_enabled"`
+	StreamKey          string  `json:"stream_key"`
+	SessionID          string  `json:"session_id"`
+	Page               string  `json:"page"`
+	PreferredFormat    string  `json:"preferred_format"`
+	ActiveSourceKind   string  `json:"active_source_kind"`
+	SourceOverride     string  `json:"source_override"`
+	Quality            string  `json:"quality"`
+	SelectedAudioTrack string  `json:"selected_audio_track"`
+	SelectedAudioLabel string  `json:"selected_audio_label"`
+	PlaybackSeconds    float64 `json:"playback_seconds"`
+	BufferSeconds      float64 `json:"buffer_seconds"`
+	StallCount         int     `json:"stall_count"`
+	Recoveries         int     `json:"recoveries"`
+	QualityTransitions int     `json:"quality_transitions"`
+	AudioSwitches      int     `json:"audio_switches"`
+	LastError          string  `json:"last_error"`
+	Reconnect          string  `json:"reconnect"`
+	Offline            bool    `json:"offline"`
+	Waiting            bool    `json:"waiting"`
+	DebugEnabled       bool    `json:"debug_enabled"`
 }
 
 type playerTelemetryCollector struct {
@@ -40,76 +44,90 @@ type playerTelemetryCollector struct {
 }
 
 type playerTelemetryStream struct {
-	StreamKey       string
-	Sessions        map[string]*playerTelemetrySession
-	Reports         int64
-	TotalStalls     int64
-	TotalRecoveries int64
-	LastError       string
-	LastUpdate      time.Time
-	LastPersist     time.Time
+	StreamKey               string
+	Sessions                map[string]*playerTelemetrySession
+	Reports                 int64
+	TotalStalls             int64
+	TotalRecoveries         int64
+	TotalQualityTransitions int64
+	TotalAudioSwitches      int64
+	LastError               string
+	LastUpdate              time.Time
+	LastPersist             time.Time
 }
 
 type playerTelemetrySession struct {
-	SessionID        string
-	Page             string
-	PreferredFormat  string
-	ActiveSourceKind string
-	SourceOverride   string
-	Quality          string
-	PlaybackSeconds  float64
-	BufferSeconds    float64
-	StallCount       int
-	Recoveries       int
-	LastError        string
-	Reconnect        string
-	Offline          bool
-	Waiting          bool
-	DebugEnabled     bool
-	LastSeen         time.Time
-	RemoteAddr       string
-	UserAgent        string
+	SessionID          string
+	Page               string
+	PreferredFormat    string
+	ActiveSourceKind   string
+	SourceOverride     string
+	Quality            string
+	SelectedAudioTrack string
+	SelectedAudioLabel string
+	PlaybackSeconds    float64
+	BufferSeconds      float64
+	StallCount         int
+	Recoveries         int
+	QualityTransitions int
+	AudioSwitches      int
+	LastError          string
+	Reconnect          string
+	Offline            bool
+	Waiting            bool
+	DebugEnabled       bool
+	LastSeen           time.Time
+	RemoteAddr         string
+	UserAgent          string
 }
 
 type playerTelemetrySnapshot struct {
-	StreamKey            string                           `json:"stream_key"`
-	ActiveSessions       int                              `json:"active_sessions"`
-	WaitingSessions      int                              `json:"waiting_sessions"`
-	OfflineSessions      int                              `json:"offline_sessions"`
-	DebugSessions        int                              `json:"debug_sessions"`
-	Reports              int64                            `json:"reports"`
-	TotalStalls          int64                            `json:"total_stalls"`
-	TotalRecoveries      int64                            `json:"total_recoveries"`
-	AverageBufferSeconds float64                          `json:"average_buffer_seconds"`
-	AveragePlayback      float64                          `json:"average_playback_seconds"`
-	LastError            string                           `json:"last_error"`
-	LastUpdate           time.Time                        `json:"last_update"`
-	Sources              map[string]int                   `json:"sources"`
-	Formats              map[string]int                   `json:"formats"`
-	Pages                map[string]int                   `json:"pages"`
-	Sessions             []playerTelemetrySessionSnapshot `json:"sessions"`
+	StreamKey               string                           `json:"stream_key"`
+	ActiveSessions          int                              `json:"active_sessions"`
+	WaitingSessions         int                              `json:"waiting_sessions"`
+	OfflineSessions         int                              `json:"offline_sessions"`
+	DebugSessions           int                              `json:"debug_sessions"`
+	Reports                 int64                            `json:"reports"`
+	TotalStalls             int64                            `json:"total_stalls"`
+	TotalRecoveries         int64                            `json:"total_recoveries"`
+	TotalQualityTransitions int64                            `json:"total_quality_transitions"`
+	TotalAudioSwitches      int64                            `json:"total_audio_switches"`
+	AverageBufferSeconds    float64                          `json:"average_buffer_seconds"`
+	AveragePlayback         float64                          `json:"average_playback_seconds"`
+	LastError               string                           `json:"last_error"`
+	LastUpdate              time.Time                        `json:"last_update"`
+	Sources                 map[string]int                   `json:"sources"`
+	Formats                 map[string]int                   `json:"formats"`
+	Pages                   map[string]int                   `json:"pages"`
+	Qualities               map[string]int                   `json:"qualities"`
+	AudioTracks             map[string]int                   `json:"audio_tracks"`
+	Sessions                []playerTelemetrySessionSnapshot `json:"sessions"`
 }
 
 type playerTelemetrySessionSnapshot struct {
-	SessionID        string    `json:"session_id"`
-	Page             string    `json:"page"`
-	PreferredFormat  string    `json:"preferred_format"`
-	ActiveSourceKind string    `json:"active_source_kind"`
-	SourceOverride   string    `json:"source_override"`
-	Quality          string    `json:"quality"`
-	PlaybackSeconds  float64   `json:"playback_seconds"`
-	BufferSeconds    float64   `json:"buffer_seconds"`
-	StallCount       int       `json:"stall_count"`
-	Recoveries       int       `json:"recoveries"`
-	LastError        string    `json:"last_error"`
-	Reconnect        string    `json:"reconnect"`
-	Offline          bool      `json:"offline"`
-	Waiting          bool      `json:"waiting"`
-	DebugEnabled     bool      `json:"debug_enabled"`
-	LastSeen         time.Time `json:"last_seen"`
-	LastSeenAgoSec   int       `json:"last_seen_ago_sec"`
-	RemoteAddr       string    `json:"remote_addr"`
-	UserAgent        string    `json:"user_agent"`
+	SessionID          string    `json:"session_id"`
+	Page               string    `json:"page"`
+	PreferredFormat    string    `json:"preferred_format"`
+	ActiveSourceKind   string    `json:"active_source_kind"`
+	SourceOverride     string    `json:"source_override"`
+	Quality            string    `json:"quality"`
+	SelectedAudioTrack string    `json:"selected_audio_track"`
+	SelectedAudioLabel string    `json:"selected_audio_label"`
+	PlaybackSeconds    float64   `json:"playback_seconds"`
+	BufferSeconds      float64   `json:"buffer_seconds"`
+	StallCount         int       `json:"stall_count"`
+	Recoveries         int       `json:"recoveries"`
+	QualityTransitions int       `json:"quality_transitions"`
+	AudioSwitches      int       `json:"audio_switches"`
+	LastError          string    `json:"last_error"`
+	Reconnect          string    `json:"reconnect"`
+	Offline            bool      `json:"offline"`
+	Waiting            bool      `json:"waiting"`
+	DebugEnabled       bool      `json:"debug_enabled"`
+	LastSeen           time.Time `json:"last_seen"`
+	LastSeenAgoSec     int       `json:"last_seen_ago_sec"`
+	RemoteAddr         string    `json:"remote_addr"`
+	UserAgent          string    `json:"user_agent"`
 }
 
 func newPlayerTelemetryCollector() *playerTelemetryCollector {
@@ -157,9 +175,17 @@ func (c *playerTelemetryCollector) Record(payload playerTelemetryPayload, remote
 		if delta := payload.Recoveries - prev.Recoveries; delta > 0 {
 			state.TotalRecoveries += int64(delta)
 		}
+		if delta := payload.QualityTransitions - prev.QualityTransitions; delta > 0 {
+			state.TotalQualityTransitions += int64(delta)
+		}
+		if delta := payload.AudioSwitches - prev.AudioSwitches; delta > 0 {
+			state.TotalAudioSwitches += int64(delta)
+		}
 	} else {
 		state.TotalStalls += int64(maxInt(payload.StallCount, 0))
 		state.TotalRecoveries += int64(maxInt(payload.Recoveries, 0))
+		state.TotalQualityTransitions += int64(maxInt(payload.QualityTransitions, 0))
+		state.TotalAudioSwitches += int64(maxInt(payload.AudioSwitches, 0))
 	}
 
 	state.Reports++
@@ -169,24 +195,28 @@ func (c *playerTelemetryCollector) Record(payload playerTelemetryPayload, remote
 	}
 
 	state.Sessions[sessionID] = &playerTelemetrySession{
-		SessionID:        sessionID,
-		Page:             payload.Page,
-		PreferredFormat:  payload.PreferredFormat,
-		ActiveSourceKind: payload.ActiveSourceKind,
-		SourceOverride:   payload.SourceOverride,
-		Quality:          payload.Quality,
-		PlaybackSeconds:  payload.PlaybackSeconds,
-		BufferSeconds:    payload.BufferSeconds,
-		StallCount:       payload.StallCount,
-		Recoveries:       payload.Recoveries,
-		LastError:        payload.LastError,
-		Reconnect:        payload.Reconnect,
-		Offline:          payload.Offline,
-		Waiting:          payload.Waiting,
-		DebugEnabled:     payload.DebugEnabled,
-		LastSeen:         now,
-		RemoteAddr:       compactLabel(stripPort(remoteAddr), 80),
-		UserAgent:        compactLabel(userAgent, 160),
+		SessionID:          sessionID,
+		Page:               payload.Page,
+		PreferredFormat:    payload.PreferredFormat,
+		ActiveSourceKind:   payload.ActiveSourceKind,
+		SourceOverride:     payload.SourceOverride,
+		Quality:            payload.Quality,
+		SelectedAudioTrack: payload.SelectedAudioTrack,
+		SelectedAudioLabel: payload.SelectedAudioLabel,
+		PlaybackSeconds:    payload.PlaybackSeconds,
+		BufferSeconds:      payload.BufferSeconds,
+		StallCount:         payload.StallCount,
+		Recoveries:         payload.Recoveries,
+		QualityTransitions: payload.QualityTransitions,
+		AudioSwitches:      payload.AudioSwitches,
+		LastError:          payload.LastError,
+		Reconnect:          payload.Reconnect,
+		Offline:            payload.Offline,
+		Waiting:            payload.Waiting,
+		DebugEnabled:       payload.DebugEnabled,
+		LastSeen:           now,
+		RemoteAddr:         compactLabel(stripPort(remoteAddr), 80),
+		UserAgent:          compactLabel(userAgent, 160),
 	}
 
 	if c.db != nil && (state.LastPersist.IsZero() || now.Sub(state.LastPersist) >= playerTelemetryPersistEvery) {
@@ -213,11 +243,13 @@ func (c *playerTelemetryCollector) Snapshot(streamKey string) playerTelemetrySna
 	state := c.streams[strings.TrimSpace(streamKey)]
 	if state == nil {
 		return playerTelemetrySnapshot{
-			StreamKey: strings.TrimSpace(streamKey),
-			Sources:   map[string]int{},
-			Formats:   map[string]int{},
-			Pages:     map[string]int{},
-			Sessions:  []playerTelemetrySessionSnapshot{},
+			StreamKey:   strings.TrimSpace(streamKey),
+			Sources:     map[string]int{},
+			Formats:     map[string]int{},
+			Pages:       map[string]int{},
+			Qualities:   map[string]int{},
+			AudioTracks: map[string]int{},
+			Sessions:    []playerTelemetrySessionSnapshot{},
 		}
 	}
 
@@ -226,16 +258,20 @@ func (c *playerTelemetryCollector) Snapshot(streamKey string) playerTelemetrySna
 
 func (c *playerTelemetryCollector) snapshotForStateLocked(state *playerTelemetryStream, now time.Time) playerTelemetrySnapshot {
 	snapshot := playerTelemetrySnapshot{
-		StreamKey:       state.StreamKey,
-		Reports:         state.Reports,
-		TotalStalls:     state.TotalStalls,
-		TotalRecoveries: state.TotalRecoveries,
-		LastError:       state.LastError,
-		LastUpdate:      state.LastUpdate,
-		Sources:         make(map[string]int),
-		Formats:         make(map[string]int),
-		Pages:           make(map[string]int),
-		Sessions:        make([]playerTelemetrySessionSnapshot, 0, len(state.Sessions)),
+		StreamKey:               state.StreamKey,
+		Reports:                 state.Reports,
+		TotalStalls:             state.TotalStalls,
+		TotalRecoveries:         state.TotalRecoveries,
+		TotalQualityTransitions: state.TotalQualityTransitions,
+		TotalAudioSwitches:      state.TotalAudioSwitches,
+		LastError:               state.LastError,
+		LastUpdate:              state.LastUpdate,
+		Sources:                 make(map[string]int),
+		Formats:                 make(map[string]int),
+		Pages:                   make(map[string]int),
+		Qualities:               make(map[string]int),
+		AudioTracks:             make(map[string]int),
+		Sessions:                make([]playerTelemetrySessionSnapshot, 0, len(state.Sessions)),
 	}
 
 	var totalBuffer float64
@@ -259,26 +295,32 @@ func (c *playerTelemetryCollector) snapshotForStateLocked(state *playerTelemetry
 		snapshot.Sources[telemetryLabel(session.ActiveSourceKind, "-")]++
 		snapshot.Formats[telemetryLabel(session.PreferredFormat, "auto")]++
 		snapshot.Pages[telemetryLabel(session.Page, "player")]++
+		snapshot.Qualities[telemetryLabel(session.Quality, "-")]++
+		snapshot.AudioTracks[telemetryLabel(session.SelectedAudioLabel, telemetryLabel(session.SelectedAudioTrack, "-"))]++
 		snapshot.Sessions = append(snapshot.Sessions, playerTelemetrySessionSnapshot{
-			SessionID:        session.SessionID,
-			Page:             telemetryLabel(session.Page, "player"),
-			PreferredFormat:  telemetryLabel(session.PreferredFormat, "auto"),
-			ActiveSourceKind: telemetryLabel(session.ActiveSourceKind, "-"),
-			SourceOverride:   telemetryLabel(session.SourceOverride, "auto"),
-			Quality:          telemetryLabel(session.Quality, "-"),
-			PlaybackSeconds:  session.PlaybackSeconds,
-			BufferSeconds:    session.BufferSeconds,
-			StallCount:       session.StallCount,
-			Recoveries:       session.Recoveries,
-			LastError:        telemetryLabel(session.LastError, "-"),
-			Reconnect:        telemetryLabel(session.Reconnect, "-"),
-			Offline:          session.Offline,
-			Waiting:          session.Waiting,
-			DebugEnabled:     session.DebugEnabled,
-			LastSeen:         session.LastSeen,
-			LastSeenAgoSec:   int(now.Sub(session.LastSeen).Seconds()),
-			RemoteAddr:       telemetryLabel(session.RemoteAddr, "-"),
-			UserAgent:        telemetryLabel(session.UserAgent, "-"),
+			SessionID:          session.SessionID,
+			Page:               telemetryLabel(session.Page, "player"),
+			PreferredFormat:    telemetryLabel(session.PreferredFormat, "auto"),
+			ActiveSourceKind:   telemetryLabel(session.ActiveSourceKind, "-"),
+			SourceOverride:     telemetryLabel(session.SourceOverride, "auto"),
+			Quality:            telemetryLabel(session.Quality, "-"),
+			SelectedAudioTrack: telemetryLabel(session.SelectedAudioTrack, "-"),
+			SelectedAudioLabel: telemetryLabel(session.SelectedAudioLabel, telemetryLabel(session.SelectedAudioTrack, "-")),
+			PlaybackSeconds:    session.PlaybackSeconds,
+			BufferSeconds:      session.BufferSeconds,
+			StallCount:         session.StallCount,
+			Recoveries:         session.Recoveries,
+			QualityTransitions: session.QualityTransitions,
+			AudioSwitches:      session.AudioSwitches,
+			LastError:          telemetryLabel(session.LastError, "-"),
+			Reconnect:          telemetryLabel(session.Reconnect, "-"),
+			Offline:            session.Offline,
+			Waiting:            session.Waiting,
+			DebugEnabled:       session.DebugEnabled,
+			LastSeen:           session.LastSeen,
+			LastSeenAgoSec:     int(now.Sub(session.LastSeen).Seconds()),
+			RemoteAddr:         telemetryLabel(session.RemoteAddr, "-"),
+			UserAgent:          telemetryLabel(session.UserAgent, "-"),
 		})
 	}
 
@@ -318,6 +360,8 @@ func normalizeTelemetryPayload(payload playerTelemetryPayload) playerTelemetryPa
 	payload.ActiveSourceKind = compactLabel(strings.TrimSpace(payload.ActiveSourceKind), 24)
 	payload.SourceOverride = compactLabel(strings.TrimSpace(payload.SourceOverride), 24)
 	payload.Quality = compactLabel(strings.TrimSpace(payload.Quality), 80)
+	payload.SelectedAudioTrack = compactLabel(strings.TrimSpace(payload.SelectedAudioTrack), 32)
+	payload.SelectedAudioLabel = compactLabel(strings.TrimSpace(payload.SelectedAudioLabel), 80)
 	payload.LastError = compactLabel(strings.TrimSpace(payload.LastError), 120)
 	payload.Reconnect = compactLabel(strings.TrimSpace(payload.Reconnect), 48)
 	if payload.PlaybackSeconds < 0 {
@@ -331,6 +375,12 @@ func normalizeTelemetryPayload(payload playerTelemetryPayload) playerTelemetryPa
 	}
 	if payload.Recoveries < 0 {
 		payload.Recoveries = 0
+	}
+	if payload.QualityTransitions < 0 {
+		payload.QualityTransitions = 0
+	}
+	if payload.AudioSwitches < 0 {
+		payload.AudioSwitches = 0
 	}
 	return payload
 }
@@ -369,20 +419,26 @@ func snapshotToTelemetrySample(snapshot playerTelemetrySnapshot) *storage.Player
 	sourcesJSON, _ := json.Marshal(snapshot.Sources)
 	formatsJSON, _ := json.Marshal(snapshot.Formats)
 	pagesJSON, _ := json.Marshal(snapshot.Pages)
+	qualitiesJSON, _ := json.Marshal(snapshot.Qualities)
+	audioTracksJSON, _ := json.Marshal(snapshot.AudioTracks)
 	return &storage.PlayerTelemetrySample{
-		StreamKey:              snapshot.StreamKey,
-		ActiveSessions:         snapshot.ActiveSessions,
-		WaitingSessions:        snapshot.WaitingSessions,
-		OfflineSessions:        snapshot.OfflineSessions,
-		DebugSessions:          snapshot.DebugSessions,
-		TotalStalls:            snapshot.TotalStalls,
-		TotalRecoveries:        snapshot.TotalRecoveries,
-		AverageBufferSeconds:   snapshot.AverageBufferSeconds,
-		AveragePlaybackSeconds: snapshot.AveragePlayback,
-		LastError:              snapshot.LastError,
-		SourcesJSON:            string(sourcesJSON),
-		FormatsJSON:            string(formatsJSON),
-		PagesJSON:              string(pagesJSON),
-		CreatedAt:              snapshot.LastUpdate,
+		StreamKey:               snapshot.StreamKey,
+		ActiveSessions:          snapshot.ActiveSessions,
+		WaitingSessions:         snapshot.WaitingSessions,
+		OfflineSessions:         snapshot.OfflineSessions,
+		DebugSessions:           snapshot.DebugSessions,
+		TotalStalls:             snapshot.TotalStalls,
+		TotalRecoveries:         snapshot.TotalRecoveries,
+		TotalQualityTransitions: snapshot.TotalQualityTransitions,
+		TotalAudioSwitches:      snapshot.TotalAudioSwitches,
+		AverageBufferSeconds:    snapshot.AverageBufferSeconds,
+		AveragePlaybackSeconds:  snapshot.AveragePlayback,
+		LastError:               snapshot.LastError,
+		SourcesJSON:             string(sourcesJSON),
+		FormatsJSON:             string(formatsJSON),
+		PagesJSON:               string(pagesJSON),
+		QualitiesJSON:           string(qualitiesJSON),
+		AudioTracksJSON:         string(audioTracksJSON),
+		CreatedAt:               snapshot.LastUpdate,
 	}
 }
