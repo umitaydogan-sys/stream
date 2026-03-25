@@ -64,10 +64,10 @@ Yapilanlar:
 - stream olusturma ekranina `Config Override JSON` eklendi
 - ayni JSON ve adim adim OBS rehberi stream detay ekranina da tasindi
 
-Su anki sinir:
+Bu asamanin o gun sonundaki siniri:
 
-- OBS cok kanalli baglanti kabul ediliyor
-- fakat gelen ek kalite izleri henuz gercek ABR varyantlarina map edilmiyor
+- OBS cok kanalli baglanti kabul ediliyordu
+- fakat o tarihte gelen ek kalite izleri henuz gercek ABR varyantlarina map edilmiyordu
 
 ## 4. Uretim Olgunlugu Acisindan Bugunku Durum
 
@@ -95,13 +95,45 @@ icin kullanilabilir bir cekirdek urun seviyesine yaklasti.
 
 ## 5. Hala Acik Kalan Ana Eksikler
 
-- OBS multitrack izlerini gercek ABR varyantlarina baglamak
-- player QoE ve stall telemetry eklemek
+- multitrack audio track secimi ve player seviyesinde audio secici
+- track bazli analytics ve kalite gecis raporlamasi
 - multi-node origin-edge cluster
 - S3 veya MinIO archive / restore
 - RBAC, audit log ve SSO
 - DRM, SSAI ve gelismis monetizasyon
 - daha genis otomatik test ve yuk testi
+
+## 7. Sonraki Kapanan Kiritik Hata
+
+Bu kayittan sonra kritik bir multitrack oynatim hatasi daha kokten kapatildi.
+
+Bulunan kok neden:
+
+- RTMP chunk reader, Type 1 ve Type 2 header'lardaki `timestamp delta`
+  degerlerini mutlak zaman gibi kullaniyordu
+- OBS multitrack yayininda ayni video CSID uzerinden gelen yeni mesajlarda
+  delta birikmedigi icin ozellikle `1080p` varyantta bozuk zaman damgalari olusuyordu
+- bunun sonucu HLS `EXTINF` ve DASH `SegmentTimeline` tarafinda
+  `0.010`, `0.011`, `0.016` gibi mikro segmentler goruluyordu
+- player tarafinda bu da siyah ekran, stall, seek hole ve donma uretiyordu
+
+Kapanan teknik duzeltmeler:
+
+- `internal/ingest/rtmp/chunk.go`
+  icinde CSID bazli mutlak timestamp birikimi eklendi
+- `internal/output/hls/muxer.go`
+  icinde segment bolme ve duration hesabi timestamp jitter'ina karsi sertlestirildi
+- `internal/output/dash/muxer.go`
+  icinde ayni duration fallback mantigi uygulandi
+- `internal/transcode/live_multitrack.go`
+  icinde master playlist tekrar tum saglikli varyantlari ilan edecek hale geldi
+
+Son durum:
+
+- mikro segmentler ortadan kalkti
+- `master.m3u8` tekrar `360p + 1080p` ABR katmanlarini saglikli sekilde ilan edebilir hale geldi
+- DASH tarafi da daha tutarli hale geldi
+- issue artÄ±k gecici workaround ile degil, kok neden kapatilarak cozuldu
 
 ## 6. Bu Yedekleme Neden Aliniyor
 

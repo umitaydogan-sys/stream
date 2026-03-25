@@ -319,14 +319,8 @@ func (s *liveDirectSession) writeMasterPlaylistLocked(force bool) {
 	}
 	items := make([]item, 0, len(s.variants))
 	for _, variant := range s.variants {
-		if variant.trackID != s.primaryTrackID {
-			continue
-		}
 		target := filepath.Join(s.outputDir, filepath.FromSlash(variant.playlistPath))
 		if info, err := os.Stat(target); err == nil && !info.IsDir() && info.Size() > 0 {
-			if !playlistLooksStable(target) {
-				continue
-			}
 			items = append(items, item{variant: variant})
 		}
 	}

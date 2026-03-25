@@ -156,33 +156,49 @@ Bu sayede bir sonraki OBS testinde sadece "goruntu var mi yok mu"
 degil, HLS ve DASH tarafinda kac katman olustugu ile
 player tarafinda stall davranisinin nasil aktigi da ayni anda izlenebilir.
 
-### 5.2.3 Canli Testte Ortaya Cikan Yeni Durum
+### 5.2.3 Canli Testte Bulunan Kok Neden ve Kalici Cozum
 
-Canli VPS testinde OBS multitrack yayininda yeni bir dar bogaz netlesti.
+Canli VPS testinde `1080p` multitrack varyantta gorulen mikro segment
+probleminin asil nedeni RTMP chunk reader tarafinda bulundu.
 
-Bugun icin durum soyle:
+Kok neden:
 
-- kok HLS `index.m3u8` akisi kararlilastirildi
-- player tarafinda siyah ekran ve sahte `offline` dongusu buyuk oranda azaltildi
-- fakat `1080p` multitrack varyanti halen mikro segmentler uretiyor
-- bu varyantta `0.010`, `0.011`, `0.016` saniye gibi bozuk `EXTINF` degerleri goruluyor
-- ayni sorun DASH `SegmentTimeline` tarafina da yansiyor
-- player kalite yukseltince `bufferSeekOverHole` ve `bufferStalledError`
-  hatalariyla tekrar donabiliyor
+- RTMP Type 1 ve Type 2 chunk header'larindaki `timestamp delta`
+  degeri mutlak zaman gibi ele aliniyordu
+- ayni CSID uzerinden akan yeni mesajlarda delta birikmedigi icin
+  bazi paketler `11ms`, `16ms` gibi yanlis zaman damgalari aliyordu
+- OBS multitrack yayininda butun video katmanlari ayni video CSID
+  uzerinden geldigi icin sorun ozellikle ust kalite izlerde buyuyordu
+- HLS ve DASH segment sureleri bu bozuk timestamp farklarindan
+  hesaplandiginda `0.010`, `0.011`, `0.016` gibi mikro segmentler olusuyordu
 
-Bu nedenle gecici guvenli mod uygulandi:
+Yapilan kalici duzeltmeler:
 
-- multitrack direct HLS master playlist su an yalnizca stabil ana kati ilan ediyor
-- player bu sayede bozuk ust kalite varyanta cikamiyor
-- yayin akiciligi korunuyor, fakat tam adaptif cok katman davranisi
-  gecici olarak sinirlanmis oluyor
+- `internal/ingest/rtmp/chunk.go`
+  icinde CSID bazli mutlak zaman ve delta birikimi eklendi
+- Type 1 ve Type 2 chunk'lar artik onceki mutlak zamana delta ekleyerek
+  gercek timestamp uretiyor
+- Type 3 yeni mesaj algisi, ayni delta'yi yeni mesaja dogru sekilde tasiyor
+- `internal/output/hls/muxer.go`
+  icinde timestamp sorunlarina karsi wall-clock savunma katmani eklendi
+- `internal/output/dash/muxer.go`
+  icinde de ayni duration fallback mantigi uygulandi
+- `internal/transcode/live_multitrack.go`
+  icinde master playlist tekrar tum saglikli varyantlari ilan edecek hale getirildi
 
-Bir sonraki teknik hedef artik nettir:
+Sonuc:
 
-- `1080p` multitrack track icin bozuk segment sinirlarini kokten bul
-- Enhanced RTMP `timestamp / CTS / keyframe` hattini dogrula
-- HLS muxer segment bolme mantigini track bazinda yeniden gozden gecir
-- DASH uretimini bozuk HLS varyantindan etkilenmeyecek hale getir
+- mikro `EXTINF` segmentleri ortadan kalkti
+- DASH `SegmentTimeline` degerleri tutarli hale geldi
+- `master.m3u8` icinde hem `360p` hem `1080p` katmanlari yeniden saglikli
+  adaptif bitrate olarak gorunebilir hale geldi
+- onceki gecici guvenli mod, hata ayiklama asamasinda kullanilan bir ara adim olarak kaldi
+
+Bu fazdan sonra odak noktasi artik sunlardir:
+
+- multitrack video katmanlari icin daha zengin analytics eklemek
+- multitrack audio track secimini urun seviyesine tasimak
+- karma OBS varyanti + transcode modunu olgunlastirmak
 
 ### 5.3 Faz 4
 
@@ -240,11 +256,11 @@ Bugun icin guclu oldugu alanlar:
 - admin paneli, setup wizard ve stream yonetimi
 - recording, analytics ve player template sistemi
 - runtime lisans, backup ve Linux servis omurgasi
-- OBS cok kanalli video baglantisini kabul eden ilk faz destek
+- OBS multitrack video icin dogrudan ABR varyant uretimi ve canli QoE gorunurlugu
 
 Bugun icin sinirli veya eksik oldugu alanlar:
 
-- cok kanalli OBS izleri henuz dogrudan ABR varyantlarina bagli degil
+- multitrack audio secimi ve track bazli analytics henuz tam urunlesmedi
 - multi-node origin-edge cluster mimarisi yok
 - S3/MinIO benzeri harici obje depolama akisi yok
 - tam enterprise seviye RBAC, audit log ve SSO katmani yok

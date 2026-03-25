@@ -65,13 +65,13 @@
 - [x] OBS'ten gelen kalite katmanlarini HLS varyantlarina dogrudan bagla
 - [x] HLS master playlist icinde track kaynakli varyantlar yaz
 - [x] DASH repack tarafinda tum video izlerini maple
-- [x] player'in bozuk ust varyanta cikmasini gecici guvenli mod ile engelle
+- [x] RTMP chunk timestamp delta birikim hatasini kapat
+- [x] `1080p` multitrack varyantinda mikro segment olusma kok nedenini kapat
+- [x] bozuk `EXTINF` ve DASH `SegmentTimeline` uretimini kalici olarak duzelt
 - [ ] transcode ile OBS varyantlarini karma kullan
 - [ ] gereksiz yeniden encode maliyetini dusur
 - [ ] track bazli bitrate / cozumunurluk analytics'i ekle
 - [ ] cok kanalli audio track secimini player tarafina tasi
-- [ ] `1080p` multitrack varyantinda mikro segment olusma kok nedenini kapat
-- [ ] bozuk `EXTINF` ve DASH `SegmentTimeline` uretimini kalici olarak duzelt
 
 ## 5. QoE ve Telemetri
 
@@ -80,6 +80,7 @@
 - [x] admin stream detay ekraninda canli QoE karti goster
 - [x] diagnostics ekraninda multitrack HLS / DASH sayaclarini goster
 - [x] `bufferSeekOverHole` ve `bufferStalledError` davranisini canli testte ayristir
+- [x] canli testte mikro segment kaynagini RTMP chunk timestamp zincirine kadar indir
 - [ ] telemetrileri kalici depolamaya al
 - [ ] telemetrileri grafik ve zaman serisi olarak goster
 - [ ] Prometheus / OpenTelemetry cikisi uret

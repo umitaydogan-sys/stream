@@ -306,10 +306,18 @@ func (sm *StreamMuxer) shouldSplit(pkt *media.Packet) bool {
 	if pkt.Timestamp >= sm.segmentStart {
 		elapsedTS = time.Duration(pkt.Timestamp-sm.segmentStart) * time.Millisecond
 	}
-	elapsedWall := time.Since(sm.segmentStartedAt)
+
+	// Use timestamp-based elapsed time as the primary signal.
+	// Only fall back to wall-clock when timestamps appear stuck (advancing
+	// less than 250 ms while real time exceeds the segment duration).
+	// This prevents micro-segments caused by timestamp jitter while still
+	// providing a safety net for truly stale timestamp streams.
 	elapsed := elapsedTS
-	if elapsedWall > elapsed {
-		elapsed = elapsedWall
+	if elapsedTS < 250*time.Millisecond {
+		elapsedWall := time.Since(sm.segmentStartedAt)
+		if elapsedWall > sm.segmentDuration {
+			elapsed = elapsedWall
+		}
 	}
 
 	if elapsed < sm.segmentDuration {
@@ -328,14 +336,20 @@ func (sm *StreamMuxer) startNewSegment(timestamp uint32) error {
 	if sm.currentSegment != nil {
 		sm.currentSegment.Close()
 
-		// Record segment info
+		// Record segment info – prefer timestamp-based duration but fall
+		// back to wall-clock when timestamps look implausible (< 250 ms
+		// while wall-clock shows a realistic value).
 		deltaMS := uint32(0)
 		if timestamp >= sm.segmentStart {
 			deltaMS = timestamp - sm.segmentStart
 		}
 		duration := float64(deltaMS) / 1000.0
+		wallDuration := time.Since(sm.segmentStartedAt).Seconds()
+		if duration < 0.25 && wallDuration >= 0.5 {
+			duration = wallDuration
+		}
 		if duration <= 0 {
-			duration = time.Since(sm.segmentStartedAt).Seconds()
+			duration = wallDuration
 		}
 		if duration <= 0 {
 			duration = sm.segmentDuration.Seconds()

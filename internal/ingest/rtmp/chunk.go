@@ -54,10 +54,12 @@ type Message struct {
 
 // ChunkReader reads RTMP chunks from a connection
 type ChunkReader struct {
-	r         io.Reader
-	chunkSize uint32
+	r           io.Reader
+	chunkSize   uint32
 	prevHeaders map[uint32]*ChunkHeader
 	prevData    map[uint32][]byte
+	csidAbsTS   map[uint32]uint32 // accumulated absolute timestamp per CSID
+	csidDelta   map[uint32]uint32 // last timestamp delta per CSID (for Type 3 reuse)
 }
 
 // NewChunkReader creates a new chunk reader
@@ -67,6 +69,8 @@ func NewChunkReader(r io.Reader) *ChunkReader {
 		chunkSize:   DefaultChunkSize,
 		prevHeaders: make(map[uint32]*ChunkHeader),
 		prevData:    make(map[uint32][]byte),
+		csidAbsTS:   make(map[uint32]uint32),
+		csidDelta:   make(map[uint32]uint32),
 	}
 }
 
@@ -86,30 +90,52 @@ func (cr *ChunkReader) ReadMessage() (*Message, error) {
 		// Get previous header for this CSID
 		prev := cr.prevHeaders[header.CSID]
 
-		// Fill in missing fields based on format type
+		// Fill in missing fields based on format type.
+		// IMPORTANT: For Type 1/2 the timestamp field is a DELTA from the
+		// previous absolute timestamp, not an absolute value.  For Type 3 a
+		// new message reuses the previous delta.  We accumulate these into
+		// csidAbsTS so that every message gets a correct absolute timestamp.
 		switch header.Fmt {
 		case 0:
-			// Full header - all fields present
+			// Full header – timestamp is ABSOLUTE
+			cr.csidDelta[header.CSID] = header.Timestamp - cr.csidAbsTS[header.CSID]
+			cr.csidAbsTS[header.CSID] = header.Timestamp
 		case 1:
-			// No stream ID
+			// Timestamp delta + length + typeID (no streamID)
 			if prev != nil {
 				header.StreamID = prev.StreamID
 			}
+			delta := header.Timestamp
+			cr.csidDelta[header.CSID] = delta
+			cr.csidAbsTS[header.CSID] += delta
+			header.Timestamp = cr.csidAbsTS[header.CSID]
 		case 2:
-			// Only timestamp delta
+			// Timestamp delta only
 			if prev != nil {
 				header.Length = prev.Length
 				header.TypeID = prev.TypeID
 				header.StreamID = prev.StreamID
 			}
+			delta := header.Timestamp
+			cr.csidDelta[header.CSID] = delta
+			cr.csidAbsTS[header.CSID] += delta
+			header.Timestamp = cr.csidAbsTS[header.CSID]
 		case 3:
-			// No header
+			// No header fields at all
 			if prev != nil {
-				header.Timestamp = prev.Timestamp
 				header.Length = prev.Length
 				header.TypeID = prev.TypeID
 				header.StreamID = prev.StreamID
 			}
+			// Detect whether this is a continuation chunk (same message)
+			// or the first chunk of a brand-new message.
+			pendingBuf := cr.prevData[header.CSID]
+			isNewMessage := len(pendingBuf) == 0 || len(pendingBuf) >= int(header.Length)
+			if isNewMessage {
+				// New message – advance by the same delta as the previous message
+				cr.csidAbsTS[header.CSID] += cr.csidDelta[header.CSID]
+			}
+			header.Timestamp = cr.csidAbsTS[header.CSID]
 		}
 
 		// Read chunk data

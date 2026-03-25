@@ -179,8 +179,12 @@ func (sm *StreamMuxer) flushSegment(ts uint32) {
 		deltaMS = ts - sm.segStart
 	}
 	duration := float64(deltaMS) / 1000.0
+	wallDuration := time.Since(sm.segStartedAt).Seconds()
+	if duration < 0.25 && wallDuration >= 0.5 {
+		duration = wallDuration
+	}
 	if duration <= 0 {
-		duration = time.Since(sm.segStartedAt).Seconds()
+		duration = wallDuration
 	}
 	if duration <= 0 {
 		duration = sm.segmentDuration.Seconds()
