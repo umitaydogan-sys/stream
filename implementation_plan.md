@@ -81,6 +81,7 @@ streaming cekirdegi yeterince olgunlastiktan sonra eklenecek.
 - `Depolama ve Arsiv Merkezi` ile kayit yonetimi, depolama ayarlari ve sistem yedekleri ayni ekranda birlestirildi
 - harici hedef seceneklerine `SFTP` de eklendi; ayni merkezden `local`, `S3`, `MinIO`, `SFTP` secilebiliyor
 - recording tarafinda varsayilan format `mp4` oldu; `mp4` ve `mkv` secildiginde yayin once guvenli `TS capture` olarak alinip kapanista `ffmpeg copy remux` ile son dosyaya donusturuluyor
+- tum kayit baslatma ekranlari ve hizli kayit endpoint'leri `mp4` varsayilanina cekildi; kullanici isterse `TS`, `MKV` veya `FLV` secebiliyor
 - kayit kutuphanesi artik gecici `.capture.ts` dosyalarini gostermiyor
 - mevcut `TS`, `FLV` ve `MKV` kayitlari panelden tek tusla `MP4 Hazirla` akisi ile izlenebilir formata donusturulebiliyor
 - sistem yedekleri icin de ayni archive altyapisi kullaniliyor; otomatik yukleme, geri yukleme ve lokal kopyayi silme politikasi ayarlanabiliyor
@@ -89,6 +90,8 @@ streaming cekirdegi yeterince olgunlastiktan sonra eklenecek.
 - recording tarafinda TS capture paketleme mantigi HLS ile hizalandi; AVC payload Annex-B, AAC payload ADTS olarak yaziliyor
 - yeni kayitlar artik ilk gecerli video keyframe'inden baslatilarak daha guvenilir MP4 remux kaynagi uretiyor
 - sistem yedegi silme ve kayit / arsiv aksiyonlari ayni ekranda daha guvenli parcali yenileme ile calisiyor
+- MinIO / S3 upload yolunda eksik `Content-Length` basligi giderildi; MinIO artik `411 MissingContentLength` vermeden gercek upload kabul ediyor
+- ayni VPS uzerinde kurulan `MinIO` ve ayri `SFTP` kullanicisi ile recording + backup upload / restore saha testi basariyla tamamlandi
 
 ## 3. Bu Surecte Neleri Kapatmis Olduk
 
@@ -179,15 +182,18 @@ Bugun artik asagidaki maddeler kapanmis sayilmali:
 
 Bugun hala acik olan gercek eksikler ise sunlar:
 
-- DASH audio-only cikisi ve audio selector davranisinin farkli oynaticilarla daha genis saha testi
+- `audio-only DASH` icin eklenen `audio.mpd` ve audio-only init segment akisinin farkli oynaticilarla saha testi
 - kalite gecisi ve audio switch verisini daha ileri alarm otomasyonu ve uzun periyot rapor katmanina baglama
 - ABR profil merdivenlerini gercek trafik ve cihaz verisine gore tekrar ince ayarlama
 - dusuk bant sahalarinda uzun sureli soak test ve canli benchmark calistirma
-- archive/object storage akisinda gercek `S3`, `MinIO` ve `SFTP` hedefleriyle uzun sureli saha testi
+- harici bir bucket ile gercek AWS S3 saha testi
+- ayni VPS uzerindeki MinIO + SFTP laboratuvar hedeflerinde yapilan testleri daha uzun sureli senaryolarla sertlestirme
 - kayit finalize/remux akisinda buyuk dosya, uzun sureli kayit ve beklenmeyen servis restart senaryolarini sertlestirme
 - onceki bozuk `TS` kayitlar icin kullaniciya acik kurtarma / uyari akislarini tasarlama
 - `Depolama ve Arsiv Merkezi` ekranini teknik terimleri azaltarak daha sade, daha anlasilir hale getirme
 - `Google Drive` ve `OneDrive` gibi populer cloud hedefleri icin daha basit arsiv baglanti secenekleri ekleme
+- playback guvenligini signed URL, oturum bagli token, hotlink korumasi ve watermark ile urunlestirme
+- dusuk butceye uygun playback security fazi ile tam DRM fazini ayri planlama
 
 ## 6. Rakiplere Gore Bugunku Konum
 
@@ -241,12 +247,17 @@ demek icin erken:
 
 Bir sonraki dogru kapatma sirasi bence su:
 
-1. audio-only DASH ve farkli client davranislarini canli saha testiyle sertlestir
-2. Operasyon Merkezi ekranini uzun sureli kullanim ve buyuk stream sayisinda sertlestir
-3. archive/object storage akisinda MinIO, gercek S3 ve SFTP saha testi al
-4. multi-node origin-edge mimarisini tasarla
-5. RBAC, audit log, SSO ve lisans enforcement tarafini sertlestir
-6. ABR profil merdivenini gercek saha benchmarklari ile tekrar optimize et
+1. `Depolama ve Arsiv Merkezi` ekranini sade, daha az teknik ve daha kullanici dostu hale getir
+2. harici bucket ile gercek S3 saha testi al
+3. ayni VPS uzerindeki MinIO + SFTP laboratuvar hedeflerini UI/UX ve uzun sureli senaryolarla yeniden dogrula
+4. audio-only DASH ve uzun sureli recording/finalize davranisini canli saha testiyle sertlestir
+5. dusuk butceye uygun playback guvenligi fazini ekle:
+   signed URL, signed manifest/segment, oturum tokeni, hotlink korumasi, watermark
+6. daha sonra tam DRM fazini tasarla:
+   AES-128 HLS key servis, DRM abstraction, Widevine/FairPlay/PlayReady hazirligi
+7. sonra multi-node origin-edge mimarisini tasarla
+8. RBAC, audit log, SSO ve lisans enforcement tarafini sertlestir
+9. ABR profil merdivenini gercek saha benchmarklari ile tekrar optimize et
 
 ## 9. Operasyon Merkezi Fazinin Uygulama Taslagi
 

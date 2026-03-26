@@ -68,6 +68,7 @@ Bugun elde olanlar:
 - object storage / archive omurgasi
 - Depolama ve Arsiv Merkezi
 - Linux servis ve deploy akisi
+- ayni VPS uzerinde kurulu MinIO ve SFTP laboratuvar hedefleri
 
 Karar:
 
@@ -110,17 +111,20 @@ Kapananlar:
 - lokal arsiv klasoru modu
 - S3 / MinIO uyumlu archive upload / restore akisi
 - SFTP hedefi ile arsiv ve yedek yukleme akisi
+- MinIO / S3 upload yolundaki eksik `Content-Length` hatasi kapatildi
 - otomatik arsiv senkronu
 - panelden arsive gonderme ve geri yukleme
 - saglik raporunda arsiv ozet gorunurlugu
 - sistem yedeklerini ayni archive omurgasina baglama
 - kayit / depolama / yedek yonetimini tek `Depolama ve Arsiv Merkezi` ekraninda birlestirme
+- ayni VPS uzerindeki MinIO ve SFTP hedeflerinde recording + backup upload / restore saha testi basariyla tamamlandi
 
 ### 3.5 Kayit ve Depolama Merkezi
 
 Kapananlar:
 
 - varsayilan kayit formati `mp4` olacak sekilde akisi guncelleme
+- tum kayit baslatma akislari ve hizli kayit endpoint'lerini `mp4` varsayilanina cekme
 - `mp4` ve `mkv` secildiginde guvenli `TS capture` alip kapanista `ffmpeg copy remux` ile izlenebilir dosya uretme
 - gecici `.capture.ts` dosyalarini kayit kutuphanesinden gizleme
 - mevcut `TS`, `FLV` ve `MKV` kayitlari panelden `MP4 Hazirla` ile donusturebilme
@@ -151,15 +155,18 @@ Karar:
 
 Asagidaki basliklar henuz tam production-ready degil:
 
-- audio-only DASH davranisinin farkli client'larda saha dogrulamasi
+- `audio-only DASH` icin eklenen `audio.mpd` ve audio-only init segment akisinin farkli client'larda saha dogrulamasi
 - kalite gecisi ve audio switch verisinin daha ileri alarm otomasyonu ve daha uzun rapor katmanina baglanmasi
 - dusuk bant genisligi icin ABR profil merdiveninin daha uzun benchmarklarla tekrar optimizasyonu
 - multi-node origin-edge cluster mimarisi
-- yeni archive / object storage akisinin gercek S3, MinIO ve SFTP sahasinda sertlestirilmesi
+- harici bir bucket ile gercek AWS S3 saha testinin alinmasi
+- ayni VPS uzerindeki MinIO ve SFTP laboratuvar hedeflerinde daha uzun sureli sertlestirme testleri
 - kayit finalize/remux akisinin uzun sureli, buyuk dosyali ve servis restart senaryolarinda sertlestirilmesi
 - onceki bozuk `TS` kayitlar icin kullaniciyi yonlendiren kurtarma / acik uyari akislarinin eklenmesi
 - `Depolama ve Arsiv Merkezi` ekraninin daha sade, teknik terimi azaltan bir UX'e kavusmasi
 - `Google Drive` ve `OneDrive` gibi populer cloud hedefleri icin basit entegrasyon seceneklerinin eklenmesi
+- signed URL, oturum tokeni, hotlink korumasi ve watermark gibi dusuk butceye uygun playback guvenligi katmanlari
+- tam DRM icin gerekli anahtar servisi, DRM abstraction ve lisans sunucusu hazirligi
 - RBAC, audit log ve SSO
 - DRM, SSAI ve monetizasyon
 - kapsamli yuk testi ve soak testi
@@ -187,10 +194,14 @@ Host:
 - systemd servis: `fluxstream`
 - servis durumu: `active`
 - health: `http://127.0.0.1:8844/api/health` -> `{"status":"ok","version":"2.0.0"}`
-- canli deploy hash: `5cf93d556b8e05b00ec609e7372c4ed46f902b02de9e820203af2932f8f87461`
+- canli deploy hash: `ba7bc219c325435e8a654bc67ec3ae711d6a84efe9e5109f7b4c22cfb234e5dc`
 - canli dogrulama: HLS master `2` video katmani, DASH MPD `3` representation (2 video + 1 audio)
 - yayin dogrulamasi: `test / live_14957742f633b59863173e5a` stream'i ile kontrol edildi
 - storage merkezi crash duzeltmesi ve yeni recording paketleme zinciri hosta yuklendi
+- recording varsayilan formati canli ayarlarda da `mp4` olarak guncellendi
+- MinIO test ortami: `127.0.0.1:9002`, bucket `fluxstream-archive-test`
+- SFTP test ortami: `fluxarchive@127.0.0.1:/srv/fluxarchive-store`
+- ayni VPS uzerinde hem recording hem backup icin upload + yerelden silme + restore dogrulamasi gecti
 
 Karar:
 
@@ -249,9 +260,11 @@ Bunu demek icin su basliklarin kapanmasi gerekiyor:
 
 Bana gore bundan sonraki en mantikli sira su:
 
-1. audio-only DASH davranisini farkli client'larda canli testle sertlestir
-2. Operasyon Merkezi'ni buyuk stream sayisi ve uzun oturumlarla sertlestir
-3. archive / object storage akisina gercek S3 ve MinIO saha testi yap
-4. archive / object storage akisina SFTP hedefiyle de saha testi yap
-5. multi-node origin-edge mimarisini tasarla
-6. RBAC, audit log ve SSO katmanini ekle
+1. `Depolama ve Arsiv Merkezi` ekranini sade ve daha anlasilir hale getir
+2. harici bir bucket ile gercek AWS S3 saha testi yap
+3. ayni VPS uzerindeki MinIO ve SFTP laboratuvar hedeflerini uzun sureli senaryolarla yeniden zorla
+4. `audio-only DASH` ve uzun sureli recording/finalize davranisini sertlestir
+5. dusuk butceye uygun playback guvenligi katmanlarini ekle
+6. sonra tam DRM mimarisini tasarla
+7. sonra multi-node origin-edge mimarisine gec
+8. RBAC, audit log ve SSO katmanini ekle

@@ -84,6 +84,8 @@
 - [x] `MP4 Hazirla` akisinin arka plan isi olarak sayfa degisse bile devam etmesini sagla
 - [x] yeni kayitlarin TS paketlemesini Annex-B / ADTS ve ilk gecerli keyframe guvenligiyle duzelt
 - [x] sistem yedegi silme ve kayit arsiv aksiyonlarini tam sayfa yeniden cizmeden guvenli hale getir
+- [x] tum kayit baslatma akislarinda varsayilan formati `mp4` yap
+- [x] S3 / MinIO upload'larinda eksik `Content-Length` hatasini kapat
 
 ## 6. Urunlestirme ve Lisans
 
@@ -116,13 +118,51 @@
 - [ ] DRM ve gelismis playback guvenligi
 - [ ] SSAI ve monetizasyon omurgasi
 - [ ] uzun sureli soak test ve yuk testi kapsamini artir
-- [ ] gercek S3, MinIO ve SFTP sahasinda uzun sureli arsiv / geri yukleme testi yap
+- [x] ayni VPS uzerinde MinIO + SFTP ile gercek upload / geri yukleme saha testi yap
+- [ ] harici bir bucket ile gercek AWS S3 saha testi yap
+- [ ] MinIO ve SFTP akisini daha uzun sureli arsiv / geri yukleme testleriyle sertlestir
 - [ ] kayit oynatim akisinda buyuk dosya, uzun sure ve kesintili finalize senaryolarini sertlestir
 - [ ] eski bozuk `TS` kayitlar icin kullaniciyi dogru yonlendiren kurtarma / uyari akislarini ekle
 - [ ] `Depolama ve Arsiv Merkezi` ekranini teknik terimleri azaltarak daha sade ve son kullanici dostu hale getir
 - [ ] `Google Drive` ve `OneDrive` gibi populer cloud arsiv hedeflerini ekle
+- [x] `audio-only DASH` icin ayri `audio.mpd` ve audio-only init segment uret
 
-## 9. Cekirdek Tamamlandiktan Sonra
+## 9. Siradaki Oncelikli Faz
+
+- [ ] `Depolama ve Arsiv Merkezi` ekranini daha sade, daha az teknik ve son kullanici dostu hale getir
+- [ ] harici `S3` bucket ile saha testi al
+- [ ] ayni VPS uzerindeki `MinIO` ve `SFTP` laboratuvar hedeflerini UI/UX akislariyla yeniden dogrula
+- [ ] `audio-only DASH` davranisini VLC, dash.js audio player ve farkli tarayicilarda canli testle sertlestir
+- [ ] buyuk dosya, uzun sureli kayit ve servis restart senaryolarinda finalize/remux akisini sertlestir
+
+## 10. Playback Guvenligi ve DRM Fazlari
+
+### 10.1 Dusuk Butce / Kisa Vade Playback Guvenligi
+
+- [ ] kisa omurlu signed playback URL destegi ekle
+- [ ] manifest ve segment istekleri icin imzali token dogrulamasi ekle
+- [ ] oturum bagli playback token mantigi kur
+- [ ] domain / referrer / origin tabanli hotlink korumasi ekle
+- [ ] IP / CIDR allowlist ve geo-kisit policy altyapisini ekle
+- [ ] playback rate limit ve esik tabanli bloklama ekle
+- [ ] gorunur watermark / dynamic overlay / oturum izi ekle
+- [ ] playback auth olaylarini audit log tarafina bagla
+
+### 10.2 Orta Vade Gelismis Playback Guvenligi
+
+- [ ] AES-128 HLS sifreleme ve anahtar servis akisini ekle
+- [ ] anahtar erisimini token / oturum / IP ile koru
+- [ ] lisansli playback policy seti olustur
+- [ ] embed domain pinning ve signed iframe mantigi ekle
+
+### 10.3 Uzun Vade Tam DRM
+
+- [ ] DRM abstraction layer tasarla
+- [ ] Widevine / FairPlay / PlayReady entegrasyon noktalarini tasarla
+- [ ] CENC / CMAF ve DRM lisans sunucusu baglantisi icin enterprise faz plani cikar
+- [ ] tam DRM ozelliklerini lisans modeliyle eslestir
+
+## 11. Cekirdek Tamamlandiktan Sonra
 
 - [ ] konferans odalari
 - [ ] canli chat

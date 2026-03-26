@@ -307,6 +307,33 @@ func registerProductAdminRoutes(webServer *web.Server, cfg *config.Manager, db *
 		http.ServeFile(w, r, path)
 	})
 
+	webServer.RegisterAdminHandler("/api/system/backups/delete", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		var req struct {
+			Name string `json:"name"`
+		}
+		if err := decodeJSON(r, &req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		name := filepath.Base(strings.TrimSpace(req.Name))
+		if name == "" || name == "." {
+			http.Error(w, "Backup adi gerekli", http.StatusBadRequest)
+			return
+		}
+		if err := systemutil.DeleteBackup(dataDir, name); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if archiveManager != nil {
+			_ = archiveManager.MarkBackupLocalDeleted(name, true)
+		}
+		jsonResp(w, map[string]interface{}{"success": true})
+	})
+
 	webServer.RegisterAdminHandler("/api/system/backups/", func(w http.ResponseWriter, r *http.Request) {
 		name := filepath.Base(strings.TrimPrefix(r.URL.Path, "/api/system/backups/"))
 		if name == "" || name == "." {
@@ -318,6 +345,9 @@ func registerProductAdminRoutes(webServer *web.Server, cfg *config.Manager, db *
 			if err := systemutil.DeleteBackup(dataDir, name); err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
+			}
+			if archiveManager != nil {
+				_ = archiveManager.MarkBackupLocalDeleted(name, true)
 			}
 			jsonResp(w, map[string]interface{}{"success": true})
 		default:

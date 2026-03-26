@@ -591,6 +591,9 @@ func main() {
 				http.Error(w, "recording lisans gerektirir", http.StatusForbidden)
 				return
 			}
+			if strings.TrimSpace(req.Format) == "" {
+				req.Format = string(recording.FormatMP4)
+			}
 			rec, err := recManager.StartRecording(req.StreamKey, recording.Format(req.Format))
 			if err != nil {
 				http.Error(w, err.Error(), 400)
@@ -981,7 +984,11 @@ func main() {
 			return
 		}
 		streamKey := strings.TrimPrefix(r.URL.Path, "/api/streams/record/")
-		rec, err := recManager.StartRecording(streamKey, recording.FormatTS)
+		recordFormat := recording.FormatMP4
+		if st, err := db.GetStreamByKey(streamKey); err == nil && st != nil && strings.TrimSpace(st.RecordFormat) != "" {
+			recordFormat = recording.Format(st.RecordFormat)
+		}
+		rec, err := recManager.StartRecording(streamKey, recordFormat)
 		if err != nil {
 			http.Error(w, err.Error(), 400)
 			return

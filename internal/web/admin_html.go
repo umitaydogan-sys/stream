@@ -1234,7 +1234,7 @@ function renderCreateStream(c){
         '<div class="form-group"><label class="form-label">Acik Cikis Formatlari</label><div class="form-hint" style="margin-bottom:10px">Bu yayinin disariya hangi formatlarda servis edilecegini secin.</div>'+renderOutputSelector(defaultStreamOutputs(),'cs')+'</div>'+
         '<div class="setting-row"><div><div class="setting-label">Yayin kaydedilsin mi?</div><div class="setting-desc">Varsayilan olarak kapali. Kalici kayitlar data/recordings altina yazilir.</div></div>'+
           '<label class="toggle"><input type="checkbox" id="cs-record-enabled" onchange="toggleCreateRecordFormat()"><span class="toggle-slider"></span></label></div>'+
-        '<div class="form-group" style="margin-top:16px"><label class="form-label">Kayit Formati</label><select class="form-select" id="cs-record-format" disabled>'+recordingFormatOptions((runtimeSettings&&runtimeSettings.recording_format)||'mp4')+'</select><div class="form-hint">MP4 secildiginde yayin once guvenli bicimde yakalanir, yayin bitince izlenebilir dosyaya finalize edilir.</div></div>'+
+        '<div class="form-group" style="margin-top:16px"><label class="form-label">Kayit Formati</label><select class="form-select" id="cs-record-format" disabled>'+recordingFormatOptions('mp4')+'</select><div class="form-hint">MP4 secildiginde yayin once guvenli bicimde yakalanir, yayin bitince izlenebilir dosyaya finalize edilir.</div></div>'+
         '<button class="btn btn-primary" onclick="createStream()">Yayin Olustur</button>'+
       '</div>'+
       '<div class="card" id="cs-side-panel">'+
@@ -2335,14 +2335,18 @@ async function renderSettingsStorage(c){
     '<div class="page-header"><h1 class="page-title">Depolama ve Arsiv Merkezi</h1><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-primary" onclick="showRecordModal()">Kayit Baslat</button><button class="btn btn-secondary" onclick="createSystemBackupFromStorage(false)">Hafif Yedek Al</button><button class="btn btn-secondary" onclick="createSystemBackupFromStorage(true)">Kayitlarla Yedek Al</button></div></div>'+
     '<div id="storage-active-banner">'+(activeRecordings.length?'<div class="card" style="margin-bottom:16px;border-color:rgba(239,68,68,.28);box-shadow:0 8px 22px rgba(239,68,68,.08)"><div class="card-header"><div><div class="card-title">Aktif Kayit Uyarisi</div><div class="form-hint">Calisan kayit oturumlari burada sabit tutulur. Durdur dugmesine buradan da erisebilirsiniz.</div></div><span class="badge badge-live">'+fmtInt(activeRecordings.length)+' aktif kayit</span></div><div style="display:flex;gap:10px;flex-wrap:wrap">'+activeRecordings.map(function(r){return '<div class="tag tag-red" style="display:flex;align-items:center;gap:10px;padding:8px 12px"><span><strong>'+escHtml(String(r.StreamKey||'-'))+'</strong> · '+escHtml(String(r.Format||'').toUpperCase())+'</span>'+(r.Status==='recording'?'<button class="btn btn-sm btn-danger" onclick="stopRec(\''+r.ID+'\')">Durdur</button>':'')+'</div>';}).join('')+'</div></div>':'')+'</div>'+
     '<div id="storage-remux-jobs">'+(remuxJobs.length?'<div class="card" style="margin-bottom:16px;background:linear-gradient(180deg,#f8fbff 0%,#f2f8ff 100%)"><div class="card-header"><div><div class="card-title">Donusum ve Senkron Isleri</div><div class="form-hint">MP4 hazirlama ve benzeri uzun isler arka planda devam eder.</div></div><button class="btn btn-secondary btn-sm" onclick="refreshStorageSnapshot({resetPreview:false})">Yenile</button></div><div style="display:flex;gap:10px;flex-wrap:wrap">'+remuxJobs.slice(0,6).map(function(job){var tone=job.status==='completed'?'green':(job.status==='error'?'red':'yellow'); var label=job.status==='completed'?'Hazir':(job.status==='error'?'Hata':'Calisiyor'); return '<div class="tag tag-'+tone+'" style="display:flex;align-items:center;gap:8px;padding:8px 12px"><span><strong>'+escHtml(job.source_name||'-')+'</strong> → '+escHtml((job.target_format||'mp4').toUpperCase())+'</span><span>'+label+'</span></div>';}).join('')+'</div></div>':'')+'</div>'+
-    '<div class="card" style="margin-bottom:16px"><div class="card-title" style="margin-bottom:8px">Kullanim Notu</div><div class="form-hint">Bu merkezde yerel kayitlar, harici arsiv hedefi ve sistem yedekleri birlikte yonetilir. Yerel klasor yapisi korunur; S3, MinIO ve SFTP hedefleri bunun ustune eklenir. MP4 secilen kayitlar yayin boyunca guvenli bicimde yakalanir, yayin bitince izlenebilir dosyaya finalize edilir.</div></div>'+
+    '<div class="card" style="margin-bottom:16px"><div class="card-header"><div><div class="card-title">Ne yapmak istiyorsunuz?</div><div class="form-hint">Bu ekran uc seyi birlikte yonetir: kayitlar, yedekler ve harici arsiv kopyalari.</div></div></div><div class="card-grid card-grid-3">'+
+      '<div style="padding:14px;border:1px solid var(--border);border-radius:12px;background:var(--bg-primary)"><div style="font-weight:700;margin-bottom:6px">1. Yerelde tut</div><div class="form-hint">En kolay baslangic. Kayitlar bu sunucuda kalir.</div></div>'+
+      '<div style="padding:14px;border:1px solid var(--border);border-radius:12px;background:var(--bg-primary)"><div style="font-weight:700;margin-bottom:6px">2. Dis kopya ekle</div><div class="form-hint">Ayni kayitlari ikinci bir hedefe de gonderirsin. Yedek icin en guvenli yoldur.</div></div>'+
+      '<div style="padding:14px;border:1px solid var(--border);border-radius:12px;background:var(--bg-primary)"><div style="font-weight:700;margin-bottom:6px">3. Geri yukle ve indir</div><div class="form-hint">Arsivden geri getir, yerelden indir veya gerekmiyorsa sil.</div></div>'+
+    '</div><div class="form-hint" style="margin-top:12px">MP4 secilen kayitlar yayin boyunca guvenli bicimde yakalanir, yayin bitince izlenebilir dosyaya finalize edilir.</div></div>'+
     '<div id="storage-stats-grid" class="card-grid card-grid-4" style="margin-bottom:16px">'+
       statCard('blue','bi-hdd-fill',formatBytes((report&&report.storage&&report.storage.recordings_bytes)||0),'Yerel Kayitlar')+
       statCard('purple','bi-archive-fill',fmtInt(backups.length),'Yerel Yedekler')+
       statCard('orange','bi-cloud-arrow-up-fill',fmtInt(archives.length),'Kayit Arsivi')+
       statCard('green','bi-safe2-fill',fmtInt(backupArchives.length),'Yedek Arsivi')+
     '</div>'+
-    '<div style="display:grid;gap:16px">'+
+    '<div class="card-grid card-grid-2" style="margin-bottom:16px">'+
       '<div class="card">'+
         '<div class="card-title" style="margin-bottom:12px">Yerel Depolama ve Temizlik</div>'+
         settingInput('storage_max_gb','Maksimum Depolama (GB)',s.storage_max_gb||'50','number','Toplam kayit ve yedek alanini izlemek icin uyarilarda kullanilir.')+
@@ -2354,43 +2358,44 @@ async function renderSettingsStorage(c){
         '<button class="btn btn-primary" style="margin-top:8px" onclick="saveSettingsCategory(\'storage\')">Yerel Ayarlari Kaydet</button>'+
       '</div>'+
       '<div class="card">'+
-        '<div class="card-title" style="margin-bottom:12px">Harici Hedef ve Senkron</div>'+
-        '<div class="card" style="margin-bottom:14px;background:var(--bg-primary)"><div class="card-title" style="margin-bottom:10px">Basit Secim Rehberi</div><div class="form-hint" style="line-height:1.8"><strong>Yerel:</strong> Kayitlar ayni sunucuda kalir. En kolay secenektir.<br><strong>S3 / MinIO:</strong> Dosyalari bulut benzeri obje depoya yollar. Daha kurumsal kullanim icindir.<br><strong>SFTP:</strong> Baska bir sunucuya klasor gibi kopyalar. Dusuk butcede en pratik harici hedeflerden biridir.<br><strong>Google Drive / OneDrive:</strong> Cok kullanilan servisler olarak yol haritasina alindi; bu turda henuz dogrudan entegrasyon yok.</div></div>'+
-        '<div class="form-group"><label class="form-label">Saglayici</label><select class="form-select setting-input" data-key="archive_provider"><option value="local" '+((s.archive_provider||'local')==='local'?'selected':'')+'>Yerel Arsiv Klasoru</option><option value="s3" '+((s.archive_provider||'')==='s3'?'selected':'')+'>S3 Uyumlu Depo</option><option value="minio" '+((s.archive_provider||'')==='minio'?'selected':'')+'>MinIO Sunucusu</option><option value="sftp" '+((s.archive_provider||'')==='sftp'?'selected':'')+'>SFTP / SSH Sunucusu</option></select><div class="form-hint">Once <strong>Yerel</strong> ile baslamak en kolayidir. Harici hedefe gecince kayit ve yedekler ikinci bir konuma da yazilabilir.</div></div>'+
-        settingInput('archive_prefix','Object Key On Eki',s.archive_prefix||'fluxstream','text','Kayitlar ve yedekler bu kok klasor altina yazilir.')+
-        settingInput('archive_public_base_url','Public Arsiv Taban URL',s.archive_public_base_url||'','text','Varsa panel tiklanabilir genel link uretir.')+
-        settingInput('archive_local_dir','Lokal Arsiv Klasoru',s.archive_local_dir||'','text','Local provider secildiginde dosyalar bu klasore kopyalanir.')+
-        settingInput('archive_endpoint','S3 / MinIO Endpoint',s.archive_endpoint||'','text','Ornek: https://s3.eu-central-1.amazonaws.com')+
-        settingInput('archive_region','Region',s.archive_region||'us-east-1','text','S3 imzalama bolgesi')+
-        settingInput('archive_bucket','Bucket',s.archive_bucket||'','text','Object storage bucket adi')+
-        settingInput('archive_access_key','Access Key',s.archive_access_key||'','text','S3 / MinIO access key')+
-        settingInput('archive_secret_key','Secret Key',s.archive_secret_key||'','password','S3 / MinIO secret key')+
-        settingInput('archive_sftp_host','SFTP Host',s.archive_sftp_host||'','text','SSH ile erisilecek host veya IP')+
-        settingInput('archive_sftp_port','SFTP Port',s.archive_sftp_port||'22','number','Genelde 22')+
-        settingInput('archive_sftp_user','SFTP Kullanici',s.archive_sftp_user||'','text','SSH kullanicisi')+
-        settingInput('archive_sftp_remote_dir','SFTP Uzak Dizin',s.archive_sftp_remote_dir||'','text','Ornek: /srv/fluxstream-archive')+
-        settingInput('archive_sftp_key_path','SFTP Anahtar Yolu',s.archive_sftp_key_path||'','text','Bos ise varsayilan SSH anahtari/agent denenir.')+
+        '<div class="card-title" style="margin-bottom:12px">Dis Kopya ve Arsiv Hedefi</div>'+
+        '<div class="card" style="margin-bottom:14px;background:var(--bg-primary)"><div class="card-title" style="margin-bottom:10px">Kolay secim rehberi</div><div class="form-hint" style="line-height:1.8"><strong>Yerel:</strong> Kayitlar ayni sunucuda ikinci bir klasore kopyalanir. En kolay secenektir.<br><strong>S3 / MinIO:</strong> Dosyalar bulut benzeri bir depoya gider. Daha duzenli backup icin uygundur.<br><strong>SFTP:</strong> Kayitlari baska bir sunucuya klasor gibi kopyalar. Dusuk butcede en pratik dis hedeflerden biridir.<br><strong>Google Drive / OneDrive:</strong> Yol haritasinda. Bu turda dogrudan entegrasyon yok.</div></div>'+
+        '<div class="form-group"><label class="form-label">Arsiv hedefi</label><select id="storage-provider-select" class="form-select setting-input" data-key="archive_provider" onchange="updateStorageProviderUI()"><option value="local" '+((s.archive_provider||'local')==='local'?'selected':'')+'>Bu sunucuda sakla</option><option value="s3" '+((s.archive_provider||'')==='s3'?'selected':'')+'>S3 bulut deposu</option><option value="minio" '+((s.archive_provider||'')==='minio'?'selected':'')+'>MinIO sunucusu</option><option value="sftp" '+((s.archive_provider||'')==='sftp'?'selected':'')+'>SFTP ile baska sunucu</option></select><div class="form-hint">Yerel ile baslamak en kolayidir. Sonra istersen dis hedefe gecebilirsin.</div></div>'+
+        '<div id="storage-provider-guide" class="card" style="margin-bottom:14px;background:var(--bg-primary)"></div>'+
+        settingInput('archive_prefix','Arsiv klasor adi',s.archive_prefix||'fluxstream','text','Kayitlar ve yedekler bu isim altinda toplanir.')+
+        settingInput('archive_public_base_url','Genel erisim link tabani',s.archive_public_base_url||'','text','Varsa panel tiklanabilir baglanti uretir.')+
+        settingInput('archive_local_dir','Bu sunucudaki arsiv klasoru',s.archive_local_dir||'','text','Yerel hedef secildiginde dosyalar bu klasore kopyalanir.')+
+        settingInput('archive_endpoint','Baglanti adresi',s.archive_endpoint||'','text','Ornek: https://s3.eu-central-1.amazonaws.com')+
+        settingInput('archive_region','Bolge',s.archive_region||'us-east-1','text','S3 / MinIO imzalama bolgesi')+
+        settingInput('archive_bucket','Depo adi (bucket)',s.archive_bucket||'','text','Dosyalarin yazilacagi depo adi')+
+        settingInput('archive_access_key','Kullanici anahtari',s.archive_access_key||'','text','S3 / MinIO erisim anahtari')+
+        settingInput('archive_secret_key','Gizli anahtar',s.archive_secret_key||'','password','S3 / MinIO gizli anahtari')+
+        settingInput('archive_sftp_host','SFTP sunucu adresi',s.archive_sftp_host||'','text','Host adi veya IP')+
+        settingInput('archive_sftp_port','SFTP portu',s.archive_sftp_port||'22','number','Genelde 22')+
+        settingInput('archive_sftp_user','Kullanici adi',s.archive_sftp_user||'','text','Sunucuda baglanacak kullanici')+
+        settingInput('archive_sftp_remote_dir','Sunucudaki hedef klasor',s.archive_sftp_remote_dir||'','text','Ornek: /srv/fluxstream-archive')+
+        settingInput('archive_sftp_key_path','Anahtar dosyasi yolu',s.archive_sftp_key_path||'','text','Bos ise varsayilan SSH anahtari / agent denenir.')+
         '<div class="setting-row"><div><div class="setting-label">SFTP Host Key Kontrolunu Gevset</div><div class="setting-desc">Ilk testte kolaylik saglar; production icin kapali tutmak daha guvenlidir.</div></div>'+
           '<label class="toggle"><input type="checkbox" class="setting-input" data-key="archive_sftp_disable_host_key_check" '+(s.archive_sftp_disable_host_key_check==='true'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
-        '<div class="setting-row"><div><div class="setting-label">Path Style URL</div><div class="setting-desc">MinIO ve bazi S3 uyumlu servislerde acik olmali.</div></div>'+
+        '<div class="setting-row"><div><div class="setting-label">MinIO uyum modu</div><div class="setting-desc">MinIO ve bazi S3 uyumlu servislerde acik olmali.</div></div>'+
           '<label class="toggle"><input type="checkbox" class="setting-input" data-key="archive_use_path_style" '+(s.archive_use_path_style!=='false'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
         '<div class="card" style="margin-top:14px;background:var(--bg-primary)">'+
           '<div class="card-title" style="margin-bottom:12px">Kayit Arsivi</div>'+
           '<div class="setting-row"><div><div class="setting-label">Kayit arsivi etkin</div><div class="setting-desc">Yerel kayit kutuphanesini bu hedefe tasir.</div></div><label class="toggle"><input type="checkbox" class="setting-input" data-key="archive_enabled" '+(s.archive_enabled==='true'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
           '<div class="setting-row"><div><div class="setting-label">Otomatik yukle</div><div class="setting-desc">Yeni kayitlar periyodik olarak arsivlenir.</div></div><label class="toggle"><input type="checkbox" class="setting-input" data-key="archive_auto_upload" '+(s.archive_auto_upload==='true'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
           '<div class="setting-row"><div><div class="setting-label">Yukleme sonrasi yereli sil</div><div class="setting-desc">Basarili upload sonrasi diski bosaltir.</div></div><label class="toggle"><input type="checkbox" class="setting-input" data-key="archive_delete_local_after_upload" '+(s.archive_delete_local_after_upload==='true'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
-          settingInput('archive_scan_interval_minutes','Tarama Araligi (dk)',s.archive_scan_interval_minutes||'10','number','Kayit arsivi tarama araligi')+
+          settingInput('archive_scan_interval_minutes','Ne kadar sik kontrol edilsin (dk)',s.archive_scan_interval_minutes||'10','number','Yeni kayitlarin ne kadar sik gonderilecegini belirler')+
           settingInput('archive_batch_size','Tek Seferde Maksimum Oge',s.archive_batch_size||'3','number','Bir turda yuklenecek kayit sayisi')+
-          '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px"><button class="btn btn-primary" onclick="saveSettingsCategory(\'storage\')">Hedefi Kaydet</button><button class="btn btn-secondary" onclick="runArchiveSync()">Kayit Arsiv Senkronu</button></div>'+
+          '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px"><button class="btn btn-primary" onclick="saveSettingsCategory(\'storage\')">Hedefi Kaydet</button><button class="btn btn-secondary" onclick="runArchiveSync()">Kayitlari Simdi Gonder</button></div>'+
         '</div>'+
         '<div class="card" style="margin-top:14px;background:var(--bg-primary)">'+
           '<div class="card-title" style="margin-bottom:12px">Sistem Yedegi Arsivi</div>'+
           '<div class="setting-row"><div><div class="setting-label">Yedek arsivi etkin</div><div class="setting-desc">Olusan sistem yedekleri ayni hedefe aktarilir.</div></div><label class="toggle"><input type="checkbox" class="setting-input" data-key="backup_archive_enabled" '+(s.backup_archive_enabled==='true'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
           '<div class="setting-row"><div><div class="setting-label">Otomatik yukle</div><div class="setting-desc">Yeni backup dosyalari periyodik olarak yuklenir.</div></div><label class="toggle"><input type="checkbox" class="setting-input" data-key="backup_archive_auto_upload" '+(s.backup_archive_auto_upload==='true'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
           '<div class="setting-row"><div><div class="setting-label">Yukleme sonrasi yereli sil</div><div class="setting-desc">Basarili upload sonrasi backup dosyasini yerelden kaldirir.</div></div><label class="toggle"><input type="checkbox" class="setting-input" data-key="backup_archive_delete_local_after_upload" '+(s.backup_archive_delete_local_after_upload==='true'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
-          settingInput('backup_archive_scan_interval_minutes','Tarama Araligi (dk)',s.backup_archive_scan_interval_minutes||'30','number','Sistem yedekleri icin tarama araligi')+
+          settingInput('backup_archive_scan_interval_minutes','Ne kadar sik kontrol edilsin (dk)',s.backup_archive_scan_interval_minutes||'30','number','Yeni yedeklerin ne kadar sik gonderilecegini belirler')+
           settingInput('backup_archive_batch_size','Tek Seferde Maksimum Oge',s.backup_archive_batch_size||'2','number','Bir turda yuklenecek backup sayisi')+
-          '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px"><button class="btn btn-primary" onclick="saveSettingsCategory(\'storage\')">Yedek Ayarlarini Kaydet</button><button class="btn btn-secondary" onclick="runBackupArchiveSync()">Yedek Arsiv Senkronu</button></div>'+
+          '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px"><button class="btn btn-primary" onclick="saveSettingsCategory(\'storage\')">Yedek Ayarlarini Kaydet</button><button class="btn btn-secondary" onclick="runBackupArchiveSync()">Yedekleri Simdi Gonder</button></div>'+
         '</div>'+
       '</div>'+
     '</div>'+
@@ -2480,7 +2485,7 @@ async function renderSettingsStorage(c){
         '<td style="display:flex;gap:8px;flex-wrap:wrap">'+
           '<a class="btn btn-sm btn-secondary" href="/api/system/backups/download/'+encodeURIComponent(item.name)+'" target="_blank" rel="noopener">Indir</a>'+
           (backupArchiveEnabled?'<button class="btn btn-sm btn-secondary" onclick=\'archiveSystemBackup('+JSON.stringify(item.name)+')\'>'+(archiveInfo&&archiveInfo.status==='archived'?'Yeniden Arsivle':'Arsive Gonder')+'</button>':'')+
-          '<button class="btn btn-sm btn-danger" onclick="deleteSystemBackup('+JSON.stringify(item.name)+')">Sil</button>'+
+          '<button class="btn btn-sm btn-danger" onclick=\'deleteSystemBackup('+JSON.stringify(item.name)+')\'>Sil</button>'+
         '</td>'+
       '</tr>';
     }).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">Yerel sistem yedegi yok</td></tr>';
@@ -2513,6 +2518,7 @@ async function renderSettingsStorage(c){
   window._recordingPreviewSelection=null;
   resetRecordingPreviewPanel();
   applyStorageSnapshot(normalizeStorageSnapshot(s,report,archivesRes,recsRes,streamsRes,savedRes,backupsRes,backupArchivesRes,remuxJobsRes),{resetPreview:true});
+  updateStorageProviderUI();
 }
 
 // ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â SETTINGS - TRANSCODE ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â
@@ -4027,7 +4033,7 @@ function renderStorageBackupRows(data){
       '<td style="display:flex;gap:8px;flex-wrap:wrap">'+
         '<button class="btn btn-sm btn-secondary" onclick=\'downloadSystemBackup('+JSON.stringify(item.name)+')\'>Indir</button>'+
         (backupArchiveEnabled?'<button class="btn btn-sm btn-secondary" onclick=\'archiveSystemBackup('+JSON.stringify(item.name)+')\'>'+(archiveInfo&&archiveInfo.status==='archived'?'Yeniden Arsivle':'Arsive Gonder')+'</button>':'')+
-        '<button class="btn btn-sm btn-danger" onclick="deleteSystemBackup('+JSON.stringify(item.name)+')">Sil</button>'+
+        '<button class="btn btn-sm btn-danger" onclick=\'deleteSystemBackup('+JSON.stringify(item.name)+')\'>Sil</button>'+
       '</td>'+
     '</tr>';
   }).join('');
@@ -4105,6 +4111,53 @@ async function refreshStorageSnapshot(opts){
   const data=await fetchStorageSnapshot();
   applyStorageSnapshot(data,opts||{});
   return data;
+}
+function setStorageFieldVisible(key, visible){
+  const input=document.querySelector('.setting-input[data-key="'+key+'"]');
+  if(!input)return;
+  const row=input.closest('.form-group, .setting-row');
+  if(row)row.style.display=visible?'':'none';
+}
+function updateStorageProviderUI(){
+  const provider=document.querySelector('.setting-input[data-key="archive_provider"]')?.value||'local';
+  const guide=document.getElementById('storage-provider-guide');
+  const config={
+    local:{
+      tone:'blue',
+      title:'Yerel klasore kopyala',
+      text:'En kolay baslangic secenegi. Kayitlar bu sunucuda ikinci bir klasore kopyalanir. Test ve tek sunucu kullanimlari icin en pratigi budur.',
+      fields:{local:true,s3:false,sftp:false}
+    },
+    s3:{
+      tone:'green',
+      title:'S3 bulut deposu kullan',
+      text:'Amazon S3 veya S3 uyumlu bulut hedeflerine gonderir. Sunucu disinda yedek tutmak icin uygundur.',
+      fields:{local:false,s3:true,sftp:false}
+    },
+    minio:{
+      tone:'orange',
+      title:'MinIO sunucusuna gonder',
+      text:'Kendi MinIO sunucuna veya S3 uyumlu baska bir obje depoya yazmak icin uygundur. Genelde MinIO uyum modu acik olur.',
+      fields:{local:false,s3:true,sftp:false}
+    },
+    sftp:{
+      tone:'purple',
+      title:'Baska bir sunucuya kopyala',
+      text:'Dusuk butcede en pratik dis hedeflerden biridir. Dosyalar SFTP ile baska bir Linux sunucusuna gider.',
+      fields:{local:false,s3:false,sftp:true}
+    }
+  };
+  const current=config[provider]||config.local;
+  if(guide){
+    guide.innerHTML='<div class="card-title" style="margin-bottom:8px">Secili hedef: <span class="tag tag-'+current.tone+'">'+escHtml(current.title)+'</span></div><div class="form-hint" style="line-height:1.8">'+escHtml(current.text)+'</div><div class="form-hint" style="margin-top:10px">Google Drive ve OneDrive entegrasyonu yol haritasinda tutuluyor.</div>';
+  }
+  setStorageFieldVisible('archive_local_dir',!!current.fields.local);
+  ['archive_endpoint','archive_region','archive_bucket','archive_access_key','archive_secret_key','archive_use_path_style'].forEach(function(key){
+    setStorageFieldVisible(key,!!current.fields.s3);
+  });
+  ['archive_sftp_host','archive_sftp_port','archive_sftp_user','archive_sftp_remote_dir','archive_sftp_key_path','archive_sftp_disable_host_key_check'].forEach(function(key){
+    setStorageFieldVisible(key,!!current.fields.sftp);
+  });
 }
 let recordingPreviewPlayer=null;
 window._recordingPreviewSelection=null;
@@ -4187,7 +4240,7 @@ function showRecordModal(){
     '<div class="form-group"><label class="form-label">Yayin</label><select class="form-select" id="rec-key">'+
     (streams.length?streams.map(s=>'<option value="'+s.stream_key+'">'+s.name+'</option>').join(''):'<option>Canli yayin yok</option>')+
     '</select></div>'+ 
-    '<div class="form-group"><label class="form-label">Format</label><select class="form-select" id="rec-fmt">'+recordingFormatOptions((runtimeSettings&&runtimeSettings.recording_format)||'mp4')+'</select><div class="form-hint">MP4 tarayici ve panel onizlemesi icin onerilir.</div></div>'+ 
+    '<div class="form-group"><label class="form-label">Format</label><select class="form-select" id="rec-fmt">'+recordingFormatOptions('mp4')+'</select><div class="form-hint">MP4 tarayici ve panel onizlemesi icin onerilir.</div></div>'+ 
     '<button class="btn btn-primary" onclick="startNewRec()" style="width:100%">Kaydi Baslat</button>'+ 
     '</div></div></div>';
 }
@@ -4533,7 +4586,7 @@ async function renderMaintenanceCenter(c){
       (backups.length
         ?'<table><thead><tr><th>Dosya</th><th>Boyut</th><th>Tarih</th><th>Tur</th><th>Islem</th></tr></thead><tbody>'+
           backups.map(function(item){
-            return '<tr><td class="mono-wrap">'+escHtml(item.name)+'</td><td>'+formatBytes(item.size||0)+'</td><td>'+escHtml(fmtLocaleDateTime(item.mod_time))+'</td><td>'+(item.include_recordings?'<span class="tag tag-blue">Kayitlar dahil</span>':'<span class="tag tag-green">Hafif</span>')+'</td><td style="white-space:nowrap"><a class="btn btn-sm btn-secondary" href="/api/system/backups/download/'+encodeURIComponent(item.name)+'" target="_blank" rel="noopener">Indir</a> <button class="btn btn-sm btn-danger" onclick="deleteSystemBackup('+JSON.stringify(item.name)+')">Sil</button></td></tr>';
+            return '<tr><td class="mono-wrap">'+escHtml(item.name)+'</td><td>'+formatBytes(item.size||0)+'</td><td>'+escHtml(fmtLocaleDateTime(item.mod_time))+'</td><td>'+(item.include_recordings?'<span class="tag tag-blue">Kayitlar dahil</span>':'<span class="tag tag-green">Hafif</span>')+'</td><td style="white-space:nowrap"><a class="btn btn-sm btn-secondary" href="/api/system/backups/download/'+encodeURIComponent(item.name)+'" target="_blank" rel="noopener">Indir</a> <button class="btn btn-sm btn-danger" onclick=\'deleteSystemBackup('+JSON.stringify(item.name)+')\'>Sil</button></td></tr>';
           }).join('')+
         '</tbody></table>'
         :'<div class="empty-state"><div class="icon"><i class="bi bi-archive"></i></div><h3>Henuz backup yok</h3><p style="color:var(--text-muted)">Ilk yedegi bu ekrandan tek tikla alabilirsiniz.</p></div>')+
@@ -4578,7 +4631,7 @@ async function restoreSystemBackupArchive(name){
 
 async function deleteSystemBackup(name){
   if(!confirm('Bu backup silinsin mi?'))return;
-  const res=await api('/api/system/backups/'+encodeURIComponent(name),{method:'DELETE'});
+  const res=await api('/api/system/backups/delete',{method:'POST',body:{name:name}});
   if(res&&res.success){
     toast('Backup silindi');
     removeStorageBackupRow(name);

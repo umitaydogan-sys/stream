@@ -115,6 +115,26 @@ func (m *Manager) RestoreBackupArchive(ctx context.Context, name string) (*stora
 	return m.db.GetBackupArchive(name)
 }
 
+func (m *Manager) MarkBackupLocalDeleted(name string, deleted bool) error {
+	name = filepath.Base(strings.TrimSpace(name))
+	if name == "" {
+		return fmt.Errorf("backup name gerekli")
+	}
+	item, err := m.db.GetBackupArchive(name)
+	if err != nil {
+		return err
+	}
+	if item == nil {
+		return nil
+	}
+	item.LocalDeleted = deleted
+	item.UpdatedAt = time.Now()
+	if err := m.db.UpsertBackupArchive(item); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (m *Manager) SyncPendingBackups(ctx context.Context, limit int) (int, error) {
 	settings := m.Settings()
 	if !settings.Configured || !settings.BackupsEnabled || !settings.BackupAutoUpload {

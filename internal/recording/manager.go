@@ -674,8 +674,8 @@ func normalizeFormat(format Format) Format {
 	case FormatFLV:
 		return FormatFLV
 	case FormatTS:
-		fallthrough
-	default:
 		return FormatTS
+	default:
+		return FormatMP4
 	}
 }

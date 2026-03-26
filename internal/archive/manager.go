@@ -547,6 +547,8 @@ func (s *s3Store) UploadFile(ctx context.Context, objectKey, localPath, contentT
 	if err != nil {
 		return storeObject{}, err
 	}
+	req.ContentLength = info.Size()
+	req.Header.Set("Content-Length", fmt.Sprintf("%d", info.Size()))
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}

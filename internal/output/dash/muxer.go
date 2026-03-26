@@ -37,7 +37,6 @@ type StreamMuxer struct {
 	audioSeqHeader []byte
 	videoTrackID   uint32
 	audioTrackID   uint32
-	hasInit        bool
 	mu             sync.Mutex
 }
 
@@ -105,10 +104,7 @@ func (sm *StreamMuxer) WritePacket(pkt *media.Packet) error {
 			sm.audioSeqHeader = make([]byte, len(pkt.Data))
 			copy(sm.audioSeqHeader, pkt.Data)
 		}
-		if !sm.hasInit && sm.videoSeqHeader != nil {
-			sm.writeInitSegment()
-			sm.hasInit = true
-		}
+		sm.writeInitSegments()
 		return nil
 	}
 
@@ -190,32 +186,36 @@ func (sm *StreamMuxer) flushSegment(ts uint32) {
 		duration = sm.segmentDuration.Seconds()
 	}
 
-	// Write video segment
+	videoFile := ""
 	if len(sm.currentVideo) > 0 {
-		vFile := fmt.Sprintf("video_%d.m4s", sm.segIdx)
-		writeSegmentFile(filepath.Join(sm.outputDir, vFile), sm.currentVideo, sm.segIdx, sm.videoTrackID, sm.segStart)
+		videoFile = fmt.Sprintf("video_%d.m4s", sm.segIdx)
+		writeSegmentFile(filepath.Join(sm.outputDir, videoFile), sm.currentVideo, sm.segIdx, sm.videoTrackID, sm.segStart)
 		sm.currentVideo = nil
 	}
 
-	// Write audio segment
+	audioFile := ""
 	if len(sm.currentAudio) > 0 {
-		aFile := fmt.Sprintf("audio_%d.m4s", sm.segIdx)
-		writeSegmentFile(filepath.Join(sm.outputDir, aFile), sm.currentAudio, sm.segIdx, sm.audioTrackID, sm.segStart)
+		audioFile = fmt.Sprintf("audio_%d.m4s", sm.segIdx)
+		writeSegmentFile(filepath.Join(sm.outputDir, audioFile), sm.currentAudio, sm.segIdx, sm.audioTrackID, sm.segStart)
 		sm.currentAudio = nil
 	}
 
 	sm.segments = append(sm.segments, segmentInfo{
 		Index:    sm.segIdx,
 		Duration: duration,
-		Video:    fmt.Sprintf("video_%d.m4s", sm.segIdx),
-		Audio:    fmt.Sprintf("audio_%d.m4s", sm.segIdx),
+		Video:    videoFile,
+		Audio:    audioFile,
 	})
 
 	// Cleanup old segments
 	for len(sm.segments) > sm.maxSegments {
 		old := sm.segments[0]
-		os.Remove(filepath.Join(sm.outputDir, old.Video))
-		os.Remove(filepath.Join(sm.outputDir, old.Audio))
+		if old.Video != "" {
+			os.Remove(filepath.Join(sm.outputDir, old.Video))
+		}
+		if old.Audio != "" {
+			os.Remove(filepath.Join(sm.outputDir, old.Audio))
+		}
 		sm.segments = sm.segments[1:]
 	}
 
@@ -226,21 +226,48 @@ func (sm *StreamMuxer) flushSegment(ts uint32) {
 	sm.writeMPD()
 }
 
-// writeInitSegment writes the fMP4 initialization segment (ftyp + moov)
-func (sm *StreamMuxer) writeInitSegment() {
+// writeInitSegments writes initialization segments for full and audio-only manifests.
+func (sm *StreamMuxer) writeInitSegments() {
+	if sm.audioSeqHeader != nil {
+		audioInit := buildInitSegment(0, sm.audioTrackID, nil, sm.audioSeqHeader)
+		os.WriteFile(filepath.Join(sm.outputDir, "audio_init.mp4"), audioInit, 0644)
+	}
+	if sm.videoSeqHeader == nil && sm.audioSeqHeader == nil {
+		return
+	}
+	initData := buildInitSegment(sm.videoTrackID, sm.audioTrackID, sm.videoSeqHeader, sm.audioSeqHeader)
+	os.WriteFile(filepath.Join(sm.outputDir, "init.mp4"), initData, 0644)
+}
+
+func buildInitSegment(videoTrackID, audioTrackID uint32, videoSeqHeader, audioSeqHeader []byte) []byte {
 	// ftyp box
 	ftyp := buildBox("ftyp", []byte("iso6\x00\x00\x02\x00iso6mp41dash"))
-
-	// Simplified moov with video track
-	moov := buildFMP4Moov(sm.videoTrackID, sm.audioTrackID, sm.videoSeqHeader, sm.audioSeqHeader)
-
-	initData := append(ftyp, moov...)
-	path := filepath.Join(sm.outputDir, "init.mp4")
-	os.WriteFile(path, initData, 0644)
+	moov := buildFMP4Moov(videoTrackID, audioTrackID, videoSeqHeader, audioSeqHeader)
+	return append(ftyp, moov...)
 }
 
 // writeMPD writes the DASH manifest (MPD)
 func (sm *StreamMuxer) writeMPD() {
+	videoSegments := sm.filterSegments(func(seg segmentInfo) bool { return seg.Video != "" })
+	audioSegments := sm.filterSegments(func(seg segmentInfo) bool { return seg.Audio != "" })
+	hasVideo := len(videoSegments) > 0 && sm.videoSeqHeader != nil
+	hasAudio := len(audioSegments) > 0 && sm.audioSeqHeader != nil
+	if !hasVideo && !hasAudio {
+		return
+	}
+
+	mainManifest := sm.buildMPDDocument(hasVideo, hasAudio, "init.mp4", videoSegments, audioSegments)
+	os.WriteFile(filepath.Join(sm.outputDir, "manifest.mpd"), []byte(mainManifest), 0644)
+
+	if hasAudio {
+		audioManifest := sm.buildMPDDocument(false, true, "audio_init.mp4", nil, audioSegments)
+		os.WriteFile(filepath.Join(sm.outputDir, "audio.mpd"), []byte(audioManifest), 0644)
+	} else {
+		_ = os.Remove(filepath.Join(sm.outputDir, "audio.mpd"))
+	}
+}
+
+func (sm *StreamMuxer) buildMPDDocument(includeVideo, includeAudio bool, initName string, videoSegments, audioSegments []segmentInfo) string {
 	targetDur := sm.segmentDuration.Seconds()
 	for _, s := range sm.segments {
 		if s.Duration > targetDur {
@@ -249,7 +276,6 @@ func (sm *StreamMuxer) writeMPD() {
 	}
 
 	minBufferTime := fmt.Sprintf("PT%.1fS", targetDur)
-
 	mpd := `<?xml version="1.0" encoding="UTF-8"?>` + "\n"
 	mpd += `<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="dynamic" ` +
 		`minimumUpdatePeriod="PT2S" minBufferTime="` + minBufferTime + `" ` +
@@ -257,43 +283,54 @@ func (sm *StreamMuxer) writeMPD() {
 		`profiles="urn:mpeg:dash:profile:isoff-live:2011">` + "\n"
 	mpd += `  <Period>` + "\n"
 
-	// Video AdaptationSet
-	mpd += `    <AdaptationSet mimeType="video/mp4" codecs="avc1.64001f" startWithSAP="1">` + "\n"
-	mpd += `      <Representation id="video" bandwidth="2000000">` + "\n"
-	mpd += `        <SegmentTemplate media="video_$Number$.m4s" initialization="init.mp4" startNumber="` +
-		fmt.Sprintf("%d", sm.firstSegNum()) + `" timescale="1000">` + "\n"
-	mpd += `          <SegmentTimeline>` + "\n"
-	for _, seg := range sm.segments {
-		mpd += fmt.Sprintf(`            <S d="%d"/>`, int(seg.Duration*1000)) + "\n"
+	if includeVideo {
+		mpd += `    <AdaptationSet mimeType="video/mp4" codecs="avc1.64001f" startWithSAP="1">` + "\n"
+		mpd += `      <Representation id="video" bandwidth="2000000">` + "\n"
+		mpd += `        <SegmentTemplate media="video_$Number$.m4s" initialization="` + initName + `" startNumber="` +
+			fmt.Sprintf("%d", firstSegmentNumber(videoSegments)) + `" timescale="1000">` + "\n"
+		mpd += `          <SegmentTimeline>` + "\n"
+		for _, seg := range videoSegments {
+			mpd += fmt.Sprintf(`            <S d="%d"/>`, int(seg.Duration*1000)) + "\n"
+		}
+		mpd += `          </SegmentTimeline>` + "\n"
+		mpd += `        </SegmentTemplate>` + "\n"
+		mpd += `      </Representation>` + "\n"
+		mpd += `    </AdaptationSet>` + "\n"
 	}
-	mpd += `          </SegmentTimeline>` + "\n"
-	mpd += `        </SegmentTemplate>` + "\n"
-	mpd += `      </Representation>` + "\n"
-	mpd += `    </AdaptationSet>` + "\n"
 
-	// Audio AdaptationSet
-	mpd += `    <AdaptationSet mimeType="audio/mp4" codecs="mp4a.40.2" startWithSAP="1">` + "\n"
-	mpd += `      <Representation id="audio" bandwidth="128000">` + "\n"
-	mpd += `        <SegmentTemplate media="audio_$Number$.m4s" initialization="init.mp4" startNumber="` +
-		fmt.Sprintf("%d", sm.firstSegNum()) + `" timescale="1000">` + "\n"
-	mpd += `          <SegmentTimeline>` + "\n"
-	for _, seg := range sm.segments {
-		mpd += fmt.Sprintf(`            <S d="%d"/>`, int(seg.Duration*1000)) + "\n"
+	if includeAudio {
+		mpd += `    <AdaptationSet mimeType="audio/mp4" codecs="mp4a.40.2" startWithSAP="1">` + "\n"
+		mpd += `      <Representation id="audio" bandwidth="128000">` + "\n"
+		mpd += `        <SegmentTemplate media="audio_$Number$.m4s" initialization="` + initName + `" startNumber="` +
+			fmt.Sprintf("%d", firstSegmentNumber(audioSegments)) + `" timescale="1000">` + "\n"
+		mpd += `          <SegmentTimeline>` + "\n"
+		for _, seg := range audioSegments {
+			mpd += fmt.Sprintf(`            <S d="%d"/>`, int(seg.Duration*1000)) + "\n"
+		}
+		mpd += `          </SegmentTimeline>` + "\n"
+		mpd += `        </SegmentTemplate>` + "\n"
+		mpd += `      </Representation>` + "\n"
+		mpd += `    </AdaptationSet>` + "\n"
 	}
-	mpd += `          </SegmentTimeline>` + "\n"
-	mpd += `        </SegmentTemplate>` + "\n"
-	mpd += `      </Representation>` + "\n"
-	mpd += `    </AdaptationSet>` + "\n"
 
 	mpd += `  </Period>` + "\n"
 	mpd += `</MPD>` + "\n"
-
-	os.WriteFile(filepath.Join(sm.outputDir, "manifest.mpd"), []byte(mpd), 0644)
+	return mpd
 }
 
-func (sm *StreamMuxer) firstSegNum() int {
-	if len(sm.segments) > 0 {
-		return sm.segments[0].Index
+func (sm *StreamMuxer) filterSegments(include func(segmentInfo) bool) []segmentInfo {
+	out := make([]segmentInfo, 0, len(sm.segments))
+	for _, seg := range sm.segments {
+		if include(seg) {
+			out = append(out, seg)
+		}
+	}
+	return out
+}
+
+func firstSegmentNumber(segments []segmentInfo) int {
+	if len(segments) > 0 {
+		return segments[0].Index
 	}
 	return 0
 }
@@ -382,29 +419,34 @@ func buildFMP4Moov(videoTrackID, audioTrackID uint32, videoSeqHeader, audioSeqHe
 	// Simplified moov box with mvhd + video trak + audio trak + mvex
 	mvhd := buildBox("mvhd", make([]byte, 100)) // minimal mvhd
 
-	// Video trak (minimal)
-	videoTrak := buildMinimalTrak(videoTrackID, "video", videoSeqHeader)
+	moovContent := append([]byte{}, mvhd...)
+	mvexContent := make([]byte, 0, 64)
 
-	// Audio trak (minimal)
-	audioTrak := buildMinimalTrak(audioTrackID, "audio", audioSeqHeader)
+	if videoSeqHeader != nil && videoTrackID != 0 {
+		videoTrak := buildMinimalTrak(videoTrackID, "video", videoSeqHeader)
+		moovContent = append(moovContent, videoTrak...)
 
-	// mvex with trex for each track
-	trex1Data := make([]byte, 24)
-	binary.BigEndian.PutUint32(trex1Data[4:8], videoTrackID)
-	binary.BigEndian.PutUint32(trex1Data[8:12], 1)  // default sample description
-	binary.BigEndian.PutUint32(trex1Data[16:20], 0) // default sample size
-	trex1 := buildBox("trex", trex1Data)
+		trexData := make([]byte, 24)
+		binary.BigEndian.PutUint32(trexData[4:8], videoTrackID)
+		binary.BigEndian.PutUint32(trexData[8:12], 1)
+		binary.BigEndian.PutUint32(trexData[16:20], 0)
+		mvexContent = append(mvexContent, buildBox("trex", trexData)...)
+	}
 
-	trex2Data := make([]byte, 24)
-	binary.BigEndian.PutUint32(trex2Data[4:8], audioTrackID)
-	binary.BigEndian.PutUint32(trex2Data[8:12], 1)
-	trex2 := buildBox("trex", trex2Data)
+	if audioSeqHeader != nil && audioTrackID != 0 {
+		audioTrak := buildMinimalTrak(audioTrackID, "audio", audioSeqHeader)
+		moovContent = append(moovContent, audioTrak...)
 
-	mvex := buildBox("mvex", append(trex1, trex2...))
+		trexData := make([]byte, 24)
+		binary.BigEndian.PutUint32(trexData[4:8], audioTrackID)
+		binary.BigEndian.PutUint32(trexData[8:12], 1)
+		binary.BigEndian.PutUint32(trexData[16:20], 0)
+		mvexContent = append(mvexContent, buildBox("trex", trexData)...)
+	}
 
-	moovContent := append(mvhd, videoTrak...)
-	moovContent = append(moovContent, audioTrak...)
-	moovContent = append(moovContent, mvex...)
+	if len(mvexContent) > 0 {
+		moovContent = append(moovContent, buildBox("mvex", mvexContent)...)
+	}
 	return buildBox("moov", moovContent)
 }
 
