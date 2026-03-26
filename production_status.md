@@ -40,6 +40,20 @@ Bu fazdan hemen sonra cekirdekte su kapanislar yapildi:
 - admin asset yukleme / listeleme / silme omurgasi eklendi
 - `/media-assets/` uzerinden marka varliklari servis edilmeye baslandi
 
+## 0.2 Son UI Polish Turu
+
+Bu son turda panel kullanilabilirligini toplayan ek iyilestirmeler yapildi:
+
+- `GelisÌ§mis Embed` ust kartlarindaki gecici ve son kullaniciya anlamsiz gelen
+  metinler, dogrudan teknik ne sundugunu anlatan baslik ve aciklamalarla degistirildi
+- tum panelde `input`, `select` ve `textarea` alanlari daha kompakt,
+  daha kosegen ve yaziyi daha net gosteren ortak bir yuzeye cekildi
+- `GelisÌ§mis Embed` ekraninda tum direkt linkler ve sekmeli onizleme yapisi
+  tekrar one cikarildi
+- `Player Sablonlari Studyosu` kalici kutuphane + canli taslak duzenleyici +
+  gercek onizleme tezgahi modeline tasindi
+- `ABR Profilleri` katman studyosu daha secim odakli preset / paket akisina yaklastirildi
+
 ## 1. Genel Karar
 
 FluxStream artik prototip seviyesini asti.
@@ -239,9 +253,9 @@ Canli host:
 - host: `23.94.220.222`
 - servis: `fluxstream`
 - health: `http://127.0.0.1:8844/api/health`
-- guncel Linux binary SHA256: `5907711E9FBCD31345A46A890C66277EDD8EBD6D7066B77BEB9F77515C6EC60A`
+- guncel Linux binary SHA256: `BB92CE8B47EA09884D4367DA96B785DBB6DA01275556A0928008C8B611C9D656`
 - ayni VPS uzerinde MinIO test ortami ve ayri SFTP hedefi ile recording + backup upload / restore basariyla dogrulandi
-- admin panelde yeni studio katmani, logo yukleme ve tani merkezi calisiyor
+- admin panelde yeni studio katmani, logo yukleme, tani merkezi ve guclendirilmis embed / player studio katmani calisiyor
 
 Not:
 

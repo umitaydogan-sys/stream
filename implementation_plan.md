@@ -55,7 +55,7 @@ Canli host:
 - servis: `active`
 - health: `http://127.0.0.1:8844/api/health`
 - Linux binary SHA256:
-  `5907711E9FBCD31345A46A890C66277EDD8EBD6D7066B77BEB9F77515C6EC60A`
+  `BB92CE8B47EA09884D4367DA96B785DBB6DA01275556A0928008C8B611C9D656`
 
 ## 0.2 Bu Fazdaki Cekirdek Sertlestirme
 
@@ -69,6 +69,16 @@ Bu fazla birlikte cekirdek tarafta da cakismaz sertlestirmeler yapildi:
 - teshis ekranina `Audio-only DASH manifest` ve `DASH ses representation` gorunurlugu eklendi
 - admin asset yukleme / listeleme / silme API'leri eklendi
 - `/media-assets/` uzerinden logo ve marka varliklari servis edilir hale geldi
+
+## 0.3 Son UI Polish Turu
+
+Bu turun sonundaki ek iyilestirmeler:
+
+- tum panelde input, select ve textarea gorunumu daha kompakt ve daha kosegen hale getirildi
+- `Gelişmis Embed` ekraninda tum direkt linkler ve sekmeli onizlemeler tekrar one cikarildi
+- `Gelişmis Embed` ust kart metinleri son kullaniciya daha teknik ve daha acik anlatacak sekilde sadeleştirildi
+- `Player Sablonlari Studyosu` kalici kutuphane + taslak duzenleyici + gercek onizleme tezgahi modeline tasindi
+- `ABR Profilleri` katman olusturucu secimli cozum / bitrate paketi mantigina yaklastirildi
 
 ## 1. Urun Vizyonu
 

@@ -1626,9 +1626,9 @@
       if(hero){
         studioInsertAfter(hero,
           '<section class="studio-grid studio-grid-3">'+
-            '<div class="studio-summary"><span>Direkt linkler</span><strong>Hepsi geri geldi</strong><div class="form-hint">HLS, DASH, MP4, ses ve protokol tablariyla eski detayli davranis korunur.</div></div>'+
-            '<div class="studio-summary"><span>Gizli / tokenli test</span><strong>Gecici davranis</strong><div class="form-hint">Bu ekranda guvenli denemeler kalici stream policy kilidi olusturmaz; kalici uygulama icin ayri policy gerekir.</div></div>'+
-            '<div class="studio-summary"><span>Onizleme sekmeleri</span><strong>Player + manifest</strong><div class="form-hint">Tarayici, harici player ve teslimat linklerini ayni yerden test edebilirsin.</div></div>'+
+            '<div class="studio-summary"><span>Direkt linkler</span><strong>Tum teslimat ciktilari</strong><div class="form-hint">HLS, DASH, MP4, ses ve protokol bazli linkler ayni ekranda listelenir.</div></div>'+
+            '<div class="studio-summary"><span>Guvenli erisim testi</span><strong>Token ve imzali link</strong><div class="form-hint">Korumali oynatim baglantilarini burada uretebilir ve yayina etkisini test edebilirsin.</div></div>'+
+            '<div class="studio-summary"><span>Onizleme sekmeleri</span><strong>Tarayici ve harici oynatici</strong><div class="form-hint">Player, manifest ve medya linklerini ayni yerden dogrulayabilirsin.</div></div>'+
           '</section>'
         );
       }

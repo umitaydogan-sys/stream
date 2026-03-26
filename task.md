@@ -33,6 +33,14 @@ Tarih: 26 Mart 2026
 - [ ] `Analitik Merkezi` ve `Teshis ve Tedavi Merkezi` ekranlarini canli veriyle uzun sureli operator kullanim testine sok
 - [ ] `Bakim ve Yedek` ile `Depolama ve Arsiv Merkezi` arasindaki rol ayrimini son kullanici bakisiyla tekrar dogrula
 
+## 0.1.1 Son UI Polish Turunda Kapananlar
+
+- [x] tum panelde input, select ve textarea gorunumunu daha kompakt ve daha kosegen hale getir
+- [x] `GelisÌ§mis Embed` ust kart metinlerini son kullaniciya daha teknik ve daha acik olacak sekilde sadeleştir
+- [x] `GelisÌ§mis Embed` ekraninda tum direkt linkleri ve sekmeli onizlemeleri yeniden one cikar
+- [x] `Player Sablonlari Studyosu`nu modaldan cikarip kalici kutuphane + taslak duzenleyici modeline tasi
+- [x] `ABR Profilleri` katman olusturucuyu secim odakli preset / paket akisi ile sadeleştir
+
 ## 0.2 Bu Turda Kapanan Cekirdek Sertlestirme
 
 - [x] `Analitik Merkezi` acilisindeki eksik JS yardimci fonksiyon hatasini kapat
