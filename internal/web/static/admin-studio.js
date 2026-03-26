@@ -52,6 +52,12 @@
     return Number.isFinite(n)?n:fallback;
   }
 
+  function fmtStudioNumber(value,digits){
+    const n=Number(value||0);
+    if(!Number.isFinite(n)) return '-';
+    return typeof digits==='number' ? n.toFixed(digits) : n.toLocaleString(localeForLang());
+  }
+
   function studioRerender(page){
     if(typeof loadPage==='function') return loadPage(page);
   }
