@@ -1,24 +1,22 @@
 # FluxStream
 
-Tek binary ile calisan, admin paneli bulunan, HLS/DASH merkezli
-canli yayin sunucusu.
+Tek binary ile calisan, admin paneli bulunan, HLS/DASH merkezli canli yayin
+sunucusu.
 
 ## Bugun Neler Var
 
 - RTMP, RTMPS, SRT, RTP, RTSP, WebRTC/WHIP, MPEG-TS ve HTTP Push ingest
-- HLS, LL-HLS, DASH, HTTP-FLV, MP4, WebM ve ses cikislari
-- OBS multitrack video ve audio dagitim zinciri
-- admin paneli, setup wizard, stream CRUD, player/embed/template sistemi
-- `Operasyon Merkezi`
-- QoE, telemetry, Prometheus ve OTel-benzeri cikis
+- HLS, LL-HLS, DASH, HTTP-FLV, MP4, WebM ve audio cikislari
+- OBS multitrack video ve audio dagitimi
+- `Embed Studyosu`, `Gelişmis Embed`, `Player Sablonlari Studyosu`
+- `Analitik Merkezi`, `Operasyon Merkezi`, `Teshis ve Tedavi Merkezi`
+- `ABR Profilleri ve Teslimat Merkezi`
+- sonradan `adaptive teslimat` acma akisi
 - recording, archive, backup ve `Depolama ve Arsiv Merkezi`
-- `Embed Studyosu`, `Analitik Merkezi` ve `ABR Profilleri ve Teslimat Merkezi`
-- `Admin Studio V2`, `Logo ve Marka Merkezi`, `Teshis ve Tedavi Merkezi`
-- Linux servis, deploy ve backup/restore omurgasi
+- playback guvenligi V1
+- `Admin Studio V2`
 
-## Bu Repo Nerede
-
-Kaynak kod:
+## Kaynak Kod
 
 - `https://github.com/umitaydogan-sys/stream`
 
@@ -32,19 +30,13 @@ Kaynak kod:
 
 ## Bugunku Konum
 
-FluxStream su anda iyi bir tek-node medya sunucusu seviyesindedir.
-Ozellikle:
+FluxStream su anda iyi bir tek-node medya sunucusu ve urunlesmis bir yayin
+cekirdegi seviyesindedir.
 
-- webcast
-- kurum ici TV
-- radyo
-- markali player ve embed dagitimi
+En mantikli sonraki fazlar:
 
-icin kullanilabilir durumdadir.
-
-Tam enterprise seviye icin sonraki buyuk fazlar:
-
-- playback guvenligi v2 ve DRM
-- harici storage ve failover sertlestirmesi
-- origin-edge / cluster
-- RBAC, audit log ve SSO
+- `audio-only DASH` saha sertlestirmesi
+- harici AWS S3 / Drive / OneDrive / Dropbox testleri
+- playback guvenligi V2
+- DRM hazirligi
+- origin-edge lite

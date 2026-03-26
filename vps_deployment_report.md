@@ -1,6 +1,6 @@
 # VPS Deployment Report
 
-Date: 2026-03-12
+Date: 2026-03-26
 Host: `23.94.220.222`
 Hostname: `host.kimediyoz.com.tr`
 OS: `Ubuntu 24.04 LTS`
@@ -9,108 +9,53 @@ OS: `Ubuntu 24.04 LTS`
 
 - FluxStream Linux service installed at `/opt/fluxstream`
 - systemd service name: `fluxstream`
-- Service user: `fluxstream`
-- Admin OS user created: `fluxadmin`
 - Current service health: `ok`
-- Active listeners after reset:
+- Active listeners:
   - HTTP: `8844`
   - RTMP: `1935`
 - UFW: inactive
 
-## Completed in This Round
+## This Round
 
-1. Linux package deployed and validated on VPS.
-2. Separate TLS profile support added:
-   - Web HTTPS profile
-   - Stream RTMPS profile
-3. Manual CRT/KEY upload path split:
-   - Web cert path default: `data/certs/web/server.crt|key`
-   - Stream cert path default: `data/certs/stream/server.crt|key`
-4. Let's Encrypt runtime support added:
-   - Web domain config
-   - Stream domain config
-   - HTTP-01 challenge listener on port `80`
-5. Linux systemd package updated:
-   - no BOM shell scripts
-   - `CAP_NET_BIND_SERVICE` for low ports
+Bu turda sunucuya yeniden `temiz kurulum` yapildi.
 
-## VPS Validation Results
+Tamamlananlar:
 
-### Base Install
+1. Linux systemd paketi yeniden uretildi.
+2. Paket sunucuya sifirdan kopyalandi.
+3. Mevcut `fluxstream` servisi kaldirildi.
+4. `/opt/fluxstream` temizlendi.
+5. Paket icindeki `install.sh` ile yeniden kurulum yapildi.
+6. `api/health` ve binary hash ile canli dogrulama alindi.
 
-- `systemctl status fluxstream` => running
-- `curl http://127.0.0.1:8844/api/health` => `{"status":"ok"...}`
+## Current Live Binary
 
-### Manual Web + Stream TLS
+- Linux SHA256:
+  `15D7CE047BC886ACB39C2B594C669C0B150F9C706E7179E36056216A369923F4`
 
-Validated with temporary self-signed certificates:
+## Validation
 
-- HTTPS listener came up on `443`
-- RTMPS listener came up on `1936`
-- `curl -k https://127.0.0.1/api/health` => success
-- `openssl s_client -connect 127.0.0.1:1936` => success
+- `systemctl is-active fluxstream` => `active`
+- `wget -qO- http://127.0.0.1:8844/api/health`
+  => `{"status":"ok","uptime":...,"version":"2.0.0"}`
+- `sha256sum /opt/fluxstream/fluxstream`
+  => yerel package ile ayni hash
 
-### Let's Encrypt Runtime Mode
-
-Validated infrastructure only:
-
-- HTTP-01 challenge listener came up on `80`
-- HTTPS listener came up on `443`
-- RTMPS listener came up on `1936`
-- `/api/ssl/status` returned separate web/stream LE config state
-
-Note:
-- Actual public certificate issuance was not completed in this round.
-- For real issuance, DNS must point to this VPS.
-- If stream uses a different domain than web, that stream domain must also have a valid DNS record.
-
-## Important DNS Note
-
-If you want separate certificates:
-
-- Web UI / embed domain example:
-  - `host.kimediyoz.com.tr`
-- Stream RTMPS domain example:
-  - `stream.kimediyoz.com.tr`
-
-Both domains must resolve to `23.94.220.222`.
-
-## Recommended Next Development Order
-
-1. i18n for installer + setup wizard + admin panel
-2. analytics chart layout cleanup
-3. recording preview inside records page
-4. license subsystem
-5. Linux-specific admin actions and packaging polish
-
-## Update: 2026-03-26
-
-Bu rapordan sonra sunucuya birden fazla canli deploy daha yapildi ve
-asagidaki alanlar sahada dogrulandi:
+## Confirmed Product Areas On VPS
 
 - OBS multitrack ingest zinciri
 - HLS + DASH varyant uretimi
 - QoE telemetry ve Operasyon Merkezi
 - `Depolama ve Arsiv Merkezi`
-- recording `mp4` varsayilani ve `TS capture + remux` modeli
-- storage ekranindaki crash zincirinin kapanmasi
-- ayni VPS uzerinde MinIO ve SFTP ile recording + backup upload / restore
-- `Embed Studyosu`, `Analitik Merkezi` ve `ABR Profilleri ve Teslimat Merkezi`
+- recording `mp4` varsayilani ve `TS capture + remux`
+- MinIO + SFTP laboratuvar testi
+- `Embed Studyosu`, `Analitik Merkezi`, `ABR Profilleri`
 - `Admin Studio V2`
-- `Logo ve Marka Merkezi`
-- `Teshis ve Tedavi Merkezi`
-- admin asset upload ve `/media-assets/` servisi
+- stream bazinda sonradan `adaptive teslimat` akisi
 
-Son deploy notu:
+## Next Useful VPS Checks
 
-- servis: `active`
-- health: `http://127.0.0.1:8844/api/health`
-- canli Linux binary SHA256:
-  `5907711E9FBCD31345A46A890C66277EDD8EBD6D7066B77BEB9F77515C6EC60A`
-
-Sonraki anlamli VPS dogrulama hedefleri:
-
-1. harici AWS S3 bucket ile gercek saha testi
-2. rclone tabanli populer bulut hedeflerinde gercek hesap testi
+1. `adaptive teslimat` icin `live_now` akisinin canli stream uzerinde gozlenmesi
+2. harici AWS S3 bucket ile gercek recording + backup upload / restore
 3. `audio-only DASH` davranisinin farkli istemcilerde dogrulanmasi
-4. playback security politikasinin canli stream policy senaryolariyla sertlestirilmesi
+4. playback guvenligi politikasinin canli stream policy senaryolariyla sertlestirilmesi

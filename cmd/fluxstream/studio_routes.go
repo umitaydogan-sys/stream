@@ -413,6 +413,128 @@ func registerStudioAdminRoutes(
 		jsonResp(w, map[string]interface{}{"success": true, "mode": "global", "profile_set": req.ProfileSet, "layers": layers})
 	})
 
+	webServer.RegisterAdminHandler("/api/admin/streams/adaptive-mode", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", 405)
+			return
+		}
+		var req struct {
+			StreamID   int64  `json:"stream_id"`
+			StreamKey  string `json:"stream_key"`
+			ProfileSet string `json:"profile_set"`
+			ApplyMode  string `json:"apply_mode"`
+			SyncMode   *bool  `json:"sync_mode"`
+		}
+		if err := decodeJSON(r, &req); err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+
+		var (
+			st  *storage.Stream
+			err error
+		)
+		if req.StreamID > 0 {
+			st, err = db.GetStreamByID(req.StreamID)
+		} else {
+			st, err = db.GetStreamByKey(strings.TrimSpace(req.StreamKey))
+		}
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		if st == nil {
+			http.Error(w, "Stream bulunamadi", 404)
+			return
+		}
+
+		policy := streampolicy.ParsePolicyJSON(st.PolicyJSON)
+		profileSet := strings.TrimSpace(strings.ToLower(req.ProfileSet))
+		if profileSet == "" {
+			profileSet = strings.TrimSpace(strings.ToLower(policy.ProfileSet))
+		}
+		if profileSet == "" {
+			profileSet = "balanced"
+		}
+		applyMode := strings.TrimSpace(strings.ToLower(req.ApplyMode))
+		if applyMode != "live_now" {
+			applyMode = "next_publish"
+		}
+		syncMode := true
+		if req.SyncMode != nil {
+			syncMode = *req.SyncMode
+		}
+
+		policy.EnableABR = true
+		policy.ProfileSet = profileSet
+		if syncMode {
+			switch profileSet {
+			case "balanced", "mobile", "resilient", "radio":
+				policy.Mode = profileSet
+			}
+		}
+		st.PolicyJSON = streampolicy.EncodePolicyJSON(policy)
+		if err := db.UpdateStream(st); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+
+		liveApplied := false
+		warnings := []string{}
+		message := "Adaptive teslimat sonraki yayin icin isaretlendi."
+		if applyMode == "live_now" {
+			if !strings.EqualFold(st.Status, "live") {
+				warnings = append(warnings, "Yayin su an canli degil; ayar bir sonraki publish aninda devreye girecek.")
+				applyMode = "next_publish"
+			} else if tcManager == nil {
+				warnings = append(warnings, "Transcode yoneticisi hazir degil; ayar bir sonraki publish aninda devreye girecek.")
+				applyMode = "next_publish"
+			} else {
+				opts := buildLiveOptionsFromConfig(cfg)
+				opts.ABREnabled = true
+				opts.ProfileSet = profileSet
+				opts.ProfilesJSON = cfg.Get("abr_profiles_json", "")
+				opts.Profiles = transcode.ResolveProfiles(opts.ProfileSet, opts.ProfilesJSON)
+				if policy.DefaultVideoTrackID > 0 && policy.DefaultVideoTrackID <= 255 {
+					opts.DefaultVideoTrackID = uint8(policy.DefaultVideoTrackID)
+				}
+				if policy.DefaultAudioTrackID > 0 && policy.DefaultAudioTrackID <= 255 {
+					opts.DefaultAudioTrackID = uint8(policy.DefaultAudioTrackID)
+				}
+				tcManager.SetStreamLiveOptions(st.StreamKey, opts)
+				tcManager.StopLiveDASH(st.StreamKey)
+				tcManager.StopLiveHLS(st.StreamKey)
+				hlsStarted := false
+				if _, err := tcManager.StartLiveHLS(st.StreamKey); err != nil {
+					warnings = append(warnings, "Canli HLS yeniden baslatilamadi: "+err.Error())
+				} else {
+					hlsStarted = true
+				}
+				if cfg.GetBool("dash_enabled", false) && cfg.GetBool("transcode_live_dash_enabled", true) {
+					if _, err := tcManager.StartLiveDASH(st.StreamKey); err != nil {
+						warnings = append(warnings, "Canli DASH yeniden baslatilamadi: "+err.Error())
+					}
+				}
+				liveApplied = hlsStarted
+				if liveApplied {
+					message = "Adaptive teslimat canli yayina uygulandi. Oynaticida kisa bir yeniden kurulum etkisi olabilir."
+				}
+			}
+		}
+
+		jsonResp(w, map[string]interface{}{
+			"success":      true,
+			"stream_id":    st.ID,
+			"stream_key":   st.StreamKey,
+			"profile_set":  profileSet,
+			"apply_mode":   applyMode,
+			"live_applied": liveApplied,
+			"warnings":     warnings,
+			"policy_json":  st.PolicyJSON,
+			"message":      message,
+		})
+	})
+
 	webServer.RegisterAdminHandler("/api/admin/analytics/center", func(w http.ResponseWriter, r *http.Request) {
 		streamKey := strings.TrimSpace(r.URL.Query().Get("stream_key"))
 		period := strings.TrimSpace(r.URL.Query().Get("period"))

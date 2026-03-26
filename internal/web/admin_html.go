@@ -1288,6 +1288,7 @@ async function renderStreams(c){
       (filtered.length===0
         ?'<div class="studio-empty" style="padding:48px"><i class="bi bi-broadcast" style="font-size:42px;display:block;margin-bottom:14px;opacity:.4"></i><div style="font-size:16px;font-weight:700;margin-bottom:6px">'+(filter==='all'?'Henuz yayin yok':'Bu filtrede yayin yok')+'</div><div style="color:var(--text-muted);font-size:13px">'+(filter==='all'?'Ilk yayininizi olusturmak icin yukardaki butonu kullanin':'Filtreyi degistirerek diger yayinlari gorebilirsiniz')+'</div></div>'
         :'<div style="display:grid;gap:12px">'+filtered.map(function(s){
+          const policy=parseStreamPolicy(s.policy_json);
           const isLive=s.status==='live';
           const borderColor=isLive?'rgba(239,68,68,.2)':'var(--border)';
           const bgGrad=isLive?'linear-gradient(180deg,#fff 0%,#fef8f8 100%)':'linear-gradient(180deg,#fff 0%,#f8fbff 100%)';
@@ -1296,11 +1297,16 @@ async function renderStreams(c){
             '<div style="flex:1;min-width:0">'+
               '<div style="font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escHtml(s.name)+'</div>'+
               '<div style="font-size:12px;color:var(--text-muted);margin-top:2px"><code style="color:var(--accent)">'+escHtml(s.stream_key)+'</code></div>'+
+              '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">'+
+                '<span class="tag '+(policy.enable_abr?'tag-green':'tag-blue')+'">'+(policy.enable_abr?('Adaptive acik · '+escHtml(policy.profile_set||'balanced')):'Tek kalite teslimat')+'</span>'+
+                (isLive?'<span class="tag tag-red">Canli yayin</span>':'<span class="tag tag-gray">Sonraki publish hazir</span>')+
+              '</div>'+
             '</div>'+
             '<div style="display:flex;align-items:center;gap:16px;flex-shrink:0">'+
               (isLive?'<div style="text-align:center"><div style="font-size:18px;font-weight:800;color:var(--text-primary)">'+fmtInt(s.viewer_count||0)+'</div><div style="font-size:11px;color:var(--text-muted)">izleyici</div></div>':'')+
               '<div style="text-align:center;min-width:60px"><div style="font-size:12px;font-weight:600;color:var(--text-secondary)">'+escHtml(s.input_codec||'-')+'</div><div style="font-size:11px;color:var(--text-muted)">codec</div></div>'+
               '<div style="display:flex;gap:6px">'+
+                '<button class="btn btn-sm '+(policy.enable_abr?'btn-secondary':'btn-primary')+'" onclick="event.stopPropagation();showAdaptiveModeModal('+s.id+')" title="Adaptive teslimat">'+(policy.enable_abr?'Adaptive':'Adaptiveye Al')+'</button>'+
                 '<button class="btn btn-sm btn-secondary btn-icon" onclick="event.stopPropagation();navigate(\'operations-center\');setTimeout(function(){if(window.operationsCenterState)window.operationsCenterState.selectedStreamId=\''+s.id+'\'},100)" title="Operasyon"><i class="bi bi-sliders"></i></button>'+
                 '<button class="btn btn-sm btn-danger btn-icon" onclick="event.stopPropagation();deleteStream('+s.id+')" title="Sil"><i class="bi bi-trash"></i></button>'+
               '</div>'+
@@ -2069,6 +2075,19 @@ async function renderStreamDetail(c,id){
       ['WAV',u.wav],['FLAC',u.flac],['HLS Ses',u.hls_audio],['DASH Ses',u.dash_audio],['Icecast',u.icecast]
     ])+
 
+    '<div class="card" style="margin-bottom:16px;border-color:'+(policy.enable_abr?'rgba(37,99,235,.18)':'rgba(59,130,246,.16)')+';background:'+(policy.enable_abr?'linear-gradient(180deg,#ffffff 0%,#f8fbff 100%)':'linear-gradient(180deg,#ffffff 0%,#f9fbff 100%)')+'">'+
+      '<div class="card-header"><div><div class="card-title">Adaptive Teslimat</div><div class="form-hint">Kaynak yayin tek kalite olsa bile sunucu bunu coklu kalite HLS / DASH teslimatina cevirebilir.</div></div><span class="tag '+(policy.enable_abr?'tag-green':'tag-blue')+'">'+(policy.enable_abr?('Aktif · '+escHtml(policy.profile_set||'balanced')):'Kapali')+'</span></div>'+
+      '<div class="metric-list">'+
+        '<div class="metric-row"><span>Davranis</span><strong>'+(policy.enable_abr?'Izleyiciye baglanti hizina gore kalite sunulur':'Yayin su an tek kalite teslim ediliyor')+'</strong></div>'+
+        '<div class="metric-row"><span>Onerilen profil</span><strong>'+escHtml(recommendedAdaptiveProfileSet(st))+'</strong></div>'+
+        '<div class="metric-row"><span>Canli uygulama</span><strong>'+(st.status==='live'?'Mumkun · kisa yeniden kurulum etkisi olabilir':'Bir sonraki publishte risksiz uygulanir')+'</strong></div>'+
+      '</div>'+
+      '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">'+
+        '<button class="btn '+(policy.enable_abr?'btn-secondary':'btn-primary')+'" onclick="showAdaptiveModeModal('+st.id+')">'+(policy.enable_abr?'Adaptive Ayarini Guncelle':'Adaptiveye Al')+'</button>'+
+        '<button class="btn btn-secondary" onclick="navigate(\'settings-abr\')">ABR Studyosunu Ac</button>'+
+      '</div>'+
+    '</div>'+
+
     '<div class="card" style="margin-bottom:16px"><div class="card-title" style="margin-bottom:12px">Teslimat ve Guvenlik Politikasi</div>'+
       '<div class="form-group"><label class="form-label">Yayin Modu</label><select class="form-select" id="sd-policy-mode"><option value="balanced" '+((policy.mode||'balanced')==='balanced'?'selected':'')+'>TV / Dengeli</option><option value="mobile" '+((policy.mode||'')==='mobile'?'selected':'')+'>Mobil / Hafif</option><option value="resilient" '+((policy.mode||'')==='resilient'?'selected':'')+'>Dusuk Bant / Dayanikli</option><option value="radio" '+((policy.mode||'')==='radio'?'selected':'')+'>Radyo / Audio</option></select><div class="form-hint">Bu, yayin icin secilen genel davranis profilidir.</div></div>'+
       '<div class="setting-row"><div><div class="setting-label">Adaptif Bitrate</div><div class="setting-desc">Acik oldugunda izleyiciye baglanti hizina gore farkli kalite katmanlari sunulur.</div></div>'+
@@ -2163,6 +2182,89 @@ async function saveStreamPolicySettings(id){
     navigate('stream-detail-'+id);
   }else{
     toast((res&&res.message)||'Kaydedilemedi','error');
+  }
+}
+function recommendedAdaptiveProfileSet(stream){
+  const st=stream||{};
+  const policy=parseStreamPolicy(st.policy_json);
+  if(policy.profile_set)return policy.profile_set;
+  if((policy.mode||'')==='radio')return 'radio';
+  if((st.input_width||0)>0 && (st.input_width||0)<=960)return 'mobile';
+  if((st.input_width||0)>=1920 || (st.input_bitrate||0)>=3500000)return 'balanced';
+  return policy.mode||'balanced';
+}
+function adaptiveProfileSelectOptions(selected){
+  const current=String(selected||'balanced');
+  return [
+    ['balanced','TV / Dengeli'],
+    ['mobile','Mobil / Hafif'],
+    ['resilient','Dusuk Bant / Dayanikli'],
+    ['radio','Radyo / Audio']
+  ].map(function(item){
+    return '<option value="'+item[0]+'"'+(item[0]===current?' selected':'')+'>'+item[1]+'</option>';
+  }).join('');
+}
+async function showAdaptiveModeModal(streamId){
+  const st=await api('/api/streams/'+streamId);
+  if(!st||st.error){toast('Yayin bilgisi alinamadi','error');return;}
+  const policy=parseStreamPolicy(st.policy_json);
+  const recommended=recommendedAdaptiveProfileSet(st);
+  closeModal('adaptive-mode-modal');
+  const isLive=st.status==='live';
+  const currentProfile=policy.profile_set||recommended||'balanced';
+  document.body.insertAdjacentHTML('beforeend',
+    '<div class="modal-overlay" id="adaptive-mode-modal" onclick="if(event.target===this)closeModal(\'adaptive-mode-modal\')">'+
+      '<div class="modal" style="max-width:760px">'+
+        '<div class="modal-title">Adaptive teslimata gec</div>'+
+        '<div class="form-hint" style="margin-bottom:16px">Kaynak yayin tek kalite olsa bile sunucu bunu coklu kalite HLS / DASH teslimatina cevirebilir. Varsayilan guvenli akis, ayari simdi kaydedip bir sonraki yayinda devreye almaktir.</div>'+
+        '<div class="card-grid card-grid-2" style="margin-bottom:16px">'+
+          '<div class="card" style="padding:16px"><div class="card-title" style="font-size:16px;margin-bottom:10px">Yayin ozeti</div><div class="metric-list">'+
+            '<div class="metric-row"><span>Yayin</span><strong>'+escHtml(st.name||st.stream_key)+'</strong></div>'+
+            '<div class="metric-row"><span>Durum</span><strong>'+(isLive?'Canli':'Cevrimdisi')+'</strong></div>'+
+            '<div class="metric-row"><span>Mevcut teslimat</span><strong>'+(policy.enable_abr?('Adaptive · '+escHtml(currentProfile)):'Tek kalite')+'</strong></div>'+
+            '<div class="metric-row"><span>Oneri</span><strong>'+escHtml(recommended)+'</strong></div>'+
+          '</div></div>'+
+          '<div class="card" style="padding:16px"><div class="card-title" style="font-size:16px;margin-bottom:10px">Ne olacak?</div><div class="metric-list">'+
+            '<div class="metric-row"><span>Sonraki yayinda</span><strong>Kesintisiz ve onerilen</strong></div>'+
+            '<div class="metric-row"><span>Canli uygula</span><strong>'+(isLive?'Kisa yeniden kurulum etkisi olabilir':'Yayin canli degilse otomatik olarak sonraki publishe kalir')+'</strong></div>'+
+            '<div class="metric-row"><span>Kaynak tipi</span><strong>Tek bitrate kaynak da uygundur</strong></div>'+
+            '<div class="metric-row"><span>Sunucu maliyeti</span><strong>FFmpeg ve CPU/GPU kullanimi artar</strong></div>'+
+          '</div></div>'+
+        '</div>'+
+        '<div class="form-group"><label class="form-label">ABR profil seti</label><select class="form-select" id="adaptive-profile-set">'+adaptiveProfileSelectOptions(currentProfile)+'</select><div class="form-hint">TV / Dengeli genel amacli baslangictir. Dusuk uplink veya zayif sunucuda Dayanikli daha guvenlidir.</div></div>'+
+        '<div class="form-group"><label class="form-label">Uygulama modu</label><select class="form-select" id="adaptive-apply-mode">'+
+          '<option value="next_publish">Sonraki yayinda etkinlestir (onerilen)</option>'+
+          (isLive?'<option value="live_now">Canli yayina simdi uygula</option>':'')+
+        '</select><div class="form-hint">'+(isLive?'Canli uygula secenegi HLS/DASH zincirini kisa sureli yeniden kurar.':'Yayin su an canli olmadigi icin ayar risksiz sekilde bir sonraki publishte devreye girer.')+'</div></div>'+
+        '<div class="setting-row"><div><div class="setting-label">Yayin modu ile hizala</div><div class="setting-desc">Secilen profil seti, yayin modunu da ayni aileye ceker.</div></div><label class="toggle"><input type="checkbox" id="adaptive-sync-mode" checked><span class="toggle-slider"></span></label></div>'+
+        '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px"><button class="btn btn-secondary" onclick="closeModal(\'adaptive-mode-modal\')">Vazgec</button><button class="btn btn-primary" onclick="applyAdaptiveModeForStream('+streamId+')">Adaptive Olarak Isaretle</button></div>'+
+      '</div>'+
+    '</div>');
+}
+async function applyAdaptiveModeForStream(streamId){
+  const profileSet=document.getElementById('adaptive-profile-set')?.value||'balanced';
+  const applyMode=document.getElementById('adaptive-apply-mode')?.value||'next_publish';
+  const syncMode=!!document.getElementById('adaptive-sync-mode')?.checked;
+  const res=await api('/api/admin/streams/adaptive-mode',{method:'POST',body:{
+    stream_id:streamId,
+    profile_set:profileSet,
+    apply_mode:applyMode,
+    sync_mode:syncMode
+  }});
+  if(!res||res.error){
+    toast((res&&res.message)||'Adaptive teslimat uygulanamadi','error');
+    return;
+  }
+  if(Array.isArray(res.warnings)&&res.warnings.length){
+    toast(res.warnings[0],'warning');
+  }else{
+    toast(res.message||'Adaptive teslimat guncellendi');
+  }
+  closeModal('adaptive-mode-modal');
+  if(String(currentPage||'').startsWith('stream-detail-')){
+    navigate('stream-detail-'+streamId);
+  }else{
+    navigate('streams');
   }
 }
 async function renderEmbedCodes(c){
