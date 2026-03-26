@@ -387,6 +387,7 @@ async function api(path,opts={}){
     const hdrs={'Content-Type':'application/json',...opts.headers};
     if(authToken) hdrs['Authorization']='Bearer '+authToken;
     const res=await fetch(API+path,{
+      cache:opts.cache||'no-store',
       headers:hdrs,
       ...opts,
       body:opts.body?JSON.stringify(opts.body):undefined,
@@ -1911,7 +1912,10 @@ async function renderStreamDetail(c,id){
   const st=await api('/api/streams/'+id);
   if(!st||st.error){c.innerHTML='<div class="empty-state"><h3>Yayin bulunamadi</h3></div>';return}
   window._streamDetailData=st;
-  const settings=await api('/api/settings');
+  const [settings,recsRes]=await Promise.all([api('/api/settings'),api('/api/recordings')]);
+  const activeRecordings=(Array.isArray(recsRes)?recsRes:[]).filter(function(item){
+    return item&&item.Status==='recording'&&item.StreamKey===st.stream_key;
+  });
   const access=await getPlaybackAccess(st.stream_key,settings,st.policy_json);
   const u=getAllURLs(st.stream_key,settings,st.name,access);
   const previewURLs=getPreviewURLs(st.stream_key,settings,st.name,access);
@@ -1982,6 +1986,7 @@ async function renderStreamDetail(c,id){
       '<div class="form-hint">Kalici kayitlar <code>data/recordings</code> altina yazilir. MP4 ve MKV secenekleri yayin kapaninca finalize edilir; canli cache dizinleri kayit sayilmaz.</div>'+
       '<div style="margin-top:16px"><button class="btn btn-primary" onclick="saveStreamRecordSettings('+st.id+')">Kayit Ayarlarini Kaydet</button></div>'+
     '</div>'+
+    (activeRecordings.length?'<div class="card" style="margin-bottom:16px;border-color:rgba(239,68,68,.28);box-shadow:0 8px 22px rgba(239,68,68,.08)"><div class="card-header"><div><div class="card-title">Aktif Kayit</div><div class="form-hint">Bu yayin icin calisan kayit oturumlari burada gorunur.</div></div><span class="badge badge-live">'+fmtInt(activeRecordings.length)+' aktif</span></div><div style="display:flex;gap:10px;flex-wrap:wrap">'+activeRecordings.map(function(r){return '<div class="tag tag-red" style="display:flex;align-items:center;gap:10px;padding:8px 12px"><span>'+escHtml(String(r.Format||'').toUpperCase())+' · '+fmtBytes(r.Size||0)+'</span><button class="btn btn-sm btn-danger" onclick="stopRec(\''+r.ID+'\')">Kaydi Durdur</button></div>';}).join('')+'</div></div>':'')+
 
     '<div class="card" style="margin-bottom:16px"><div class="card-title" style="margin-bottom:12px">Embed Kodlari</div>'+
       (access&&access.needs_token?'<div class="form-hint" style="margin-bottom:10px;color:var(--warning)">Bu yayinda playback token gerekli. Aasagidaki preview ve linkler gecici token ile uretildi.</div>':'')+
@@ -2296,7 +2301,8 @@ async function renderSettingsSecurity(c){
 
 // ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â SETTINGS - STORAGE ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â
 async function renderSettingsStorage(c){
-  const [s,report,archivesRes,recsRes,streamsRes,savedRes,backupsRes,backupArchivesRes,upgradeRes]=await Promise.all([
+  teardownRecordingPreview();
+  const [s,report,archivesRes,recsRes,streamsRes,savedRes,backupsRes,backupArchivesRes,upgradeRes,remuxJobsRes]=await Promise.all([
     api('/api/settings'),
     api('/api/health/report'),
     api('/api/recordings/archives'),
@@ -2305,15 +2311,18 @@ async function renderSettingsStorage(c){
     api('/api/recordings/library'),
     api('/api/system/backups'),
     api('/api/system/backups/archives'),
-    api('/api/system/upgrade/plan')
+    api('/api/system/upgrade/plan'),
+    api('/api/recordings/remux/jobs')
   ]);
   const archiveSummary=report&&report.storage&&report.storage.archive?report.storage.archive:{};
   const archives=Array.isArray(archivesRes)?archivesRes:[];
   const recs=Array.isArray(recsRes)?recsRes:[];
+  const activeRecordings=recs.filter(function(item){return item&&item.Status==='recording';});
   const streams=Array.isArray(streamsRes)?streamsRes:[];
   const saved=Array.isArray(savedRes)?savedRes:[];
   const backups=(backupsRes&&Array.isArray(backupsRes.items))?backupsRes.items:[];
   const backupArchives=Array.isArray(backupArchivesRes)?backupArchivesRes:[];
+  const remuxJobs=Array.isArray(remuxJobsRes)?remuxJobsRes:[];
   const archiveMap={};
   const backupArchiveMap={};
   archives.forEach(function(item){archiveMap[item.stream_key+'::'+item.filename]=item;});
@@ -2324,14 +2333,16 @@ async function renderSettingsStorage(c){
   const restoreCmd=commands.backup_restore||'fluxstream backup restore fluxstream-backup-YYYYMMDD-HHMMSS.tar.gz';
   c.innerHTML=
     '<div class="page-header"><h1 class="page-title">Depolama ve Arsiv Merkezi</h1><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-primary" onclick="showRecordModal()">Kayit Baslat</button><button class="btn btn-secondary" onclick="createSystemBackupFromStorage(false)">Hafif Yedek Al</button><button class="btn btn-secondary" onclick="createSystemBackupFromStorage(true)">Kayitlarla Yedek Al</button></div></div>'+
+    '<div id="storage-active-banner">'+(activeRecordings.length?'<div class="card" style="margin-bottom:16px;border-color:rgba(239,68,68,.28);box-shadow:0 8px 22px rgba(239,68,68,.08)"><div class="card-header"><div><div class="card-title">Aktif Kayit Uyarisi</div><div class="form-hint">Calisan kayit oturumlari burada sabit tutulur. Durdur dugmesine buradan da erisebilirsiniz.</div></div><span class="badge badge-live">'+fmtInt(activeRecordings.length)+' aktif kayit</span></div><div style="display:flex;gap:10px;flex-wrap:wrap">'+activeRecordings.map(function(r){return '<div class="tag tag-red" style="display:flex;align-items:center;gap:10px;padding:8px 12px"><span><strong>'+escHtml(String(r.StreamKey||'-'))+'</strong> · '+escHtml(String(r.Format||'').toUpperCase())+'</span>'+(r.Status==='recording'?'<button class="btn btn-sm btn-danger" onclick="stopRec(\''+r.ID+'\')">Durdur</button>':'')+'</div>';}).join('')+'</div></div>':'')+'</div>'+
+    '<div id="storage-remux-jobs">'+(remuxJobs.length?'<div class="card" style="margin-bottom:16px;background:linear-gradient(180deg,#f8fbff 0%,#f2f8ff 100%)"><div class="card-header"><div><div class="card-title">Donusum ve Senkron Isleri</div><div class="form-hint">MP4 hazirlama ve benzeri uzun isler arka planda devam eder.</div></div><button class="btn btn-secondary btn-sm" onclick="refreshStorageSnapshot({resetPreview:false})">Yenile</button></div><div style="display:flex;gap:10px;flex-wrap:wrap">'+remuxJobs.slice(0,6).map(function(job){var tone=job.status==='completed'?'green':(job.status==='error'?'red':'yellow'); var label=job.status==='completed'?'Hazir':(job.status==='error'?'Hata':'Calisiyor'); return '<div class="tag tag-'+tone+'" style="display:flex;align-items:center;gap:8px;padding:8px 12px"><span><strong>'+escHtml(job.source_name||'-')+'</strong> → '+escHtml((job.target_format||'mp4').toUpperCase())+'</span><span>'+label+'</span></div>';}).join('')+'</div></div>':'')+'</div>'+
     '<div class="card" style="margin-bottom:16px"><div class="card-title" style="margin-bottom:8px">Kullanim Notu</div><div class="form-hint">Bu merkezde yerel kayitlar, harici arsiv hedefi ve sistem yedekleri birlikte yonetilir. Yerel klasor yapisi korunur; S3, MinIO ve SFTP hedefleri bunun ustune eklenir. MP4 secilen kayitlar yayin boyunca guvenli bicimde yakalanir, yayin bitince izlenebilir dosyaya finalize edilir.</div></div>'+
-    '<div class="card-grid card-grid-4" style="margin-bottom:16px">'+
+    '<div id="storage-stats-grid" class="card-grid card-grid-4" style="margin-bottom:16px">'+
       statCard('blue','bi-hdd-fill',formatBytes((report&&report.storage&&report.storage.recordings_bytes)||0),'Yerel Kayitlar')+
       statCard('purple','bi-archive-fill',fmtInt(backups.length),'Yerel Yedekler')+
       statCard('orange','bi-cloud-arrow-up-fill',fmtInt(archives.length),'Kayit Arsivi')+
       statCard('green','bi-safe2-fill',fmtInt(backupArchives.length),'Yedek Arsivi')+
     '</div>'+
-    '<div class="card-grid card-grid-2">'+
+    '<div style="display:grid;gap:16px">'+
       '<div class="card">'+
         '<div class="card-title" style="margin-bottom:12px">Yerel Depolama ve Temizlik</div>'+
         settingInput('storage_max_gb','Maksimum Depolama (GB)',s.storage_max_gb||'50','number','Toplam kayit ve yedek alanini izlemek icin uyarilarda kullanilir.')+
@@ -2344,7 +2355,8 @@ async function renderSettingsStorage(c){
       '</div>'+
       '<div class="card">'+
         '<div class="card-title" style="margin-bottom:12px">Harici Hedef ve Senkron</div>'+
-        '<div class="form-group"><label class="form-label">Saglayici</label><select class="form-select setting-input" data-key="archive_provider"><option value="local" '+((s.archive_provider||'local')==='local'?'selected':'')+'>Lokal Arsiv Klasoru</option><option value="s3" '+((s.archive_provider||'')==='s3'?'selected':'')+'>S3 Uyumlu</option><option value="minio" '+((s.archive_provider||'')==='minio'?'selected':'')+'>MinIO</option><option value="sftp" '+((s.archive_provider||'')==='sftp'?'selected':'')+'>SFTP / SSH</option></select><div class="form-hint">S3 ve MinIO object storage icindir. SFTP, dusuk butcede harici sunucuya klasor bazli aktarim icin uygundur.</div></div>'+
+        '<div class="card" style="margin-bottom:14px;background:var(--bg-primary)"><div class="card-title" style="margin-bottom:10px">Basit Secim Rehberi</div><div class="form-hint" style="line-height:1.8"><strong>Yerel:</strong> Kayitlar ayni sunucuda kalir. En kolay secenektir.<br><strong>S3 / MinIO:</strong> Dosyalari bulut benzeri obje depoya yollar. Daha kurumsal kullanim icindir.<br><strong>SFTP:</strong> Baska bir sunucuya klasor gibi kopyalar. Dusuk butcede en pratik harici hedeflerden biridir.<br><strong>Google Drive / OneDrive:</strong> Cok kullanilan servisler olarak yol haritasina alindi; bu turda henuz dogrudan entegrasyon yok.</div></div>'+
+        '<div class="form-group"><label class="form-label">Saglayici</label><select class="form-select setting-input" data-key="archive_provider"><option value="local" '+((s.archive_provider||'local')==='local'?'selected':'')+'>Yerel Arsiv Klasoru</option><option value="s3" '+((s.archive_provider||'')==='s3'?'selected':'')+'>S3 Uyumlu Depo</option><option value="minio" '+((s.archive_provider||'')==='minio'?'selected':'')+'>MinIO Sunucusu</option><option value="sftp" '+((s.archive_provider||'')==='sftp'?'selected':'')+'>SFTP / SSH Sunucusu</option></select><div class="form-hint">Once <strong>Yerel</strong> ile baslamak en kolayidir. Harici hedefe gecince kayit ve yedekler ikinci bir konuma da yazilabilir.</div></div>'+
         settingInput('archive_prefix','Object Key On Eki',s.archive_prefix||'fluxstream','text','Kayitlar ve yedekler bu kok klasor altina yazilir.')+
         settingInput('archive_public_base_url','Public Arsiv Taban URL',s.archive_public_base_url||'','text','Varsa panel tiklanabilir genel link uretir.')+
         settingInput('archive_local_dir','Lokal Arsiv Klasoru',s.archive_local_dir||'','text','Local provider secildiginde dosyalar bu klasore kopyalanir.')+
@@ -2382,10 +2394,8 @@ async function renderSettingsStorage(c){
         '</div>'+
       '</div>'+
     '</div>'+
-    '<div class="card-grid card-grid-2" style="margin-top:16px;margin-bottom:16px">'+
-      '<div class="card"><div class="card-header"><h3 class="card-title">Aktif Kayitlar</h3><span class="form-hint">'+fmtInt(recs.length)+' aktif oturum</span></div><div class="card-body"><table class="table"><thead><tr><th>ID</th><th>Yayin</th><th>Format</th><th>Durum</th><th>Boyut</th><th>Islem</th></tr></thead><tbody id="rec-list"></tbody></table></div></div>'+
-      '<div class="card"><div class="card-header"><h3 class="card-title">Secili Kayit Onizleme</h3><span class="form-hint">TS / FLV eski dosyalarda gerekirse MP4 donusumu baslatabilirsiniz.</span></div><div class="card-body"><div id="recording-preview-panel"><div class="empty-state"><div class="icon"><i class="bi bi-film"></i></div><h3>Kayit secin</h3><p style="color:var(--text-muted)">Panel secili kaydi ayni sayfada oynatir.</p></div></div></div></div>'+
-    '</div>'+
+    '<div class="card" style="margin-top:16px;margin-bottom:16px"><div class="card-header"><h3 class="card-title">Aktif Kayitlar</h3><span class="form-hint" id="storage-active-count">'+fmtInt(recs.length)+' aktif oturum</span></div><div class="card-body"><table class="table"><thead><tr><th>ID</th><th>Yayin</th><th>Format</th><th>Durum</th><th>Boyut</th><th style="white-space:nowrap">Islem</th></tr></thead><tbody id="rec-list"></tbody></table></div></div>'+
+    '<div class="card" style="margin-bottom:16px"><div class="card-header"><h3 class="card-title">Secili Kayit Onizleme</h3><span class="form-hint">TS / FLV eski dosyalarda gerekirse MP4 donusumu baslatabilirsiniz.</span></div><div class="card-body"><div id="recording-preview-panel"><div class="empty-state"><div class="icon"><i class="bi bi-film"></i></div><h3>Kayit secin</h3><p style="color:var(--text-muted)">Panel secili kaydi ayni sayfada oynatir.</p></div></div></div></div>'+
     '<div class="card" style="margin-bottom:16px"><div class="card-header"><h3 class="card-title">Kayit Kutuphanesi</h3><span class="form-hint">Yerelde bulunan dosyalar ve izlenebilir kopyalar</span></div><div class="card-body"><table class="table"><thead><tr><th>Yayin</th><th>Dosya</th><th>Format</th><th>Tarih</th><th>Boyut</th><th>Arsiv</th><th>Islem</th></tr></thead><tbody id="saved-rec-list"></tbody></table></div></div>'+
     '<div class="card" style="margin-bottom:16px"><div class="card-header"><h3 class="card-title">Kayit Arsiv Kutuphanesi</h3><span class="form-hint">Object storage, MinIO veya SFTP hedefindeki kayitlar</span></div><div class="card-body"><table class="table"><thead><tr><th>Yayin</th><th>Dosya</th><th>Saglayici</th><th>Tarih</th><th>Yerel Durum</th><th>Sonuc</th><th>Islem</th></tr></thead><tbody id="archive-rec-list"></tbody></table></div></div>'+
     '<div class="card" style="margin-bottom:16px"><div class="card-header"><h3 class="card-title">Sistem Yedekleri</h3><span class="form-hint">Restore komutu: '+escHtml(restoreCmd)+'</span></div><div class="card-body"><table class="table"><thead><tr><th>Dosya</th><th>Boyut</th><th>Tarih</th><th>Tur</th><th>Arsiv</th><th>Islem</th></tr></thead><tbody id="system-backup-list"></tbody></table></div></div>'+
@@ -2395,7 +2405,18 @@ async function renderSettingsStorage(c){
   const rl=document.getElementById('rec-list');
   if(rl){
     rl.innerHTML=recs.length?recs.map(function(r){
-      return '<tr><td style="font-size:12px">'+r.ID+'</td><td>'+r.StreamKey+'</td><td>'+r.Format+'</td><td><span class="badge badge-'+(r.Status==='recording'?'green':(r.Status==='error'?'red':'gray'))+'">'+r.Status+'</span></td><td>'+fmtBytes(r.Size||0)+'</td><td>'+(r.Status==='recording'?'<button class="btn btn-sm btn-danger" onclick="stopRec(\''+r.ID+'\')">Durdur</button>':'—')+'</td></tr>';
+      const recID=String(r.ID||'');
+      const streamKey=String(r.StreamKey||'');
+      const shortID=recID.length>28?recID.slice(0,28)+'…':recID;
+      const shortStream=streamKey.length>22?streamKey.slice(0,22)+'…':streamKey;
+      return '<tr>'+
+        '<td><code title="'+escHtml(recID)+'" style="display:inline-block;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom">'+escHtml(shortID)+'</code></td>'+
+        '<td><code title="'+escHtml(streamKey)+'" style="display:inline-block;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom">'+escHtml(shortStream)+'</code></td>'+
+        '<td style="white-space:nowrap">'+escHtml(String(r.Format||'').toUpperCase())+'</td>'+
+        '<td style="white-space:nowrap"><span class="badge badge-'+(r.Status==='recording'?'green':(r.Status==='error'?'red':'gray'))+'">'+escHtml(String(r.Status||'-'))+'</span></td>'+
+        '<td style="white-space:nowrap">'+fmtBytes(r.Size||0)+'</td>'+
+        '<td style="white-space:nowrap">'+(r.Status==='recording'?'<button class="btn btn-sm btn-danger" onclick="stopRec(\''+r.ID+'\')">Durdur</button>':'—')+'</td>'+
+      '</tr>';
     }).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">Aktif kayit yok</td></tr>';
   }
 
@@ -2457,7 +2478,7 @@ async function renderSettingsStorage(c){
         '<td>'+(item.include_recordings?'<span class="tag tag-blue">Kayitlar dahil</span>':'<span class="tag tag-green">Hafif</span>')+'</td>'+
         '<td>'+archiveBadge+'</td>'+
         '<td style="display:flex;gap:8px;flex-wrap:wrap">'+
-          '<a class="btn btn-sm btn-secondary" href="/api/system/backups/download/'+encodeURIComponent(item.name)+'">Indir</a>'+
+          '<a class="btn btn-sm btn-secondary" href="/api/system/backups/download/'+encodeURIComponent(item.name)+'" target="_blank" rel="noopener">Indir</a>'+
           (backupArchiveEnabled?'<button class="btn btn-sm btn-secondary" onclick=\'archiveSystemBackup('+JSON.stringify(item.name)+')\'>'+(archiveInfo&&archiveInfo.status==='archived'?'Yeniden Arsivle':'Arsive Gonder')+'</button>':'')+
           '<button class="btn btn-sm btn-danger" onclick="deleteSystemBackup('+JSON.stringify(item.name)+')">Sil</button>'+
         '</td>'+
@@ -2489,9 +2510,9 @@ async function renderSettingsStorage(c){
   window._recordingArchives=archives;
   window._systemBackups=backups;
   window._backupArchives=backupArchives;
-  if(saved.length){
-    previewRecordingPanel(saved[0].stream_key,saved[0].name,saved[0].format||'',saved[0].mod_time||'',saved[0].size||0);
-  }
+  window._recordingPreviewSelection=null;
+  resetRecordingPreviewPanel();
+  applyStorageSnapshot(normalizeStorageSnapshot(s,report,archivesRes,recsRes,streamsRes,savedRes,backupsRes,backupArchivesRes,remuxJobsRes),{resetPreview:true});
 }
 
 // ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â SETTINGS - TRANSCODE ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â
@@ -2810,7 +2831,8 @@ async function runArchiveSync(showToast=true){
   const res=await api('/api/recordings/archive/sync',{method:'POST'});
   if(res&&res.success){
     if(showToast)toast('Arsiv senkronu tamamlandi');
-    if(currentPage==='recordings'||currentPage==='settings-storage')loadPage(currentPage);
+    if(currentPage==='recordings'||currentPage==='settings-storage')await refreshStorageSnapshot({resetPreview:false});
+    else if(currentPage==='maintenance-center')await loadPage(currentPage);
   }else{
     toast((res&&res.message)||'Arsiv senkronu basarisiz','error');
   }
@@ -2819,7 +2841,8 @@ async function runBackupArchiveSync(showToast=true){
   const res=await api('/api/system/backups/archive/sync',{method:'POST'});
   if(res&&res.success){
     if(showToast)toast('Yedek arsiv senkronu tamamlandi');
-    if(currentPage==='recordings'||currentPage==='settings-storage'||currentPage==='maintenance-center')loadPage(currentPage);
+    if(currentPage==='recordings'||currentPage==='settings-storage')await refreshStorageSnapshot({resetPreview:false});
+    else if(currentPage==='maintenance-center')await loadPage(currentPage);
   }else{
     toast((res&&res.message)||'Yedek arsiv senkronu basarisiz','error');
   }
@@ -3874,7 +3897,217 @@ function renderBackupArchiveStatusBadge(item){
   if(item.local_deleted)return '<span class="tag tag-yellow">Arsivde</span>';
   return '<span class="tag tag-green">Arsivlendi</span>';
 }
+function normalizeStorageSnapshot(settings,report,archivesRes,recsRes,streamsRes,savedRes,backupsRes,backupArchivesRes,remuxJobsRes){
+  const archives=Array.isArray(archivesRes)?archivesRes:[];
+  const recs=Array.isArray(recsRes)?recsRes:[];
+  const streams=Array.isArray(streamsRes)?streamsRes:[];
+  const saved=Array.isArray(savedRes)?savedRes:[];
+  const backups=(backupsRes&&Array.isArray(backupsRes.items))?backupsRes.items:[];
+  const backupArchives=Array.isArray(backupArchivesRes)?backupArchivesRes:[];
+  const remuxJobs=Array.isArray(remuxJobsRes)?remuxJobsRes:[];
+  const archiveMap={};
+  const backupArchiveMap={};
+  archives.forEach(function(item){archiveMap[item.stream_key+'::'+item.filename]=item;});
+  backupArchives.forEach(function(item){backupArchiveMap[item.name]=item;});
+  return {
+    settings:settings||{},
+    report:report||{},
+    archiveSummary:(report&&report.storage&&report.storage.archive)?report.storage.archive:{},
+    archives:archives,
+    recs:recs,
+    activeRecordings:recs.filter(function(item){return item&&item.Status==='recording';}),
+    streams:streams,
+    saved:saved,
+    backups:backups,
+    backupArchives:backupArchives,
+    remuxJobs:remuxJobs,
+    archiveMap:archiveMap,
+    backupArchiveMap:backupArchiveMap,
+    archiveEnabled:settings&&settings.archive_enabled==='true',
+    backupArchiveEnabled:settings&&settings.backup_archive_enabled==='true'
+  };
+}
+function renderStorageActiveBanner(data){
+  const activeRecordings=Array.isArray(data&&data.activeRecordings)?data.activeRecordings:[];
+  if(!activeRecordings.length)return '';
+  return '<div class="card" style="margin-bottom:16px;border-color:rgba(239,68,68,.28);box-shadow:0 8px 22px rgba(239,68,68,.08)"><div class="card-header"><div><div class="card-title">Aktif Kayit Uyarisi</div><div class="form-hint">Calisan kayit oturumlari burada sabit tutulur. Durdur dugmesine buradan da erisebilirsiniz.</div></div><span class="badge badge-live">'+fmtInt(activeRecordings.length)+' aktif kayit</span></div><div style="display:flex;gap:10px;flex-wrap:wrap">'+activeRecordings.map(function(r){return '<div class="tag tag-red" style="display:flex;align-items:center;gap:10px;padding:8px 12px"><span><strong>'+escHtml(String(r.StreamKey||'-'))+'</strong> · '+escHtml(String(r.Format||'').toUpperCase())+'</span>'+(r.Status==='recording'?'<button class="btn btn-sm btn-danger" onclick="stopRec(\''+r.ID+'\')">Durdur</button>':'')+'</div>';}).join('')+'</div></div>';
+}
+function renderStorageRemuxJobs(data){
+  const remuxJobs=Array.isArray(data&&data.remuxJobs)?data.remuxJobs:[];
+  if(!remuxJobs.length)return '';
+  return '<div class="card" style="margin-bottom:16px;background:linear-gradient(180deg,#f8fbff 0%,#f2f8ff 100%)"><div class="card-header"><div><div class="card-title">Donusum ve Senkron Isleri</div><div class="form-hint">MP4 hazirlama ve benzeri uzun isler arka planda devam eder.</div></div><button class="btn btn-secondary btn-sm" onclick="refreshStorageSnapshot({resetPreview:false})">Yenile</button></div><div style="display:flex;gap:10px;flex-wrap:wrap">'+remuxJobs.slice(0,8).map(function(job){var tone=job.status==='completed'?'green':(job.status==='error'?'red':'yellow'); var label=job.status==='completed'?'Hazir':(job.status==='error'?'Hata':'Calisiyor'); return '<div class="tag tag-'+tone+'" style="display:flex;align-items:center;gap:8px;padding:8px 12px"><span><strong>'+escHtml(job.source_name||'-')+'</strong> &rarr; '+escHtml((job.target_format||'mp4').toUpperCase())+'</span><span>'+label+'</span></div>';}).join('')+'</div></div>';
+}
+function renderStorageStatsGrid(data){
+  const report=data&&data.report?data.report:{};
+  return statCard('blue','bi-hdd-fill',formatBytes((report&&report.storage&&report.storage.recordings_bytes)||0),'Yerel Kayitlar')+
+    statCard('purple','bi-archive-fill',fmtInt((data&&data.backups||[]).length),'Yerel Yedekler')+
+    statCard('orange','bi-cloud-arrow-up-fill',fmtInt((data&&data.archives||[]).length),'Kayit Arsivi')+
+    statCard('green','bi-safe2-fill',fmtInt((data&&data.backupArchives||[]).length),'Yedek Arsivi');
+}
+function renderStorageActiveRecordingRows(data){
+  const recs=Array.isArray(data&&data.recs)?data.recs:[];
+  if(!recs.length)return '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">Aktif kayit yok</td></tr>';
+  return recs.map(function(r){
+    const recID=String(r.ID||'');
+    const streamKey=String(r.StreamKey||'');
+    const shortID=recID.length>28?recID.slice(0,28)+'...':recID;
+    const shortStream=streamKey.length>22?streamKey.slice(0,22)+'...':streamKey;
+    return '<tr>'+
+      '<td><code title="'+escHtml(recID)+'" style="display:inline-block;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom">'+escHtml(shortID)+'</code></td>'+
+      '<td><code title="'+escHtml(streamKey)+'" style="display:inline-block;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom">'+escHtml(shortStream)+'</code></td>'+
+      '<td style="white-space:nowrap">'+escHtml(String(r.Format||'').toUpperCase())+'</td>'+
+      '<td style="white-space:nowrap"><span class="badge badge-'+(r.Status==='recording'?'green':(r.Status==='error'?'red':'gray'))+'">'+escHtml(String(r.Status||'-'))+'</span></td>'+
+      '<td style="white-space:nowrap">'+fmtBytes(r.Size||0)+'</td>'+
+      '<td style="white-space:nowrap">'+(r.Status==='recording'?'<button class="btn btn-sm btn-danger" onclick="stopRec(\''+r.ID+'\')">Durdur</button>':'-')+'</td>'+
+    '</tr>';
+  }).join('');
+}
+function renderStorageSavedRecordingRows(data){
+  const saved=Array.isArray(data&&data.saved)?data.saved:[];
+  const archiveMap=data&&data.archiveMap?data.archiveMap:{};
+  const archiveEnabled=!!(data&&data.archiveEnabled);
+  if(!saved.length)return '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px">Kaydedilmis dosya yok</td></tr>';
+  return saved.map(function(r){
+    const archiveInfo=archiveMap[r.stream_key+'::'+r.name];
+    const archiveBadge=archiveInfo?renderArchiveStatusBadge(archiveInfo):'<span class="tag tag-blue">Yerelde</span>';
+    const format=String(r.format||'').toLowerCase();
+    const canRemux=format==='ts'||format==='flv'||format==='mkv';
+    return '<tr>'+
+      '<td><code>'+escHtml(r.stream_key)+'</code></td>'+
+      '<td>'+escHtml(r.name)+'</td>'+
+      '<td>'+(r.format||'-').toUpperCase()+'</td>'+
+      '<td>'+fmtLocaleDateTime(r.mod_time)+'</td>'+
+      '<td>'+fmtBytes(r.size||0)+'</td>'+
+      '<td>'+archiveBadge+'</td>'+
+      '<td style="display:flex;gap:8px;flex-wrap:wrap">'+
+        '<button class="btn btn-sm btn-secondary" onclick=\'previewRecordingPanel('+JSON.stringify(r.stream_key)+','+JSON.stringify(r.name)+','+JSON.stringify(r.format||'')+','+JSON.stringify(r.mod_time||'')+','+(r.size||0)+')\'>Onizle</button>'+
+        '<button class="btn btn-sm btn-secondary" onclick=\'downloadRecordingFile('+JSON.stringify(r.stream_key)+','+JSON.stringify(r.name)+')\'>Indir</button>'+
+        (canRemux?'<button class="btn btn-sm btn-secondary" onclick=\'remuxRecordingFile('+JSON.stringify(r.stream_key)+','+JSON.stringify(r.name)+','+JSON.stringify('mp4')+')\'>MP4 Hazirla</button>':'')+
+        (archiveEnabled?'<button class="btn btn-sm btn-secondary" onclick=\'archiveRecordingFile('+JSON.stringify(r.stream_key)+','+JSON.stringify(r.name)+')\'>'+(archiveInfo&&archiveInfo.status==='archived'?'Yeniden Arsivle':'Arsive Gonder')+'</button>':'')+
+        (archiveInfo&&archiveInfo.object_url?'<button class="btn btn-sm btn-secondary" onclick=\'window.open('+JSON.stringify(archiveInfo.object_url)+',"_blank")\'>Arsiv Linki</button>':'')+
+        '<button class="btn btn-sm btn-danger" onclick=\'deleteRecordingFile('+JSON.stringify(r.stream_key)+','+JSON.stringify(r.name)+')\'>Sil</button>'+
+      '</td>'+
+    '</tr>';
+  }).join('');
+}
+function renderStorageArchiveRows(data){
+  const archives=Array.isArray(data&&data.archives)?data.archives:[];
+  if(!archives.length)return '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px">Arsivlenmis kayit yok</td></tr>';
+  return archives.map(function(item){
+    const localState=item.local_deleted?'<span class="tag tag-yellow">Yerelde yok</span>':'<span class="tag tag-green">Yerelde var</span>';
+    const statusBadge=renderArchiveStatusBadge(item);
+    return '<tr>'+
+      '<td><code>'+escHtml(item.stream_key)+'</code></td>'+
+      '<td>'+escHtml(item.filename)+'</td>'+
+      '<td>'+escHtml(String(item.provider||'-').toUpperCase())+'</td>'+
+      '<td>'+fmtLocaleDateTime(item.archived_at||item.updated_at||item.created_at)+'</td>'+
+      '<td>'+localState+'</td>'+
+      '<td>'+statusBadge+(item.last_error?'<div class="setting-desc" style="max-width:320px">'+escHtml(item.last_error)+'</div>':'')+'</td>'+
+      '<td style="display:flex;gap:8px;flex-wrap:wrap">'+
+        '<button class="btn btn-sm btn-secondary" onclick=\'restoreRecordingArchive('+JSON.stringify(item.stream_key)+','+JSON.stringify(item.filename)+')\'>Geri Yukle</button>'+
+        (item.object_url?'<button class="btn btn-sm btn-secondary" onclick=\'window.open('+JSON.stringify(item.object_url)+',"_blank")\'>Arsiv Linki</button>':'')+
+      '</td>'+
+    '</tr>';
+  }).join('');
+}
+function renderStorageBackupRows(data){
+  const backups=Array.isArray(data&&data.backups)?data.backups:[];
+  const backupArchiveMap=data&&data.backupArchiveMap?data.backupArchiveMap:{};
+  const backupArchiveEnabled=!!(data&&data.backupArchiveEnabled);
+  if(!backups.length)return '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">Yerel sistem yedegi yok</td></tr>';
+  return backups.map(function(item){
+    const archiveInfo=backupArchiveMap[item.name];
+    const archiveBadge=archiveInfo?renderBackupArchiveStatusBadge(archiveInfo):'<span class="tag tag-blue">Yerelde</span>';
+    return '<tr data-backup-name="'+escHtml(item.name)+'">'+
+      '<td class="mono-wrap">'+escHtml(item.name)+'</td>'+
+      '<td>'+formatBytes(item.size||0)+'</td>'+
+      '<td>'+escHtml(fmtLocaleDateTime(item.mod_time))+'</td>'+
+      '<td>'+(item.include_recordings?'<span class="tag tag-blue">Kayitlar dahil</span>':'<span class="tag tag-green">Hafif</span>')+'</td>'+
+      '<td>'+archiveBadge+'</td>'+
+      '<td style="display:flex;gap:8px;flex-wrap:wrap">'+
+        '<button class="btn btn-sm btn-secondary" onclick=\'downloadSystemBackup('+JSON.stringify(item.name)+')\'>Indir</button>'+
+        (backupArchiveEnabled?'<button class="btn btn-sm btn-secondary" onclick=\'archiveSystemBackup('+JSON.stringify(item.name)+')\'>'+(archiveInfo&&archiveInfo.status==='archived'?'Yeniden Arsivle':'Arsive Gonder')+'</button>':'')+
+        '<button class="btn btn-sm btn-danger" onclick="deleteSystemBackup('+JSON.stringify(item.name)+')">Sil</button>'+
+      '</td>'+
+    '</tr>';
+  }).join('');
+}
+function renderStorageBackupArchiveRows(data){
+  const backupArchives=Array.isArray(data&&data.backupArchives)?data.backupArchives:[];
+  if(!backupArchives.length)return '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">Arsivlenmis sistem yedegi yok</td></tr>';
+  return backupArchives.map(function(item){
+    const localState=item.local_deleted?'<span class="tag tag-yellow">Yerelde yok</span>':'<span class="tag tag-green">Yerelde var</span>';
+    const statusBadge=renderBackupArchiveStatusBadge(item);
+    return '<tr>'+
+      '<td class="mono-wrap">'+escHtml(item.name)+'</td>'+
+      '<td>'+escHtml(String(item.provider||'-').toUpperCase())+'</td>'+
+      '<td>'+fmtLocaleDateTime(item.archived_at||item.updated_at||item.created_at)+'</td>'+
+      '<td>'+localState+'</td>'+
+      '<td>'+statusBadge+(item.last_error?'<div class="setting-desc" style="max-width:320px">'+escHtml(item.last_error)+'</div>':'')+'</td>'+
+      '<td style="display:flex;gap:8px;flex-wrap:wrap">'+
+        '<button class="btn btn-sm btn-secondary" onclick=\'restoreSystemBackupArchive('+JSON.stringify(item.name)+')\'>Geri Getir</button>'+
+        (item.object_url?'<button class="btn btn-sm btn-secondary" onclick=\'window.open('+JSON.stringify(item.object_url)+',"_blank")\'>Arsiv Linki</button>':'')+
+      '</td>'+
+    '</tr>';
+  }).join('');
+}
+function applyStorageSnapshot(data,opts){
+  const options=opts||{};
+  window._storageData=data;
+  window._recStreams=data.streams;
+  window._savedRecordings=data.saved;
+  window._recordingArchives=data.archives;
+  window._systemBackups=data.backups;
+  window._backupArchives=data.backupArchives;
+  const activeBanner=document.getElementById('storage-active-banner');
+  if(activeBanner)activeBanner.innerHTML=renderStorageActiveBanner(data);
+  const jobs=document.getElementById('storage-remux-jobs');
+  if(jobs)jobs.innerHTML=renderStorageRemuxJobs(data);
+  const stats=document.getElementById('storage-stats-grid');
+  if(stats)stats.innerHTML=renderStorageStatsGrid(data);
+  const recCount=document.getElementById('storage-active-count');
+  if(recCount)recCount.textContent=fmtInt((data.recs||[]).length)+' aktif oturum';
+  const recList=document.getElementById('rec-list');
+  if(recList)recList.innerHTML=renderStorageActiveRecordingRows(data);
+  const savedList=document.getElementById('saved-rec-list');
+  if(savedList)savedList.innerHTML=renderStorageSavedRecordingRows(data);
+  const archiveList=document.getElementById('archive-rec-list');
+  if(archiveList)archiveList.innerHTML=renderStorageArchiveRows(data);
+  const backupList=document.getElementById('system-backup-list');
+  if(backupList)backupList.innerHTML=renderStorageBackupRows(data);
+  const backupArchiveList=document.getElementById('backup-archive-list');
+  if(backupArchiveList)backupArchiveList.innerHTML=renderStorageBackupArchiveRows(data);
+  const selection=window._recordingPreviewSelection;
+  const selectedStillExists=!!(selection&&Array.isArray(data.saved)&&data.saved.some(function(item){
+    return String(item.stream_key||'')===String(selection.stream_key||'') && String(item.name||'')===String(selection.name||'');
+  }));
+  if(options.resetPreview || !selectedStillExists){
+    window._recordingPreviewSelection=null;
+    teardownRecordingPreview();
+    resetRecordingPreviewPanel();
+  }
+}
+async function fetchStorageSnapshot(){
+  const [s,report,archivesRes,recsRes,streamsRes,savedRes,backupsRes,backupArchivesRes,remuxJobsRes]=await Promise.all([
+    api('/api/settings'),
+    api('/api/health/report'),
+    api('/api/recordings/archives'),
+    api('/api/recordings'),
+    api('/api/streams'),
+    api('/api/recordings/library'),
+    api('/api/system/backups'),
+    api('/api/system/backups/archives'),
+    api('/api/recordings/remux/jobs')
+  ]);
+  return normalizeStorageSnapshot(s,report,archivesRes,recsRes,streamsRes,savedRes,backupsRes,backupArchivesRes,remuxJobsRes);
+}
+async function refreshStorageSnapshot(opts){
+  const data=await fetchStorageSnapshot();
+  applyStorageSnapshot(data,opts||{});
+  return data;
+}
 let recordingPreviewPlayer=null;
+window._recordingPreviewSelection=null;
 function recordingFileURL(streamKey,name,download){
   return '/recordings/'+encodeURIComponent(streamKey)+'/'+encodeURIComponent(name)+(download?'?download=1':'');
 }
@@ -3886,9 +4119,63 @@ function destroyRecordingPreviewPlayer(){
     }
   }catch(e){}
 }
+function teardownRecordingPreview(){
+  destroyRecordingPreviewPlayer();
+  try{
+    const panel=document.getElementById('recording-preview-panel');
+    if(!panel)return;
+    panel.querySelectorAll('video,audio').forEach(function(media){
+      try{
+        media.pause();
+        media.removeAttribute('src');
+        media.load();
+      }catch(e){}
+    });
+  }catch(e){}
+}
+function resetRecordingPreviewPanel(){
+  const panel=document.getElementById('recording-preview-panel');
+  if(!panel)return;
+  panel.innerHTML='<div class="empty-state"><div class="icon"><i class="bi bi-film"></i></div><h3>Kayit secin</h3><p style="color:var(--text-muted)">Panel secili kaydi ayni sayfada oynatir.</p></div>';
+}
+async function refreshStorageSurface(targetPage){
+  teardownRecordingPreview();
+  await new Promise(function(resolve){setTimeout(resolve,0);});
+  const page=targetPage||currentPage;
+  if(page==='settings-storage'||page==='recordings'||page==='maintenance-center'){
+    await loadPage(page);
+    return;
+  }
+  navigate('settings-storage');
+}
+async function prepareStorageAction(){
+  window._recordingPreviewSelection=null;
+  teardownRecordingPreview();
+  resetRecordingPreviewPanel();
+  await new Promise(function(resolve){
+    if(typeof requestAnimationFrame==='function'){
+      requestAnimationFrame(function(){setTimeout(resolve,0);});
+      return;
+    }
+    setTimeout(resolve,0);
+  });
+}
 async function stopRec(id){
-  await api('/api/recordings/stop/'+id);
-  if(currentPage==='recordings'||currentPage==='settings-storage')loadPage(currentPage);else navigate('recordings');
+  const res=await api('/api/recordings/stop/'+id);
+  if(res&&res.error){
+    toast(res.message||'Kayit durdurulamadi','error');
+    return;
+  }
+  toast('Kayit durduruldu');
+  if(currentPage==='recordings'||currentPage==='settings-storage'){
+    await refreshStorageSnapshot({resetPreview:false});
+  }else if(currentPage==='maintenance-center'){
+    await loadPage(currentPage);
+  }else if(String(currentPage||'').indexOf('stream-detail-')===0){
+    await loadPage(currentPage);
+  }else{
+    navigate('settings-storage');
+  }
 }
 function showRecordModal(){
   const streams=(window._recStreams||[]).filter(s=>s.status==='live');
@@ -3915,6 +4202,7 @@ async function startNewRec(){
 // Yeni: Kayıt önizlemesini panelde gösteren fonksiyon
 async function previewRecordingPanel(streamKey,name,format,mod_time,size){
   destroyRecordingPreviewPlayer();
+  window._recordingPreviewSelection={stream_key:String(streamKey||''),name:String(name||'')};
   const panel=document.getElementById('recording-preview-panel');
   if(!panel)return;
   const url=recordingFileURL(streamKey,name,false);
@@ -3927,28 +4215,15 @@ async function previewRecordingPanel(streamKey,name,format,mod_time,size){
     (canRemux?'<button class="btn btn-sm btn-secondary" onclick=\'remuxRecordingFile('+JSON.stringify(streamKey)+','+JSON.stringify(name)+','+JSON.stringify('mp4')+')\'>MP4 Hazirla</button>':'')+
   '</div>';
   if(ext==='mp4'||ext==='webm'||ext==='ogg'){
-    panel.innerHTML=header+'<video controls playsinline src="'+url+'" style="width:100%;max-height:60vh;background:#000"></video>'+actions;
+    panel.innerHTML=header+'<div style="position:relative;width:100%;aspect-ratio:16/9;min-height:280px;background:#000;border-radius:14px;overflow:hidden"><video controls playsinline src="'+url+'" style="position:absolute;inset:0;width:100%;height:100%;background:#000;object-fit:contain"></video></div>'+actions;
     return;
   }
   if(ext==='mp3'||ext==='aac'||ext==='wav'||ext==='flac'){
     panel.innerHTML=header+'<div style="padding:24px"><audio controls src="'+url+'" style="width:100%"></audio></div>'+actions;
     return;
   }
-  if(ext==='flv'||ext==='ts'){
-    panel.innerHTML=header+'<video id="rec-preview-video" controls playsinline style="width:100%;max-height:60vh;background:#000"></video>'+actions;
-    try{
-      await loadEmbedScript('/static/vendor/mpegts.min.js');
-      const video=document.getElementById('rec-preview-video');
-      if(video&&window.mpegts&&window.mpegts.isSupported&&window.mpegts.isSupported()){
-        recordingPreviewPlayer=window.mpegts.createPlayer({type:ext==='flv'?'flv':'mpegts',isLive:false,url:url});
-        recordingPreviewPlayer.attachMediaElement(video);
-        recordingPreviewPlayer.load();
-      }else{
-        panel.innerHTML=header+'<div class="empty-state"><h3>Onizleme desteklenmiyor</h3><p style="color:var(--text-muted)">Bu tarayici ham '+escHtml(ext.toUpperCase())+' kaydini dogrudan oynatamiyor. MP4 donusumu baslatabilirsiniz.</p></div>'+actions;
-      }
-    }catch(e){
-      panel.innerHTML=header+'<div class="empty-state"><h3>Onizleme hazirlanamadi</h3><p style="color:var(--text-muted)">'+escHtml(e.message||'Bilinmeyen hata')+'</p></div>'+actions;
-    }
+  if(ext==='flv'||ext==='ts'||ext==='mkv'){
+    panel.innerHTML=header+'<div class="empty-state"><div class="icon"><i class="bi bi-magic"></i></div><h3>Guvenli onizleme icin MP4 onerilir</h3><p style="color:var(--text-muted)">Bu kayit '+escHtml(ext.toUpperCase())+' olarak saklandi. Tarayici ici onizleme yerine once <strong>MP4 Hazirla</strong> kullanmaniz daha kararlidir.</p></div>'+actions;
     return;
   }
   panel.innerHTML=header+'<div class="empty-state"><h3>Onizleme yok</h3><p style="color:var(--text-muted)">Bu format panelde dogrudan oynatilamiyor.</p></div>'+actions;
@@ -3956,11 +4231,34 @@ async function previewRecordingPanel(streamKey,name,format,mod_time,size){
 function downloadRecordingFile(streamKey,name){
   window.open(recordingFileURL(streamKey,name,true),'_blank');
 }
+function downloadSystemBackup(name){
+  const link=document.createElement('a');
+  link.href='/api/system/backups/download/'+encodeURIComponent(name);
+  link.target='_blank';
+  link.rel='noopener';
+  link.download=name||'backup.tar.gz';
+  document.body.appendChild(link);
+  link.click();
+  setTimeout(function(){ if(link.parentNode)link.parentNode.removeChild(link); },0);
+}
+function removeStorageBackupRow(name){
+  const tbody=document.getElementById('system-backup-list');
+  if(!tbody)return;
+  tbody.querySelectorAll('tr[data-backup-name]').forEach(function(row){
+    if(String(row.getAttribute('data-backup-name')||'')===String(name||'')){
+      row.remove();
+    }
+  });
+  if(!tbody.children.length){
+    tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">Yerel sistem yedegi yok</td></tr>';
+  }
+}
 async function remuxRecordingFile(streamKey,name,format){
   const res=await api('/api/recordings/remux',{method:'POST',body:{stream_key:streamKey,filename:name,format:format||'mp4'}});
-  if(res&&res.success){
-    toast('Izlenebilir kopya hazirlandi');
-    if(currentPage==='recordings'||currentPage==='settings-storage')loadPage(currentPage);
+  if(res&&res.success&&res.job){
+    toast('MP4 donusumu arka planda basladi');
+    if(currentPage==='recordings'||currentPage==='settings-storage')await refreshStorageSnapshot({resetPreview:false});
+    else if(currentPage==='maintenance-center')await loadPage(currentPage);
   }else{
     toast((res&&res.message)||'Donusum basarisiz','error');
   }
@@ -3969,7 +4267,8 @@ async function archiveRecordingFile(streamKey,name){
   const res=await api('/api/recordings/archive',{method:'POST',body:{stream_key:streamKey,filename:name}});
   if(res&&res.stream_key){
     toast('Kayit arsive gonderildi');
-    if(currentPage==='recordings'||currentPage==='settings-storage')loadPage(currentPage);
+    if(currentPage==='recordings'||currentPage==='settings-storage')await refreshStorageSnapshot({resetPreview:false});
+    else if(currentPage==='maintenance-center')await loadPage(currentPage);
   }else{
     toast((res&&res.message)||'Arsivleme basarisiz','error');
   }
@@ -3978,17 +4277,26 @@ async function restoreRecordingArchive(streamKey,name){
   const res=await api('/api/recordings/restore',{method:'POST',body:{stream_key:streamKey,filename:name}});
   if(res&&res.stream_key){
     toast('Kayit geri yuklendi');
-    if(currentPage==='recordings'||currentPage==='settings-storage')loadPage(currentPage);
+    if(currentPage==='recordings'||currentPage==='settings-storage')await refreshStorageSnapshot({resetPreview:false});
+    else if(currentPage==='maintenance-center')await loadPage(currentPage);
   }else{
     toast((res&&res.message)||'Geri yukleme basarisiz','error');
   }
 }
 async function deleteRecordingFile(streamKey,name){
   if(!confirm('Bu kayit dosyasini silmek istediginize emin misiniz?'))return;
+  const deletingSelected=!!(window._recordingPreviewSelection&&String(window._recordingPreviewSelection.stream_key||'')===String(streamKey||'')&&String(window._recordingPreviewSelection.name||'')===String(name||''));
   const res=await api('/api/recordings/file',{method:'DELETE',body:{stream_key:streamKey,filename:name}});
   if(res&&res.status==='deleted'){
+    if(deletingSelected){
+      window._recordingPreviewSelection=null;
+      teardownRecordingPreview();
+      resetRecordingPreviewPanel();
+    }
     toast('Kayit silindi');
-    if(currentPage==='recordings'||currentPage==='settings-storage')loadPage(currentPage);else navigate('recordings');
+    if(currentPage==='recordings'||currentPage==='settings-storage')await refreshStorageSnapshot({resetPreview:false});
+    else if(currentPage==='maintenance-center')await loadPage(currentPage);
+    else navigate('settings-storage');
   }else{
     toast((res&&res.message)||'Kayit silinemedi','error');
   }
@@ -4225,7 +4533,7 @@ async function renderMaintenanceCenter(c){
       (backups.length
         ?'<table><thead><tr><th>Dosya</th><th>Boyut</th><th>Tarih</th><th>Tur</th><th>Islem</th></tr></thead><tbody>'+
           backups.map(function(item){
-            return '<tr><td class="mono-wrap">'+escHtml(item.name)+'</td><td>'+formatBytes(item.size||0)+'</td><td>'+escHtml(fmtLocaleDateTime(item.mod_time))+'</td><td>'+(item.include_recordings?'<span class="tag tag-blue">Kayitlar dahil</span>':'<span class="tag tag-green">Hafif</span>')+'</td><td style="white-space:nowrap"><a class="btn btn-sm btn-secondary" href="/api/system/backups/download/'+encodeURIComponent(item.name)+'">Indir</a> <button class="btn btn-sm btn-danger" onclick="deleteSystemBackup('+JSON.stringify(item.name)+')">Sil</button></td></tr>';
+            return '<tr><td class="mono-wrap">'+escHtml(item.name)+'</td><td>'+formatBytes(item.size||0)+'</td><td>'+escHtml(fmtLocaleDateTime(item.mod_time))+'</td><td>'+(item.include_recordings?'<span class="tag tag-blue">Kayitlar dahil</span>':'<span class="tag tag-green">Hafif</span>')+'</td><td style="white-space:nowrap"><a class="btn btn-sm btn-secondary" href="/api/system/backups/download/'+encodeURIComponent(item.name)+'" target="_blank" rel="noopener">Indir</a> <button class="btn btn-sm btn-danger" onclick="deleteSystemBackup('+JSON.stringify(item.name)+')">Sil</button></td></tr>';
           }).join('')+
         '</tbody></table>'
         :'<div class="empty-state"><div class="icon"><i class="bi bi-archive"></i></div><h3>Henuz backup yok</h3><p style="color:var(--text-muted)">Ilk yedegi bu ekrandan tek tikla alabilirsiniz.</p></div>')+
@@ -4236,7 +4544,8 @@ async function createSystemBackup(includeRecordings){
   const res=await api('/api/system/backups',{method:'POST',body:{include_recordings:!!includeRecordings}});
   if(res&&res.success){
     toast('Backup hazirlandi');
-    if(currentPage==='settings-storage'||currentPage==='recordings'||currentPage==='maintenance-center')loadPage(currentPage);else loadPage('maintenance-center');
+    if(currentPage==='settings-storage'||currentPage==='recordings')await refreshStorageSnapshot({resetPreview:false});
+    else loadPage('maintenance-center');
   }else{
     toast((res&&res.message)||'Backup olusturulamadi','error');
   }
@@ -4249,7 +4558,8 @@ async function archiveSystemBackup(name){
   const res=await api('/api/system/backups/archive',{method:'POST',body:{name:name}});
   if(res&&res.success){
     toast('Sistem yedegi arsive gonderildi');
-    if(currentPage==='settings-storage'||currentPage==='recordings'||currentPage==='maintenance-center')loadPage(currentPage);
+    if(currentPage==='settings-storage'||currentPage==='recordings')await refreshStorageSnapshot({resetPreview:false});
+    else await loadPage('maintenance-center');
   }else{
     toast((res&&res.message)||'Yedek arsivleme basarisiz','error');
   }
@@ -4259,7 +4569,8 @@ async function restoreSystemBackupArchive(name){
   const res=await api('/api/system/backups/archive/restore',{method:'POST',body:{name:name}});
   if(res&&res.success){
     toast('Arsiv yedegi yerel backup klasorune geri getirildi');
-    if(currentPage==='settings-storage'||currentPage==='recordings'||currentPage==='maintenance-center')loadPage(currentPage);
+    if(currentPage==='settings-storage'||currentPage==='recordings')await refreshStorageSnapshot({resetPreview:false});
+    else await loadPage('maintenance-center');
   }else{
     toast((res&&res.message)||'Arsiv yedegi geri getirilemedi','error');
   }
@@ -4270,7 +4581,9 @@ async function deleteSystemBackup(name){
   const res=await api('/api/system/backups/'+encodeURIComponent(name),{method:'DELETE'});
   if(res&&res.success){
     toast('Backup silindi');
-    if(currentPage==='settings-storage'||currentPage==='recordings'||currentPage==='maintenance-center')loadPage(currentPage);else loadPage('maintenance-center');
+    removeStorageBackupRow(name);
+    if(currentPage==='settings-storage'||currentPage==='recordings')await refreshStorageSnapshot({resetPreview:false});
+    else loadPage('maintenance-center');
   }else{
     toast((res&&res.message)||'Backup silinemedi','error');
   }

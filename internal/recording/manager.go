@@ -44,6 +44,14 @@ type Recording struct {
 	capturePath string
 	finalPath   string
 	finalizeErr string
+	hasVideo    bool
+	hasAudio    bool
+	started     bool
+
+	videoConfigNALU []byte
+	aacProfile      int
+	aacFreqIndex    int
+	aacChannelCfg   int
 }
 
 // SavedRecording represents a completed recording file on disk.
@@ -56,12 +64,26 @@ type SavedRecording struct {
 	Path      string    `json:"-"`
 }
 
+// RemuxJob represents a background conversion job for a saved recording.
+type RemuxJob struct {
+	ID           string    `json:"id"`
+	StreamKey    string    `json:"stream_key"`
+	SourceName   string    `json:"source_name"`
+	TargetName   string    `json:"target_name"`
+	TargetFormat string    `json:"target_format"`
+	Status       string    `json:"status"`
+	LastError    string    `json:"last_error,omitempty"`
+	StartedAt    time.Time `json:"started_at"`
+	FinishedAt   time.Time `json:"finished_at,omitempty"`
+}
+
 // Manager manages stream recordings and DVR
 type Manager struct {
 	streamMgr     *stream.Manager
 	recordingsDir string
 	ffmpegPath    string
 	recordings    map[string]*Recording
+	remuxJobs     map[string]*RemuxJob
 	maxDuration   time.Duration
 	mu            sync.RWMutex
 }
@@ -77,6 +99,7 @@ func NewManager(streamMgr *stream.Manager, recordingsDir, ffmpegPath string) *Ma
 		recordingsDir: recordingsDir,
 		ffmpegPath:    ffmpegPath,
 		recordings:    make(map[string]*Recording),
+		remuxJobs:     make(map[string]*RemuxJob),
 		maxDuration:   24 * time.Hour,
 	}
 }
@@ -124,17 +147,20 @@ func (m *Manager) StartRecording(streamKey string, format Format) (*Recording, e
 	}
 
 	rec := &Recording{
-		ID:          recID,
-		StreamKey:   streamKey,
-		Format:      format,
-		FilePath:    filePath,
-		StartedAt:   time.Now(),
-		Status:      "recording",
-		file:        file,
-		tsMuxer:     ts.NewMuxer(),
-		stopCh:      make(chan struct{}),
-		capturePath: capturePath,
-		finalPath:   filePath,
+		ID:            recID,
+		StreamKey:     streamKey,
+		Format:        format,
+		FilePath:      filePath,
+		StartedAt:     time.Now(),
+		Status:        "recording",
+		file:          file,
+		tsMuxer:       ts.NewMuxer(),
+		stopCh:        make(chan struct{}),
+		capturePath:   capturePath,
+		finalPath:     filePath,
+		aacProfile:    1,
+		aacFreqIndex:  4,
+		aacChannelCfg: 2,
 	}
 
 	m.recordings[recID] = rec
@@ -204,6 +230,57 @@ func (m *Manager) GetStreamRecordings(streamKey string) []*Recording {
 			result = append(result, r)
 		}
 	}
+	return result
+}
+
+// StartRemuxJob starts a background remux operation for a saved recording.
+func (m *Manager) StartRemuxJob(streamKey, filename string, targetFormat Format) (*RemuxJob, error) {
+	targetFormat = normalizeRemuxTarget(targetFormat)
+	streamKey = strings.TrimSpace(streamKey)
+	filename = filepath.Base(strings.TrimSpace(filename))
+	if streamKey == "" || filename == "" {
+		return nil, fmt.Errorf("stream_key ve filename gerekli")
+	}
+	targetName := strings.TrimSuffix(filename, filepath.Ext(filename)) + "." + string(targetFormat)
+	m.mu.Lock()
+	for _, job := range m.remuxJobs {
+		if job.StreamKey == streamKey && job.SourceName == filename && job.TargetName == targetName && (job.Status == "queued" || job.Status == "running") {
+			existing := *job
+			m.mu.Unlock()
+			return &existing, nil
+		}
+	}
+	jobID := fmt.Sprintf("remux_%d", time.Now().UnixNano())
+	job := &RemuxJob{
+		ID:           jobID,
+		StreamKey:    streamKey,
+		SourceName:   filename,
+		TargetName:   targetName,
+		TargetFormat: string(targetFormat),
+		Status:       "queued",
+		StartedAt:    time.Now(),
+	}
+	m.remuxJobs[jobID] = job
+	m.mu.Unlock()
+
+	go m.runRemuxJob(jobID, streamKey, filename, targetFormat)
+
+	copyJob := *job
+	return &copyJob, nil
+}
+
+// ListRemuxJobs returns all background remux jobs.
+func (m *Manager) ListRemuxJobs() []*RemuxJob {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	result := make([]*RemuxJob, 0, len(m.remuxJobs))
+	for _, job := range m.remuxJobs {
+		copyJob := *job
+		result = append(result, &copyJob)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].StartedAt.After(result[j].StartedAt)
+	})
 	return result
 }
 
@@ -385,14 +462,58 @@ func (m *Manager) encodePacket(rec *Recording, pkt *media.Packet) []byte {
 }
 
 func (m *Manager) encodeTSPacket(rec *Recording, pkt *media.Packet) []byte {
+	if pkt == nil {
+		return nil
+	}
 	if pkt.IsSequenceHeader {
+		switch pkt.Type {
+		case media.PacketTypeVideo:
+			rec.hasVideo = true
+			rec.videoConfigNALU = recordingParseAVCConfigToAnnexB(pkt.Data)
+		case media.PacketTypeAudio:
+			rec.hasAudio = true
+			recordingParseAACAudioSpecificConfig(rec, pkt.Data)
+		}
 		return nil
 	}
 	mediaPkt := pkt.Clone()
-	if pkt.Type == media.PacketTypeVideo && len(pkt.Data) > 5 {
-		mediaPkt.Data = pkt.Data[5:]
-	} else if pkt.Type == media.PacketTypeAudio && len(pkt.Data) > 2 {
-		mediaPkt.Data = pkt.Data[2:]
+	switch pkt.Type {
+	case media.PacketTypeVideo:
+		rec.hasVideo = true
+		if len(pkt.Data) <= 5 {
+			return nil
+		}
+		if !rec.started {
+			if !pkt.IsKeyframe {
+				return nil
+			}
+			rec.started = true
+		}
+		annexB := recordingAVCCToAnnexB(pkt.Data[5:])
+		if pkt.IsKeyframe && len(rec.videoConfigNALU) > 0 {
+			mediaPkt.Data = append(append([]byte{}, rec.videoConfigNALU...), annexB...)
+		} else {
+			mediaPkt.Data = annexB
+		}
+	case media.PacketTypeAudio:
+		rec.hasAudio = true
+		if rec.hasVideo && !rec.started {
+			return nil
+		}
+		if len(pkt.Data) < 2 {
+			return nil
+		}
+		codecID := (pkt.Data[0] >> 4) & 0x0F
+		if codecID == byte(media.AudioCodecAAC) {
+			if len(pkt.Data) <= 2 {
+				return nil
+			}
+			mediaPkt.Data = recordingAddADTSHeader(pkt.Data[2:], rec.aacProfile, rec.aacFreqIndex, rec.aacChannelCfg)
+		} else {
+			mediaPkt.Data = pkt.Data[1:]
+		}
+	default:
+		return nil
 	}
 	return rec.tsMuxer.MuxPacket(mediaPkt)
 }

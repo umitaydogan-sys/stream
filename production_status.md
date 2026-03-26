@@ -1,6 +1,6 @@
 # FluxStream Production Durum Raporu
 
-Tarih: 25 Mart 2026
+Tarih: 26 Mart 2026
 
 ## 1. Genel Karar
 
@@ -125,6 +125,10 @@ Kapananlar:
 - gecici `.capture.ts` dosyalarini kayit kutuphanesinden gizleme
 - mevcut `TS`, `FLV` ve `MKV` kayitlari panelden `MP4 Hazirla` ile donusturebilme
 - kayit onizleme panelini oynatilabilir formatlara gore daha durust hale getirme
+- `Depolama ve Arsiv Merkezi` ekranindaki sayfa kilitlenmesi / renderer crash zincirini kapatma
+- `MP4 Hazirla` isini arka plan remux isi olarak surdurup ayni ekranda durumunu gosterebilme
+- recording TS paketlemesini duzelterek yeni kayitlari MP4'e daha guvenilir cevrilebilir hale getirme
+- sistem yedegi silme ve benzeri storage aksiyonlarini tam sayfa yeniden cizmeden daha guvenli hale getirme
 
 Karar:
 
@@ -153,6 +157,9 @@ Asagidaki basliklar henuz tam production-ready degil:
 - multi-node origin-edge cluster mimarisi
 - yeni archive / object storage akisinin gercek S3, MinIO ve SFTP sahasinda sertlestirilmesi
 - kayit finalize/remux akisinin uzun sureli, buyuk dosyali ve servis restart senaryolarinda sertlestirilmesi
+- onceki bozuk `TS` kayitlar icin kullaniciyi yonlendiren kurtarma / acik uyari akislarinin eklenmesi
+- `Depolama ve Arsiv Merkezi` ekraninin daha sade, teknik terimi azaltan bir UX'e kavusmasi
+- `Google Drive` ve `OneDrive` gibi populer cloud hedefleri icin basit entegrasyon seceneklerinin eklenmesi
 - RBAC, audit log ve SSO
 - DRM, SSAI ve monetizasyon
 - kapsamli yuk testi ve soak testi
@@ -171,7 +178,8 @@ Yerelde:
 - `go test ./...` gecti
 - admin JS sentaks kontrolu gecti
 - lokal arsiv upload / restore akisi sentetik testte gecti
-- lokal kayit remux ve MP4 finalize akisi gecti
+- recording TS paketleme birim testleri eklendi ve gecti
+- yeni kayitlar icin MP4 finalize / remux kaynak akisi duzeltildi
 
 Host:
 
@@ -179,14 +187,16 @@ Host:
 - systemd servis: `fluxstream`
 - servis durumu: `active`
 - health: `http://127.0.0.1:8844/api/health` -> `{"status":"ok","version":"2.0.0"}`
-- canli deploy hash: `9df16fdd23936df61b3c2a92a5ea42d679d1454d9b61f2e28acd0259eb648596`
+- canli deploy hash: `5cf93d556b8e05b00ec609e7372c4ed46f902b02de9e820203af2932f8f87461`
 - canli dogrulama: HLS master `2` video katmani, DASH MPD `3` representation (2 video + 1 audio)
 - yayin dogrulamasi: `test / live_14957742f633b59863173e5a` stream'i ile kontrol edildi
+- storage merkezi crash duzeltmesi ve yeni recording paketleme zinciri hosta yuklendi
 
 Karar:
 
 - canli deploy ve servis guncelleme akisi calisiyor
 - DASH/HLS multitrack zinciri artik sahada daha guven verici durumda
+- storage / recording tarafi da yeni kayitlarda daha guvenilir noktaya geldi
 
 ## 6. Rakiplere Gore Bugunku Konum
 

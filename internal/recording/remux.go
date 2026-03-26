@@ -88,23 +88,63 @@ func (m *Manager) remuxFile(sourcePath, targetPath string, format Format) error 
 	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
 		return err
 	}
-	tmpPath := targetPath + ".tmp"
+	targetExt := strings.ToLower(filepath.Ext(targetPath))
+	tmpPath := strings.TrimSuffix(targetPath, targetExt) + ".partial" + targetExt
 	_ = os.Remove(tmpPath)
-	args := []string{"-hide_banner", "-loglevel", "error", "-y", "-fflags", "+genpts", "-i", sourcePath, "-map", "0", "-c", "copy"}
-	if format == FormatMP4 {
-		args = append(args, "-movflags", "+faststart")
-	}
-	args = append(args, tmpPath)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, m.ffmpegPath, args...)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		_ = os.Remove(tmpPath)
-		msg := strings.TrimSpace(string(out))
-		if msg == "" {
-			msg = err.Error()
+	runFFmpeg := func(timeout time.Duration, args []string) error {
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, m.ffmpegPath, args...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			msg := strings.TrimSpace(string(out))
+			if msg == "" {
+				msg = err.Error()
+			}
+			return fmt.Errorf("ffmpeg remux hatasi: %s", msg)
 		}
-		return fmt.Errorf("ffmpeg remux hatasi: %s", msg)
+		return nil
+	}
+	baseArgs := []string{
+		"-hide_banner", "-loglevel", "error", "-y",
+		"-fflags", "+genpts+discardcorrupt",
+		"-err_detect", "ignore_err",
+		"-analyzeduration", "100M",
+		"-probesize", "100M",
+		"-i", sourcePath,
+		"-map", "0:v?",
+		"-map", "0:a?",
+		"-map", "0:s?",
+	}
+	copyArgs := append([]string{}, baseArgs...)
+	copyArgs = append(copyArgs, "-c", "copy")
+	switch format {
+	case FormatMP4:
+		copyArgs = append(copyArgs, "-movflags", "+faststart", "-f", "mp4")
+	case FormatMKV:
+		copyArgs = append(copyArgs, "-f", "matroska")
+	}
+	copyArgs = append(copyArgs, tmpPath)
+	copyErr := runFFmpeg(10*time.Minute, copyArgs)
+	if copyErr != nil && format == FormatMP4 {
+		_ = os.Remove(tmpPath)
+		fallbackArgs := append([]string{}, baseArgs...)
+		fallbackArgs = append(fallbackArgs,
+			"-c:v", "libx264",
+			"-preset", "veryfast",
+			"-crf", "23",
+			"-c:a", "aac",
+			"-b:a", "160k",
+			"-movflags", "+faststart",
+			"-f", "mp4",
+			tmpPath,
+		)
+		if fallbackErr := runFFmpeg(30*time.Minute, fallbackArgs); fallbackErr != nil {
+			_ = os.Remove(tmpPath)
+			return fmt.Errorf("%v | fallback: %v", copyErr, fallbackErr)
+		}
+	} else if copyErr != nil {
+		_ = os.Remove(tmpPath)
+		return copyErr
 	}
 	_ = os.Remove(targetPath)
 	if err := os.Rename(tmpPath, targetPath); err != nil {
@@ -122,5 +162,36 @@ func normalizeRemuxTarget(format Format) Format {
 		fallthrough
 	default:
 		return FormatMP4
+	}
+}
+
+func (m *Manager) runRemuxJob(jobID, streamKey, filename string, targetFormat Format) {
+	m.mu.Lock()
+	job, ok := m.remuxJobs[jobID]
+	if ok {
+		job.Status = "running"
+	}
+	m.mu.Unlock()
+	if !ok {
+		return
+	}
+
+	saved, err := m.RemuxSavedRecording(streamKey, filename, targetFormat)
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	job, ok = m.remuxJobs[jobID]
+	if !ok {
+		return
+	}
+	job.FinishedAt = time.Now()
+	if err != nil {
+		job.Status = "error"
+		job.LastError = err.Error()
+		return
+	}
+	job.Status = "completed"
+	if saved != nil && strings.TrimSpace(saved.Name) != "" {
+		job.TargetName = saved.Name
 	}
 }

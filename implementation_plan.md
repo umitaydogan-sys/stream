@@ -84,6 +84,11 @@ streaming cekirdegi yeterince olgunlastiktan sonra eklenecek.
 - kayit kutuphanesi artik gecici `.capture.ts` dosyalarini gostermiyor
 - mevcut `TS`, `FLV` ve `MKV` kayitlari panelden tek tusla `MP4 Hazirla` akisi ile izlenebilir formata donusturulebiliyor
 - sistem yedekleri icin de ayni archive altyapisi kullaniliyor; otomatik yukleme, geri yukleme ve lokal kopyayi silme politikasi ayarlanabiliyor
+- `Depolama ve Arsiv Merkezi` ekranindaki buton aksiyonlari artik tam sayfa yeniden cizmeden calisiyor; renderer crash zinciri kapatildi
+- `MP4 Hazirla` akisinin durumu arka plan isi olarak izlenebiliyor; sayfa degisse de remux isi devam ediyor
+- recording tarafinda TS capture paketleme mantigi HLS ile hizalandi; AVC payload Annex-B, AAC payload ADTS olarak yaziliyor
+- yeni kayitlar artik ilk gecerli video keyframe'inden baslatilarak daha guvenilir MP4 remux kaynagi uretiyor
+- sistem yedegi silme ve kayit / arsiv aksiyonlari ayni ekranda daha guvenli parcali yenileme ile calisiyor
 
 ## 3. Bu Surecte Neleri Kapatmis Olduk
 
@@ -180,6 +185,9 @@ Bugun hala acik olan gercek eksikler ise sunlar:
 - dusuk bant sahalarinda uzun sureli soak test ve canli benchmark calistirma
 - archive/object storage akisinda gercek `S3`, `MinIO` ve `SFTP` hedefleriyle uzun sureli saha testi
 - kayit finalize/remux akisinda buyuk dosya, uzun sureli kayit ve beklenmeyen servis restart senaryolarini sertlestirme
+- onceki bozuk `TS` kayitlar icin kullaniciya acik kurtarma / uyari akislarini tasarlama
+- `Depolama ve Arsiv Merkezi` ekranini teknik terimleri azaltarak daha sade, daha anlasilir hale getirme
+- `Google Drive` ve `OneDrive` gibi populer cloud hedefleri icin daha basit arsiv baglanti secenekleri ekleme
 
 ## 6. Rakiplere Gore Bugunku Konum
 

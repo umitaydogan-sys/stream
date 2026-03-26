@@ -726,12 +726,23 @@ func main() {
 		if strings.TrimSpace(req.Format) == "" {
 			req.Format = "mp4"
 		}
-		item, err := recManager.RemuxSavedRecording(req.StreamKey, req.Filename, recording.Format(req.Format))
+		job, err := recManager.StartRemuxJob(req.StreamKey, req.Filename, recording.Format(req.Format))
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		jsonResp(w, map[string]interface{}{"success": true, "item": item})
+		jsonResp(w, map[string]interface{}{"success": true, "job": job})
+	})
+	webServer.RegisterHandler("/api/recordings/remux/jobs", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		jobs := recManager.ListRemuxJobs()
+		if jobs == nil {
+			jobs = []*recording.RemuxJob{}
+		}
+		jsonResp(w, jobs)
 	})
 	webServer.RegisterHandler("/api/recordings/file", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "DELETE" {

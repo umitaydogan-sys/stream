@@ -80,6 +80,10 @@
 - [x] kayitlari `ham capture + izlenebilir MP4/MKV finalize/remux` modeliyle gercekten oynatilabilir hale getir
 - [x] sistem yedeklerini de ayni depolama ve arsiv merkezi altina bagla
 - [x] harici hedeflerde `S3`, `MinIO`, `SFTP` seceneklerini ayni arayuzden yonetilebilir hale getir
+- [x] `Depolama ve Arsiv Merkezi` ekranindaki tam sayfa kilitlenme / renderer crash zincirini kapat
+- [x] `MP4 Hazirla` akisinin arka plan isi olarak sayfa degisse bile devam etmesini sagla
+- [x] yeni kayitlarin TS paketlemesini Annex-B / ADTS ve ilk gecerli keyframe guvenligiyle duzelt
+- [x] sistem yedegi silme ve kayit arsiv aksiyonlarini tam sayfa yeniden cizmeden guvenli hale getir
 
 ## 6. Urunlestirme ve Lisans
 
@@ -114,6 +118,9 @@
 - [ ] uzun sureli soak test ve yuk testi kapsamini artir
 - [ ] gercek S3, MinIO ve SFTP sahasinda uzun sureli arsiv / geri yukleme testi yap
 - [ ] kayit oynatim akisinda buyuk dosya, uzun sure ve kesintili finalize senaryolarini sertlestir
+- [ ] eski bozuk `TS` kayitlar icin kullaniciyi dogru yonlendiren kurtarma / uyari akislarini ekle
+- [ ] `Depolama ve Arsiv Merkezi` ekranini teknik terimleri azaltarak daha sade ve son kullanici dostu hale getir
+- [ ] `Google Drive` ve `OneDrive` gibi populer cloud arsiv hedeflerini ekle
 
 ## 9. Cekirdek Tamamlandiktan Sonra
 
