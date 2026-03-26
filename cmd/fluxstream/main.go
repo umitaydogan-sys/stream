@@ -708,6 +708,33 @@ func main() {
 		}
 		jsonResp(w, map[string]interface{}{"success": true, "uploaded": uploaded})
 	})
+	webServer.RegisterAdminHandler("/api/storage/connection-test", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if archiveManager == nil {
+			http.Error(w, "archive manager hazir degil", http.StatusServiceUnavailable)
+			return
+		}
+		var req struct {
+			Role    string            `json:"role"`
+			Updates map[string]string `json:"updates"`
+		}
+		if err := decodeJSON(r, &req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if strings.TrimSpace(req.Role) == "" {
+			req.Role = "recordings"
+		}
+		result, err := archiveManager.TestConnection(r.Context(), req.Role, req.Updates)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		jsonResp(w, map[string]interface{}{"success": true, "result": result})
+	})
 	webServer.RegisterHandler("/api/recordings/remux", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)

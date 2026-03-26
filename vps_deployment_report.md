@@ -83,3 +83,22 @@ Both domains must resolve to `23.94.220.222`.
 4. license subsystem
 5. Linux-specific admin actions and packaging polish
 
+## Update: 2026-03-26
+
+Bu rapordan sonra sunucuya birden fazla canli deploy daha yapildi ve
+asagidaki alanlar sahada dogrulandi:
+
+- OBS multitrack ingest zinciri
+- HLS + DASH varyant uretimi
+- QoE telemetry ve Operasyon Merkezi
+- `Depolama ve Arsiv Merkezi`
+- recording `mp4` varsayilani ve `TS capture + remux` modeli
+- storage ekranindaki crash zincirinin kapanmasi
+- ayni VPS uzerinde MinIO ve SFTP ile recording + backup upload / restore
+
+Sonraki anlamli VPS dogrulama hedefleri:
+
+1. harici AWS S3 bucket ile gercek saha testi
+2. rclone tabanli populer bulut hedeflerinde gercek hesap testi
+3. `audio-only DASH` davranisinin farkli istemcilerde dogrulanmasi
+4. playback security fazina giris

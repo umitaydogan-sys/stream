@@ -20,7 +20,8 @@ func (m *Manager) ListBackupArchives() ([]storage.BackupArchive, error) {
 
 func (m *Manager) ArchiveBackup(ctx context.Context, name string) (*storage.BackupArchive, error) {
 	settings := m.Settings()
-	if !settings.Configured || !settings.BackupsEnabled {
+	target := settings.Backup
+	if !target.Configured || !settings.BackupsEnabled {
 		return nil, fmt.Errorf("yedek arsivi etkin degil")
 	}
 	name = filepath.Base(strings.TrimSpace(name))
@@ -32,16 +33,16 @@ func (m *Manager) ArchiveBackup(ctx context.Context, name string) (*storage.Back
 	if err != nil {
 		return nil, err
 	}
-	client, err := m.newClient(settings)
+	client, err := m.newClient(target)
 	if err != nil {
 		return nil, err
 	}
-	objectKey := buildBackupObjectKey(settings.Prefix, name)
+	objectKey := buildBackupObjectKey(target.Prefix, name)
 	item := &storage.BackupArchive{
 		Name:              name,
-		Provider:          providerLabel(settings.Provider),
-		Bucket:            settings.Bucket,
-		Endpoint:          settings.Endpoint,
+		Provider:          providerLabel(target.Provider, target.ProviderVariant),
+		Bucket:            target.Bucket,
+		Endpoint:          target.Endpoint,
 		ObjectKey:         objectKey,
 		Size:              info.Size(),
 		IncludeRecordings: strings.Contains(strings.ToLower(name), "with-recordings"),
@@ -59,7 +60,7 @@ func (m *Manager) ArchiveBackup(ctx context.Context, name string) (*storage.Back
 	item.ETag = obj.ETag
 	item.Size = obj.Size
 	item.ArchivedAt = time.Now()
-	if settings.BackupDeleteLocal {
+	if target.DeleteLocal {
 		if err := os.Remove(localPath); err == nil {
 			item.LocalDeleted = true
 		}
@@ -73,7 +74,8 @@ func (m *Manager) ArchiveBackup(ctx context.Context, name string) (*storage.Back
 
 func (m *Manager) RestoreBackupArchive(ctx context.Context, name string) (*storage.BackupArchive, error) {
 	settings := m.Settings()
-	if !settings.Configured || !settings.BackupsEnabled {
+	target := settings.Backup
+	if !target.Configured || !settings.BackupsEnabled {
 		return nil, fmt.Errorf("yedek arsivi etkin degil")
 	}
 	name = filepath.Base(strings.TrimSpace(name))
@@ -87,7 +89,7 @@ func (m *Manager) RestoreBackupArchive(ctx context.Context, name string) (*stora
 	if item == nil || strings.TrimSpace(item.ObjectKey) == "" {
 		return nil, fmt.Errorf("arsiv yedegi bulunamadi")
 	}
-	client, err := m.newClient(settings)
+	client, err := m.newClient(target)
 	if err != nil {
 		return nil, err
 	}
@@ -137,11 +139,12 @@ func (m *Manager) MarkBackupLocalDeleted(name string, deleted bool) error {
 
 func (m *Manager) SyncPendingBackups(ctx context.Context, limit int) (int, error) {
 	settings := m.Settings()
-	if !settings.Configured || !settings.BackupsEnabled || !settings.BackupAutoUpload {
+	target := settings.Backup
+	if !target.Configured || !settings.BackupsEnabled || !target.AutoUpload {
 		return 0, nil
 	}
 	if limit <= 0 {
-		limit = settings.BackupBatchSize
+		limit = target.BatchSize
 	}
 	files, err := systemutil.ListBackups(m.dataDir)
 	if err != nil {

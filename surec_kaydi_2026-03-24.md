@@ -154,3 +154,38 @@ Bu yedeklemede yer almamasi gerekenler:
 - `data/` icerigi
 - gecici kontrol dosyalari
 - referans / test amacli temp klasorler
+
+## 8. 26 Mart 2026 Depolama ve Bulut Fazı
+
+Bu kayittan sonra cekirdekte ikinci buyuk olgunlasma storage ve recording
+tarafinda gerceklesti.
+
+Kapanan ana alanlar:
+
+- `Depolama ve Arsiv Merkezi` ile kayit, arsiv ve sistem yedegi tek ekrana tasindi
+- tum kayit baslatma akislari `mp4` varsayilanina cekildi
+- recording tarafinda `ham capture + finalize/remux` modeli guvenilir hale getirildi
+- `MP4 Hazirla` arka plan isi olarak calisabilir hale geldi
+- storage ekranindaki tam sayfa donma / renderer crash zinciri kapatildi
+- sistem yedegi silme, kaydi durdurma ve arsiv aksiyonlari daha guvenli hale getirildi
+
+Bu fazda depolama tarafi da genisledi:
+
+- basit ve gelismis mod eklendi
+- kayitlar ve sistem yedekleri icin ayri hedefler tanimlanabilir hale geldi
+- `AWS S3`, `MinIO`, `Cloudflare R2`, `Backblaze B2`, `Wasabi`,
+  `DigitalOcean Spaces`, `Linode Object Storage`, `Scaleway Object Storage`,
+  `IDrive e2` ve `SFTP` kartli secenekler olarak eklendi
+- rclone tabanli baglanti profili ile `Google Drive`, `OneDrive`, `Dropbox`,
+  `Google Cloud Storage`, `Azure Blob`, `Box`, `pCloud`, `MEGA`,
+  `Nextcloud` ve `WebDAV` gibi hedeflere hazir altyapi kuruldu
+
+Canli saha sonucu:
+
+- ayni VPS uzerinde MinIO ve ayri bir SFTP hedefi ile recording + backup upload / restore testi basariyla tamamlandi
+- bu, entegrasyonun calistigini kanitladi ama gercek dis ortam felaket yedegi yerine gecmez
+
+Bu noktadaki urun resmi:
+
+- FluxStream artik sadece yayin alip dagitan bir server degil
+- ayni zamanda operasyon, telemetry, kayit, arsiv ve sistem yedegi yoneten tek-node bir medya cekirdegi

@@ -209,9 +209,31 @@ tr:hover td{background:rgba(37,99,235,.04)}
 .segment-control{display:inline-flex;gap:6px;padding:4px;background:var(--bg-primary);border:1px solid var(--border);border-radius:999px}
 .segment-btn{border:none;background:transparent;color:var(--text-muted);font-size:12px;font-weight:700;padding:7px 12px;border-radius:999px;cursor:pointer;transition:all .2s}
 .segment-btn.active{background:#fff;color:var(--text-primary);box-shadow:var(--shadow-sm)}
+.storage-shell{display:flex;flex-direction:column;gap:16px}
+.storage-hero{display:grid;gap:16px;grid-template-columns:1.2fr .8fr}
+.storage-choice-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.storage-choice-card{border:1px solid var(--border);border-radius:16px;background:linear-gradient(180deg,#fff 0%,#f7fbff 100%);padding:16px;cursor:pointer;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+.storage-choice-card:hover{transform:translateY(-1px);box-shadow:var(--shadow-md)}
+.storage-choice-card.active{border-color:rgba(37,99,235,.35);box-shadow:0 10px 28px rgba(37,99,235,.12)}
+.storage-choice-card .icon{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;margin-bottom:10px;background:rgba(37,99,235,.08);color:var(--accent)}
+.storage-choice-card .title{font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:4px}
+.storage-choice-card .desc{font-size:12px;color:var(--text-muted);line-height:1.6}
+.storage-target-shell{display:flex;flex-direction:column;gap:14px}
+.storage-target-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+.storage-target-meta{display:flex;flex-wrap:wrap;gap:8px}
+.storage-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:var(--bg-primary);border:1px solid var(--border);font-size:12px;font-weight:700;color:var(--text-secondary)}
+.storage-provider-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.storage-form-grid{display:grid;gap:14px;grid-template-columns:repeat(2,minmax(0,1fr))}
+.storage-subtle{padding:14px 16px;border-radius:14px;background:linear-gradient(180deg,#fbfdff 0%,#f5f9ff 100%);border:1px solid rgba(37,99,235,.08)}
+.storage-kpi-list{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+.storage-kpi{padding:12px 14px;border-radius:14px;background:var(--bg-primary);border:1px solid var(--border)}
+.storage-kpi strong{display:block;font-size:18px;color:var(--text-primary)}
+.storage-kpi span{display:block;font-size:12px;color:var(--text-muted);margin-top:4px}
+.storage-test-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.storage-provider-note{font-size:12px;color:var(--text-muted);line-height:1.7}
 .viewer-table td,.viewer-table th{font-size:12px}
 .mono-wrap{font-family:Consolas,monospace;font-size:12px;word-break:break-all;color:var(--text-secondary)}
-@media(max-width:980px){.quick-grid{grid-template-columns:1fr}}
+@media(max-width:980px){.quick-grid{grid-template-columns:1fr}.storage-hero,.storage-form-grid{grid-template-columns:1fr}}
 @media(max-width:768px){.sidebar{transform:translateX(-100%)}.sidebar.open{transform:translateX(0)}.main{margin-left:0}.card-grid-4,.card-grid-3,.card-grid-2{grid-template-columns:1fr}}
 ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:var(--bg-primary)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .hidden{display:none!important}
@@ -2314,6 +2336,17 @@ async function renderSettingsStorage(c){
     api('/api/system/upgrade/plan'),
     api('/api/recordings/remux/jobs')
   ]);
+  {
+    const commands=(upgradeRes&&upgradeRes.commands)||{};
+    const restoreCmd=commands.backup_restore||'fluxstream backup restore fluxstream-backup-YYYYMMDD-HHMMSS.tar.gz';
+    const storageData=normalizeStorageSnapshot(s,report,archivesRes,recsRes,streamsRes,savedRes,backupsRes,backupArchivesRes,remuxJobsRes);
+    c.innerHTML=renderStorageCenter(storageData,restoreCmd);
+    window._recordingPreviewSelection=null;
+    resetRecordingPreviewPanel();
+    applyStorageSnapshot(storageData,{resetPreview:true});
+    updateStorageProviderUI();
+    return;
+  }
   const archiveSummary=report&&report.storage&&report.storage.archive?report.storage.archive:{};
   const archives=Array.isArray(archivesRes)?archivesRes:[];
   const recs=Array.isArray(recsRes)?recsRes:[];
@@ -3933,6 +3966,318 @@ function normalizeStorageSnapshot(settings,report,archivesRes,recsRes,streamsRes
     backupArchiveEnabled:settings&&settings.backup_archive_enabled==='true'
   };
 }
+function storageProviderCatalog(){
+  return [
+    {engine:'local',variant:'local',title:'Yerel Disk',icon:'bi-hdd-stack',desc:'Dosyalari bu sunucuda ikinci bir klasorde tutar.',hint:'Tek sunuculu ve en kolay baslangic secenegi.',family:'local'},
+    {engine:'s3',variant:'aws_s3',title:'AWS S3',icon:'bi-cloud-fill',desc:'Amazon S3 bucket hedefine yazar.',hint:'Gercek dis felaket yedegi icin en guclu seceneklerden biri.',family:'s3'},
+    {engine:'minio',variant:'minio',title:'MinIO',icon:'bi-server',desc:'Kendi S3 uyumlu MinIO sunucuna yazar.',hint:'Kendi objeni barindiriyorsan idealdir.',family:'s3'},
+    {engine:'s3',variant:'cloudflare_r2',title:'Cloudflare R2',icon:'bi-cloud-fill',desc:'R2 bucket hedefine S3 uyumlu yazim yapar.',hint:'Egress maliyetini dusurmek isteyenlerde cok populer.',family:'s3'},
+    {engine:'s3',variant:'backblaze_b2',title:'Backblaze B2',icon:'bi-cloud-fill',desc:'B2 S3 uyumlu bucket hedefine yazar.',hint:'Dusuk maliyetli dis backup icin sik kullanilir.',family:'s3'},
+    {engine:'s3',variant:'wasabi',title:'Wasabi',icon:'bi-cloud-fill',desc:'Wasabi bucket hedefine yazar.',hint:'Uzun sureli arsiv icin populer bir secenek.',family:'s3'},
+    {engine:'s3',variant:'digitalocean_spaces',title:'DO Spaces',icon:'bi-cloud-fill',desc:'DigitalOcean Spaces bucket hedefine yazar.',hint:'Kucuk ekipler icin pratik bir S3 uyumlu secim.',family:'s3'},
+    {engine:'s3',variant:'linode_object_storage',title:'Linode Object',icon:'bi-cloud-fill',desc:'Linode object storage hedefine yazar.',hint:'S3 uyumlu baska bir uygun maliyetli secenek.',family:'s3'},
+    {engine:'s3',variant:'scaleway_object_storage',title:'Scaleway Object',icon:'bi-cloud-fill',desc:'Scaleway object storage hedefine yazar.',hint:'Avrupa odakli bir S3 uyumlu alternatiftir.',family:'s3'},
+    {engine:'s3',variant:'idrive_e2',title:'IDrive e2',icon:'bi-cloud-fill',desc:'IDrive e2 bucket hedefine yazar.',hint:'S3 uyumlu uygun maliyetli bir depolama secenegi.',family:'s3'},
+    {engine:'sftp',variant:'sftp',title:'SFTP Sunucu',icon:'bi-folder-symlink',desc:'Dosyalari baska bir Linux sunucusuna klasor gibi kopyalar.',hint:'Dusuk butcede en pratik uzak hedeflerden biridir.',family:'sftp'},
+    {engine:'rclone',variant:'google_drive',title:'Google Drive',icon:'bi-cloud-fill',desc:'Google Drive klasorune yukler.',hint:'Rclone baglanti profiliyle calisir.',family:'rclone'},
+    {engine:'rclone',variant:'onedrive',title:'OneDrive',icon:'bi-cloud-fill',desc:'Microsoft OneDrive hedefine yukler.',hint:'Rclone baglanti profiliyle calisir.',family:'rclone'},
+    {engine:'rclone',variant:'dropbox',title:'Dropbox',icon:'bi-cloud-fill',desc:'Dropbox klasorune yukler.',hint:'Rclone baglanti profiliyle calisir.',family:'rclone'},
+    {engine:'rclone',variant:'google_cloud_storage',title:'Google Cloud Storage',icon:'bi-cloud-fill',desc:'GCS bucket benzeri hedefine yazar.',hint:'Rclone baglantisi ile calisir.',family:'rclone'},
+    {engine:'rclone',variant:'azure_blob',title:'Azure Blob',icon:'bi-cloud-fill',desc:'Azure Blob container hedefine yazar.',hint:'Rclone baglantisi ile calisir.',family:'rclone'},
+    {engine:'rclone',variant:'box',title:'Box',icon:'bi-cloud-fill',desc:'Box klasorune yukler.',hint:'Rclone baglanti profili ile calisir.',family:'rclone'},
+    {engine:'rclone',variant:'pcloud',title:'pCloud',icon:'bi-cloud-fill',desc:'pCloud klasorune yukler.',hint:'Rclone baglanti profili ile calisir.',family:'rclone'},
+    {engine:'rclone',variant:'mega',title:'MEGA',icon:'bi-cloud-fill',desc:'MEGA klasorune yukler.',hint:'Rclone baglanti profili ile calisir.',family:'rclone'},
+    {engine:'rclone',variant:'nextcloud',title:'Nextcloud',icon:'bi-cloud-fill',desc:'Nextcloud / ownCloud deposuna yazar.',hint:'Rclone veya WebDAV profili ile calisir.',family:'rclone'},
+    {engine:'rclone',variant:'webdav',title:'WebDAV',icon:'bi-cloud-fill',desc:'WebDAV tabanli genel bulut hedeflerine yazar.',hint:'Kurumsal dosya servisleri icin genis uyumluluk saglar.',family:'rclone'}
+  ];
+}
+function storageResolveProvider(engine, variant){
+  engine=String(engine||'').toLowerCase().trim();
+  variant=String(variant||'').toLowerCase().trim();
+  if(engine)return engine;
+  if(['aws_s3','cloudflare_r2','backblaze_b2','wasabi','digitalocean_spaces','linode_object_storage','scaleway_object_storage','idrive_e2'].indexOf(variant)>=0)return 's3';
+  if(variant==='minio')return 'minio';
+  if(variant==='sftp')return 'sftp';
+  if(['google_drive','onedrive','dropbox','google_cloud_storage','azure_blob','box','pcloud','mega','nextcloud','webdav'].indexOf(variant)>=0)return 'rclone';
+  return 'local';
+}
+function storageDefaultVariant(engine){
+  switch(storageResolveProvider(engine,'')){
+    case 's3': return 'aws_s3';
+    case 'minio': return 'minio';
+    case 'sftp': return 'sftp';
+    case 'rclone': return 'google_drive';
+    default: return 'local';
+  }
+}
+function storageProviderInfo(engine, variant){
+  const resolvedEngine=storageResolveProvider(engine,variant);
+  const resolvedVariant=String(variant||storageDefaultVariant(resolvedEngine)).toLowerCase();
+  const found=storageProviderCatalog().find(function(item){
+    return item.engine===resolvedEngine && item.variant===resolvedVariant;
+  });
+  if(found)return found;
+  return storageProviderCatalog().find(function(item){return item.engine===resolvedEngine;})||storageProviderCatalog()[0];
+}
+function storagePrettyLabel(raw){
+  const value=String(raw||'').trim().toLowerCase();
+  if(!value)return '-';
+  const info=storageProviderCatalog().find(function(item){
+    return item.variant===value || (item.engine===value && item.variant===storageDefaultVariant(item.engine));
+  });
+  if(info)return info.title;
+  return value.replace(/_/g,' ').replace(/\b\w/g,function(ch){return ch.toUpperCase();});
+}
+function storageRoleMeta(role){
+  return role==='backups'
+    ?{prefix:'backup_archive',title:'Sistem Yedegi Hedefi',syncAction:'runBackupArchiveSync()',syncLabel:'Yedekleri Simdi Gonder',testLabel:'Yedek hedefini test et'}
+    :{prefix:'archive',title:'Kayit Arsiv Hedefi',syncAction:'runArchiveSync()',syncLabel:'Kayitlari Simdi Gonder',testLabel:'Kayit hedefini test et'};
+}
+function readStorageDraftSettings(){
+  const base=Object.assign({},(window._storageData&&window._storageData.settings)||{});
+  document.querySelectorAll('.setting-input').forEach(function(el){
+    const key=el.dataset.key;
+    if(!key)return;
+    if(el.type==='checkbox')base[key]=el.checked?'true':'false';
+    else base[key]=el.value;
+  });
+  return base;
+}
+function storageTargetState(role, settings){
+  const meta=storageRoleMeta(role);
+  const sameTarget=role==='backups' && String(settings.backup_archive_use_same_target||'true')!=='false';
+  const sourcePrefix=sameTarget?'archive':meta.prefix;
+  const savedEngine=String(settings[meta.prefix+'_provider']||'').toLowerCase();
+  const savedVariant=String(settings[meta.prefix+'_provider_variant']||'').toLowerCase();
+  const engine=storageResolveProvider(settings[sourcePrefix+'_provider']||'', settings[sourcePrefix+'_provider_variant']||'');
+  const variant=String(settings[sourcePrefix+'_provider_variant']||storageDefaultVariant(engine)).toLowerCase();
+  return {
+    role:role,
+    meta:meta,
+    sameTarget:sameTarget,
+    sourcePrefix:sourcePrefix,
+    engine:engine,
+    variant:variant,
+    savedEngine:savedEngine||engine,
+    savedVariant:savedVariant||variant,
+    provider:storageProviderInfo(engine,variant),
+    mode:String(settings.archive_ui_mode||'simple').toLowerCase()==='advanced'?'advanced':'simple'
+  };
+}
+function renderStorageHiddenField(key,value){
+  return '<input type="hidden" class="setting-input" data-key="'+escHtml(key)+'" value="'+escHtml(String(value==null?'':value))+'">';
+}
+function renderStorageCenter(data,restoreCmd){
+  const settings=(data&&data.settings)||{};
+  return '<div class="storage-shell">'+
+    '<div class="page-header"><h1 class="page-title">Depolama ve Arsiv Merkezi</h1><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-primary" onclick="showRecordModal()">Kayit Baslat</button><button class="btn btn-secondary" onclick="createSystemBackupFromStorage(false)">Hafif Yedek Al</button><button class="btn btn-secondary" onclick="createSystemBackupFromStorage(true)">Kayitlarla Yedek Al</button></div></div>'+
+    '<div id="storage-active-banner"></div>'+
+    '<div id="storage-remux-jobs"></div>'+
+    '<div class="storage-hero">'+
+      '<div class="card"><div class="card-title" style="margin-bottom:12px">Kolay secim rehberi</div><div class="storage-choice-grid">'+
+        '<div class="storage-choice-card active"><div class="icon"><i class="bi bi-1-circle"></i></div><div class="title">Yerelde basla</div><div class="desc">Kayitlar once bu sunucuda dursun. En hizli ve risksiz kurulum boyle olur.</div></div>'+
+        '<div class="storage-choice-card active"><div class="icon"><i class="bi bi-2-circle"></i></div><div class="title">Ikinci kopya ekle</div><div class="desc">Kayitlari ve sistem yedeklerini uzak hedefe gondererek disk ve felaket riskini dusur.</div></div>'+
+        '<div class="storage-choice-card active"><div class="icon"><i class="bi bi-3-circle"></i></div><div class="title">Geri yukle</div><div class="desc">Yerelde olmayan dosyayi arsivden geri getir, gerekirse indir ve tekrar kullan.</div></div>'+
+      '</div><div class="storage-provider-note" style="margin-top:12px">MP4 kayitlar varsayilan olarak onerilir. Tarayici onizleme, indirme ve arsiv akisi icin en sorunsuz secim budur.</div></div>'+
+      '<div class="card"><div class="card-title" style="margin-bottom:12px">Durum Ozeti</div><div class="storage-kpi-list">'+
+        '<div class="storage-kpi"><strong>'+fmtInt((data&&data.saved||[]).length)+'</strong><span>Yerel kayit dosyasi</span></div>'+
+        '<div class="storage-kpi"><strong>'+fmtInt((data&&data.archives||[]).length)+'</strong><span>Kayit arsiv kopyasi</span></div>'+
+        '<div class="storage-kpi"><strong>'+fmtInt((data&&data.backups||[]).length)+'</strong><span>Yerel sistem yedegi</span></div>'+
+        '<div class="storage-kpi"><strong>'+fmtInt((data&&data.backupArchives||[]).length)+'</strong><span>Yedek arsiv kopyasi</span></div>'+
+      '</div><div class="storage-provider-note" style="margin-top:14px">Restore komutu: <code>'+escHtml(restoreCmd)+'</code></div></div>'+
+    '</div>'+
+    '<div id="storage-stats-grid" class="card-grid card-grid-4" style="margin-bottom:0"></div>'+
+    '<div id="storage-settings-shell">'+renderStorageSettingsShell(settings,data)+'</div>'+
+    '<div class="card" style="margin-top:16px;margin-bottom:16px"><div class="card-header"><h3 class="card-title">Aktif Kayitlar</h3><span class="form-hint" id="storage-active-count">0 aktif oturum</span></div><div class="card-body"><table class="table"><thead><tr><th>ID</th><th>Yayin</th><th>Format</th><th>Durum</th><th>Boyut</th><th style="white-space:nowrap">Islem</th></tr></thead><tbody id="rec-list"></tbody></table></div></div>'+
+    '<div class="card" style="margin-bottom:16px"><div class="card-header"><h3 class="card-title">Secili Kayit Onizleme</h3><span class="form-hint">Ham TS/FLV/MKV kayitlarda once MP4 hazirlamak daha kararlidir.</span></div><div class="card-body"><div id="recording-preview-panel"><div class="empty-state"><div class="icon"><i class="bi bi-film"></i></div><h3>Kayit secin</h3><p style="color:var(--text-muted)">Panel secili kaydi ayni sayfada oynatir.</p></div></div></div></div>'+
+    '<div class="card" style="margin-bottom:16px"><div class="card-header"><h3 class="card-title">Kayit Kutuphanesi</h3><span class="form-hint">Yereldeki kayitlar, indirme ve donusum aksiyonlari</span></div><div class="card-body"><table class="table"><thead><tr><th>Yayin</th><th>Dosya</th><th>Format</th><th>Tarih</th><th>Boyut</th><th>Arsiv</th><th>Islem</th></tr></thead><tbody id="saved-rec-list"></tbody></table></div></div>'+
+    '<div class="card" style="margin-bottom:16px"><div class="card-header"><h3 class="card-title">Kayit Arsiv Kutuphanesi</h3><span class="form-hint">Harici hedefte bulunan kayitlar</span></div><div class="card-body"><table class="table"><thead><tr><th>Yayin</th><th>Dosya</th><th>Saglayici</th><th>Tarih</th><th>Yerel Durum</th><th>Sonuc</th><th>Islem</th></tr></thead><tbody id="archive-rec-list"></tbody></table></div></div>'+
+    '<div class="card" style="margin-bottom:16px"><div class="card-header"><h3 class="card-title">Sistem Yedekleri</h3><span class="form-hint">Yerelde duran sistem yedekleri</span></div><div class="card-body"><table class="table"><thead><tr><th>Dosya</th><th>Boyut</th><th>Tarih</th><th>Tur</th><th>Arsiv</th><th>Islem</th></tr></thead><tbody id="system-backup-list"></tbody></table></div></div>'+
+    '<div class="card" style="margin-bottom:16px"><div class="card-header"><h3 class="card-title">Yedek Arsiv Kutuphanesi</h3><span class="form-hint">Harici hedefte saklanan sistem yedekleri</span></div><div class="card-body"><table class="table"><thead><tr><th>Dosya</th><th>Saglayici</th><th>Tarih</th><th>Yerel Durum</th><th>Sonuc</th><th>Islem</th></tr></thead><tbody id="backup-archive-list"></tbody></table></div></div>'+
+    '<div id="rec-modal" style="display:none"></div>'+
+  '</div>';
+}
+function renderStorageSettingsShell(settings,data){
+  return '<div class="card-grid card-grid-2" style="margin-top:16px">'+
+    '<div class="card">'+renderStorageModeCard(settings,data)+'</div>'+
+    '<div class="card">'+renderStorageLocalMaintenanceCard(settings)+'</div>'+
+  '</div>'+
+  '<div class="card-grid card-grid-2" style="margin-top:16px">'+
+    '<div id="storage-recordings-panel">'+renderStorageTargetPanel('recordings',settings,data)+'</div>'+
+    '<div id="storage-backups-panel">'+renderStorageTargetPanel('backups',settings,data)+'</div>'+
+  '</div>';
+}
+function renderStorageModeCard(settings,data){
+  const mode=String(settings.archive_ui_mode||'simple').toLowerCase()==='advanced'?'advanced':'simple';
+  const sameTarget=String(settings.backup_archive_use_same_target||'true')!=='false';
+  return renderStorageHiddenField('archive_ui_mode',mode)+renderStorageHiddenField('backup_archive_use_same_target',sameTarget?'true':'false')+
+    '<div class="storage-target-shell"><div class="storage-target-top"><div><div class="card-title">Kullanim Modu ve Mimari</div><div class="storage-provider-note">Basit mod gundelik isler icin sade alanlar gosterir. Gelismis mod, endpoint, path-style, rclone config ve yasam dongusu gibi teknik ayrintilari acar.</div></div><div class="segment-control"><button class="segment-btn '+(mode==='simple'?'active':'')+'" onclick="switchStorageUIMode(\'simple\')">Basit Mod</button><button class="segment-btn '+(mode==='advanced'?'active':'')+'" onclick="switchStorageUIMode(\'advanced\')">Gelismis Mod</button></div></div>'+
+      '<div class="storage-subtle"><div class="setting-row"><div><div class="setting-label">Kayıt ve yedek ayni hedefi kullansin</div><div class="setting-desc">Acik olursa sistem yedekleri kayitlarla ayni cloud veya uzak klasore gider. Kaparsaniz yedekler icin ayri hedef secebilirsiniz.</div></div><label class="toggle"><input type="checkbox" '+(sameTarget?'checked':'')+' onchange="toggleBackupTargetMode(this.checked)"><span class="toggle-slider"></span></label></div></div>'+
+      '<div class="storage-provider-note">S3 ailesi: AWS S3, MinIO, R2, Backblaze B2, Wasabi, DigitalOcean Spaces, Linode, Scaleway, IDrive e2. Rclone ailesi: Google Drive, OneDrive, Dropbox, GCS, Azure Blob, Box, pCloud, MEGA, Nextcloud ve WebDAV.</div>'+
+      '<div class="storage-test-row"><button class="btn btn-primary" onclick="saveStorageCenter()">Tum Ayarlari Kaydet</button><button class="btn btn-secondary" onclick="refreshStorageSnapshot({resetPreview:false})">Yeniden Tara</button></div></div>';
+}
+function renderStorageLocalMaintenanceCard(settings){
+  return '<div class="storage-target-shell"><div class="card-title">Yerel Depolama ve Temizlik</div><div class="storage-provider-note">Yerel kopya her zaman korunur. Uzak hedef ekleseniz bile burada ne kadar veri saklanacagini ve bakimin nasil calisacagini belirleyebilirsiniz.</div><div class="storage-form-grid">'+
+    settingInput('storage_max_gb','Maksimum Depolama (GB)',settings.storage_max_gb||'50','number','Disk ve saglik uyari esiklerinde kullanilir.')+
+    settingInput('recordings_retention_days','Kayit Saklama Suresi (gun)',settings.recordings_retention_days||'30','number','0 verilirse otomatik silinmez.')+
+    settingInput('recordings_keep_latest','Yayin Basina Sakla',settings.recordings_keep_latest||'10','number','Her yayindan tutulacak son kayit sayisi.')+
+    settingInput('storage_auto_clean','Uyumluluk Temizlik Gun Sayisi',settings.storage_auto_clean||'30','number','Eski davranis uyumlulugu icin korunur.')+
+  '</div><div class="setting-row"><div><div class="setting-label">Otomatik Bakim</div><div class="setting-desc">Temizlik, telemetry ve trim bakimlarini periyodik olarak calistirir.</div></div><label class="toggle"><input type="checkbox" class="setting-input" data-key="maintenance_auto_cleanup" '+(settings.maintenance_auto_cleanup!=='false'?'checked':'')+'><span class="toggle-slider"></span></label></div></div>';
+}
+function renderStorageTargetPanel(role,settings,data){
+  const target=storageTargetState(role,settings);
+  const mode=target.mode;
+  const meta=target.meta;
+  const summary=(data&&data.archiveSummary)||{};
+  const sameTargetNote=role==='backups'&&target.sameTarget?'<div class="storage-subtle">Sistem yedekleri su an kayitlarla ayni bulut hedefini kullanir. Ayri hedef istiyorsaniz yukaridan bu secenegi kapatin.</div>':'';
+  return '<div class="card storage-target-shell">'+
+    renderStorageHiddenField(meta.prefix+'_provider',target.savedEngine)+
+    renderStorageHiddenField(meta.prefix+'_provider_variant',target.savedVariant)+
+    '<div class="storage-target-top"><div><div class="card-title">'+meta.title+'</div><div class="storage-provider-note">'+escHtml(target.provider.desc+' '+target.provider.hint)+'</div></div><div class="storage-target-meta">'+renderStorageTargetBadges(role,target,summary)+'</div></div>'+
+    sameTargetNote+
+    (role==='backups'&&target.sameTarget?'':'<div><div class="storage-provider-note" style="margin-bottom:10px">Bir hedef karti secin. Kullanici bulut markasini gorur; sistem alt tarafta dogru motoru kendisi kullanir.</div><div class="storage-provider-grid">'+renderStorageProviderCards(role,target)+'</div></div>')+
+    renderStorageTargetFields(role,target,settings,mode)+
+    '<div class="storage-test-row"><button class="btn btn-primary" onclick="saveStorageCenter()">Kaydet</button><button class="btn btn-secondary" onclick="testStorageTarget(\''+role+'\')">'+meta.testLabel+'</button><button class="btn btn-secondary" onclick="'+meta.syncAction+'">'+meta.syncLabel+'</button></div>'+
+    '<div id="storage-test-result-'+role+'">'+renderStorageTestResult(role)+'</div>'+
+  '</div>';
+}
+function renderStorageProviderCards(role,target){
+  return storageProviderCatalog().map(function(item){
+    const active=item.engine===target.engine && item.variant===target.variant;
+    return '<div class="storage-choice-card '+(active?'active':'')+'" onclick="selectStorageProvider(\''+role+'\',\''+item.engine+'\',\''+item.variant+'\')"><div class="icon"><i class="bi '+item.icon+'"></i></div><div class="title">'+escHtml(item.title)+'</div><div class="desc">'+escHtml(item.desc)+'</div></div>';
+  }).join('');
+}
+function renderStorageTargetBadges(role,target,summary){
+  const configured=role==='backups'?!!summary.backup_configured:!!summary.recording_configured;
+  const provider=role==='backups'?(summary.backup_provider||target.provider.title):(summary.recording_provider||target.provider.title);
+  const schedule=role==='backups'?(summary.backup_schedule||'weekly'):(summary.recording_schedule||'immediate');
+  const lastSync=role==='backups'?summary.last_backup_sync_at:summary.last_sync_at;
+  return '<span class="storage-pill">'+escHtml(storagePrettyLabel(provider||target.provider.title))+'</span>'+
+    '<span class="storage-pill">'+(configured?'Hazir':'Eksik ayar')+'</span>'+
+    '<span class="storage-pill">'+escHtml(String(schedule||'-')).toUpperCase()+'</span>'+
+    '<span class="storage-pill">'+(lastSync?escHtml(fmtLocaleDateTime(lastSync)):'Henuz senkron yok')+'</span>';
+}
+function renderStorageTargetFields(role,target,settings,mode){
+  const prefix=target.meta.prefix;
+  const sourcePrefix=target.sourcePrefix;
+  const advanced=mode==='advanced';
+  const isBackup=role==='backups';
+  const scheduleValue=settings[prefix+'_schedule']||(isBackup?'weekly':'immediate');
+  const tierValue=settings[prefix+'_target_tier']||(isBackup?'cold':'standard');
+  const common='<div class="storage-form-grid">'+
+    '<div class="setting-row"><div><div class="setting-label">'+(isBackup?'Yedek arsivi etkin':'Kayit arsivi etkin')+'</div><div class="setting-desc">'+(isBackup?'Yeni sistem yedekleri secilen hedefe gidebilir.':'Yeni kayitlar secilen hedefe gidebilir.')+'</div></div><label class="toggle"><input type="checkbox" class="setting-input" data-key="'+prefix+'_enabled" '+(settings[prefix+'_enabled']==='true'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+    '<div class="setting-row"><div><div class="setting-label">Otomatik yukle</div><div class="setting-desc">Yeni dosyalar zamanlama kuralina gore otomatik gonderilir.</div></div><label class="toggle"><input type="checkbox" class="setting-input" data-key="'+prefix+'_auto_upload" '+(settings[prefix+'_auto_upload']==='true'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+    '<div class="setting-row"><div><div class="setting-label">Yukleme sonrasi yereli sil</div><div class="setting-desc">Basarili kopya sonrasi yerel dosyayi temizler.</div></div><label class="toggle"><input type="checkbox" class="setting-input" data-key="'+prefix+'_delete_local_after_upload" '+(settings[prefix+'_delete_local_after_upload']==='true'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+    settingSelect(prefix+'_schedule','Gonderim sikligi',scheduleValue,[{value:'manual',label:'Elle'},{value:'immediate',label:'Yeni dosya geldikce'},{value:'hourly',label:'Saatlik'},{value:'daily',label:'Gunluk'},{value:'weekly',label:'Haftalik'}],'Otomatik yukleme aciksa hangi ritimde calisacagini belirler.')+
+    settingInput(prefix+'_scan_interval_minutes','Tarama araligi (dk)',settings[prefix+'_scan_interval_minutes']||(isBackup?'30':'10'),'number','Yeni dosyalari hangi aralikla kontrol edecegi.')+
+    settingInput(prefix+'_batch_size','Tek turda islenecek oge',settings[prefix+'_batch_size']||(isBackup?'2':'3'),'number','Bir turda kac dosya gonderilecegi.')+
+    settingSelect(prefix+'_target_tier','Arsiv seviyesi',tierValue,[{value:'standard',label:'Standart'},{value:'cold',label:'Soguk arsiv'},{value:'hot',label:'Hizli erisim'}],'Hedefin kullanim tipini operator tarafinda isaretlemek icindir.')+
+    settingInput(prefix+'_cold_after_days','Soguk arsive gecis gunu',settings[prefix+'_cold_after_days']||(isBackup?'7':'30'),'number','Yasam dongusu planlamasi icin saklanir.')+
+  '</div>';
+  let providerFields='';
+  if(target.provider.family==='local'){
+    providerFields=settingInput(sourcePrefix+'_local_dir','Yerel arsiv klasoru',settings[sourcePrefix+'_local_dir']||'','text','Dosyalar bu sunucuda bu klasore kopyalanir.');
+  }else if(target.provider.family==='s3'){
+    providerFields='<div class="storage-form-grid">'+
+      settingInput(sourcePrefix+'_endpoint','Baglanti adresi',settings[sourcePrefix+'_endpoint']||'','text','Ornek: https://s3.eu-central-1.amazonaws.com veya servisinizin endpoint adresi.')+
+      settingInput(sourcePrefix+'_region','Bolge',settings[sourcePrefix+'_region']||'us-east-1','text','S3 uyumlu servisler icin imzalama bolgesi.')+
+      settingInput(sourcePrefix+'_bucket','Bucket / alan adi',settings[sourcePrefix+'_bucket']||'','text','Yazma yapilacak container veya bucket adi.')+
+      settingInput(sourcePrefix+'_access_key','Erisim anahtari',settings[sourcePrefix+'_access_key']||'','text','Servisin verdigi access key degeri.')+
+      settingInput(sourcePrefix+'_secret_key','Gizli anahtar',settings[sourcePrefix+'_secret_key']||'','password','Servisin verdigi secret key degeri.')+
+      (advanced?'<div class="setting-row"><div><div class="setting-label">Path style kullan</div><div class="setting-desc">MinIO, R2 ve bazi S3 uyumlu servislerde acik olmasi gerekir.</div></div><label class="toggle"><input type="checkbox" class="setting-input" data-key="'+sourcePrefix+'_use_path_style" '+(settings[sourcePrefix+'_use_path_style']!=='false'?'checked':'')+'><span class="toggle-slider"></span></label></div>':'')+
+    '</div>';
+  }else if(target.provider.family==='sftp'){
+    providerFields='<div class="storage-form-grid">'+
+      settingInput(sourcePrefix+'_sftp_host','Sunucu adresi',settings[sourcePrefix+'_sftp_host']||'','text','Host adi veya IP adresi.')+
+      settingInput(sourcePrefix+'_sftp_port','Port',settings[sourcePrefix+'_sftp_port']||'22','number','Genelde 22 olur.')+
+      settingInput(sourcePrefix+'_sftp_user','Kullanici adi',settings[sourcePrefix+'_sftp_user']||'','text','Uzak sunucuda baglanacak hesap.')+
+      settingInput(sourcePrefix+'_sftp_remote_dir','Uzak klasor',settings[sourcePrefix+'_sftp_remote_dir']||'','text','Ornek: /srv/fluxstream-archive')+
+      settingInput(sourcePrefix+'_sftp_key_path','Anahtar dosya yolu',settings[sourcePrefix+'_sftp_key_path']||'','text','Bos ise sunucudaki varsayilan SSH anahtari denenir.')+
+      (advanced?'<div class="setting-row"><div><div class="setting-label">Host key kontrolunu gevset</div><div class="setting-desc">Testte kolaylik saglar; production icin kapali tutmak daha guvenlidir.</div></div><label class="toggle"><input type="checkbox" class="setting-input" data-key="'+sourcePrefix+'_sftp_disable_host_key_check" '+(settings[sourcePrefix+'_sftp_disable_host_key_check']==='true'?'checked':'')+'><span class="toggle-slider"></span></label></div>':'')+
+    '</div>';
+  }else{
+    providerFields='<div class="storage-form-grid">'+
+      settingInput(sourcePrefix+'_rclone_remote','Bulut baglanti profili',settings[sourcePrefix+'_rclone_remote']||'','text','Sunucuda tanimli rclone profil adi. Ornek: gdrive-ana veya onedrive-media')+
+      settingInput(sourcePrefix+'_rclone_path','Hedef klasor / yol',settings[sourcePrefix+'_rclone_path']||'','text','Bulut hedefinde yazilacak klasor. Ornek: fluxstream/recordings')+
+      (advanced?settingInput(sourcePrefix+'_rclone_config_path','Rclone config yolu',settings[sourcePrefix+'_rclone_config_path']||'','text','Bos ise varsayilan rclone.conf kullanilir.'):'' )+
+    '</div>';
+  }
+  const extras=(advanced?'<div class="storage-form-grid">'+
+    settingInput(prefix+'_prefix','Object key kok klasoru',settings[prefix+'_prefix']||'fluxstream','text','Kayitlar ve yedekler bu kok klasor altina yazilir.')+
+    settingInput(prefix+'_public_base_url','Public link tabani',settings[prefix+'_public_base_url']||'','text','Varsa panelde tiklanabilir public link uretir.')+
+  '</div>':'');
+  return '<div class="storage-subtle">'+providerFields+extras+common+'</div>';
+}
+function renderStorageTestResult(role){
+  window._storageTestResults=window._storageTestResults||{};
+  const result=window._storageTestResults[role];
+  if(!result)return '';
+  return '<div class="storage-subtle" style="margin-top:12px;border-color:'+(result.ok?'rgba(16,185,129,.25)':'rgba(239,68,68,.22)')+'"><div class="setting-label" style="margin-bottom:6px">'+(result.ok?'Baglanti testi basarili':'Baglanti testi hatali')+'</div><div class="storage-provider-note">'+escHtml(result.message||'')+'</div></div>';
+}
+async function saveStorageCenter(){
+  await saveSettingsCategory('storage');
+  await loadPage('settings-storage');
+}
+function switchStorageUIMode(mode){
+  setStorageInputValue('archive_ui_mode',mode);
+  updateStorageProviderUI();
+}
+function toggleBackupTargetMode(useSame){
+  setStorageInputValue('backup_archive_use_same_target',useSame?'true':'false');
+  updateStorageProviderUI();
+}
+function setStorageInputValue(key,value){
+  const el=document.querySelector('.setting-input[data-key="'+key+'"]');
+  if(!el)return;
+  if(el.type==='checkbox')el.checked=String(value)==='true';
+  else el.value=value;
+}
+function selectStorageProvider(role,engine,variant){
+  const prefix=storageRoleMeta(role).prefix;
+  setStorageInputValue(prefix+'_provider',engine);
+  setStorageInputValue(prefix+'_provider_variant',variant);
+  applyStorageProviderPreset(role,engine,variant);
+  updateStorageProviderUI();
+}
+function applyStorageProviderPreset(role,engine,variant){
+  const prefix=storageRoleMeta(role).prefix;
+  const sourcePrefix=(role==='backups' && String(readStorageDraftSettings().backup_archive_use_same_target||'true')!=='false')?'archive':prefix;
+  const presets={
+    aws_s3:{endpoint:'https://s3.eu-central-1.amazonaws.com',region:'eu-central-1',pathStyle:'false'},
+    minio:{endpoint:'http://127.0.0.1:9002',region:'us-east-1',pathStyle:'true'},
+    cloudflare_r2:{endpoint:'https://ACCOUNT_ID.r2.cloudflarestorage.com',region:'auto',pathStyle:'true'},
+    backblaze_b2:{endpoint:'https://s3.us-west-004.backblazeb2.com',region:'us-west-004',pathStyle:'true'},
+    wasabi:{endpoint:'https://s3.eu-central-1.wasabisys.com',region:'eu-central-1',pathStyle:'true'},
+    digitalocean_spaces:{endpoint:'https://fra1.digitaloceanspaces.com',region:'fra1',pathStyle:'true'},
+    linode_object_storage:{endpoint:'https://eu-central-1.linodeobjects.com',region:'eu-central-1',pathStyle:'true'},
+    scaleway_object_storage:{endpoint:'https://s3.fr-par.scw.cloud',region:'fr-par',pathStyle:'true'},
+    idrive_e2:{endpoint:'https://storage.wdc.idrivee2-23.com',region:'us-east-1',pathStyle:'true'}
+  };
+  const preset=presets[variant];
+  if(!preset)return;
+  if(!document.querySelector('.setting-input[data-key="'+sourcePrefix+'_endpoint"]')?.value)setStorageInputValue(sourcePrefix+'_endpoint',preset.endpoint);
+  if(!document.querySelector('.setting-input[data-key="'+sourcePrefix+'_region"]')?.value)setStorageInputValue(sourcePrefix+'_region',preset.region);
+  setStorageInputValue(sourcePrefix+'_use_path_style',preset.pathStyle);
+}
+async function testStorageTarget(role){
+  window._storageTestResults=window._storageTestResults||{};
+  const updates=readStorageDraftSettings();
+  try{
+    const res=await api('/api/storage/connection-test',{method:'POST',body:{role:role,updates:updates}});
+    if(res&&res.success===false){
+      window._storageTestResults[role]={ok:false,message:res.message||'Baglanti testi basarisiz'};
+      toast(res.message||'Baglanti testi basarisiz','error');
+    }else{
+      const result=(res&&res.result)||{};
+      window._storageTestResults[role]={ok:true,message:'Test dosyasi yazildi ve silindi. Saglayici: '+String(result.provider||'-')};
+      toast('Baglanti testi basarili');
+    }
+  }catch(e){
+    window._storageTestResults[role]={ok:false,message:e.message||'Baglanti testi basarisiz'};
+    toast('Baglanti testi basarisiz: '+e.message,'error');
+  }
+  updateStorageProviderUI();
+}
 function renderStorageActiveBanner(data){
   const activeRecordings=Array.isArray(data&&data.activeRecordings)?data.activeRecordings:[];
   if(!activeRecordings.length)return '';
@@ -4092,6 +4437,7 @@ function applyStorageSnapshot(data,opts){
     teardownRecordingPreview();
     resetRecordingPreviewPanel();
   }
+  updateStorageProviderUI();
 }
 async function fetchStorageSnapshot(){
   const [s,report,archivesRes,recsRes,streamsRes,savedRes,backupsRes,backupArchivesRes,remuxJobsRes]=await Promise.all([
@@ -4119,45 +4465,10 @@ function setStorageFieldVisible(key, visible){
   if(row)row.style.display=visible?'':'none';
 }
 function updateStorageProviderUI(){
-  const provider=document.querySelector('.setting-input[data-key="archive_provider"]')?.value||'local';
-  const guide=document.getElementById('storage-provider-guide');
-  const config={
-    local:{
-      tone:'blue',
-      title:'Yerel klasore kopyala',
-      text:'En kolay baslangic secenegi. Kayitlar bu sunucuda ikinci bir klasore kopyalanir. Test ve tek sunucu kullanimlari icin en pratigi budur.',
-      fields:{local:true,s3:false,sftp:false}
-    },
-    s3:{
-      tone:'green',
-      title:'S3 bulut deposu kullan',
-      text:'Amazon S3 veya S3 uyumlu bulut hedeflerine gonderir. Sunucu disinda yedek tutmak icin uygundur.',
-      fields:{local:false,s3:true,sftp:false}
-    },
-    minio:{
-      tone:'orange',
-      title:'MinIO sunucusuna gonder',
-      text:'Kendi MinIO sunucuna veya S3 uyumlu baska bir obje depoya yazmak icin uygundur. Genelde MinIO uyum modu acik olur.',
-      fields:{local:false,s3:true,sftp:false}
-    },
-    sftp:{
-      tone:'purple',
-      title:'Baska bir sunucuya kopyala',
-      text:'Dusuk butcede en pratik dis hedeflerden biridir. Dosyalar SFTP ile baska bir Linux sunucusuna gider.',
-      fields:{local:false,s3:false,sftp:true}
-    }
-  };
-  const current=config[provider]||config.local;
-  if(guide){
-    guide.innerHTML='<div class="card-title" style="margin-bottom:8px">Secili hedef: <span class="tag tag-'+current.tone+'">'+escHtml(current.title)+'</span></div><div class="form-hint" style="line-height:1.8">'+escHtml(current.text)+'</div><div class="form-hint" style="margin-top:10px">Google Drive ve OneDrive entegrasyonu yol haritasinda tutuluyor.</div>';
-  }
-  setStorageFieldVisible('archive_local_dir',!!current.fields.local);
-  ['archive_endpoint','archive_region','archive_bucket','archive_access_key','archive_secret_key','archive_use_path_style'].forEach(function(key){
-    setStorageFieldVisible(key,!!current.fields.s3);
-  });
-  ['archive_sftp_host','archive_sftp_port','archive_sftp_user','archive_sftp_remote_dir','archive_sftp_key_path','archive_sftp_disable_host_key_check'].forEach(function(key){
-    setStorageFieldVisible(key,!!current.fields.sftp);
-  });
+  const shell=document.getElementById('storage-settings-shell');
+  if(!shell)return;
+  const draft=readStorageDraftSettings();
+  shell.innerHTML=renderStorageSettingsShell(draft,window._storageData||{});
 }
 let recordingPreviewPlayer=null;
 window._recordingPreviewSelection=null;

@@ -5,27 +5,35 @@ Tarih: 26 Mart 2026
 ## 1. Genel Karar
 
 FluxStream artik prototip seviyesini asti.
-Bugun itibariyla tek sunucuda kurulabilen, admin paneli olan,
-cok protokollu ingest alabilen, HLS ve DASH dagitabilen,
-OBS multitrack ile calisabilen, player/embed/template uretebilen
-ve operasyon merkezi sunan bir medya sunucusu haline geldi.
+Bugun itibariyla:
+
+- tek sunucuda kurulabilen
+- admin paneli olan
+- cok protokollu ingest alabilen
+- HLS ve DASH dagitabilen
+- OBS multitrack ile calisabilen
+- player/embed/template uretebilen
+- QoE ve operasyon merkezi sunan
+- kayit, arsiv ve sistem yedegini tek merkezde yonetebilen
+
+bir medya sunucusu haline geldi.
 
 Kisa karar:
 
 - tek node webcast, kurum ici TV, radyo ve markali player dagitimi icin kullanilabilir seviyede
 - ama tam enterprise, clusterli ve cok node'lu dagitim urunu demek icin hala erken
 
-## 2. Bugun Production'a En Yakin Alanlar
+## 2. Production'a En Yakin Alanlar
 
 ### 2.1 Ingest ve Dagitim Omurgasi
 
-Bugun guclu gorunen alanlar:
+Guclu taraflar:
 
 - RTMP, RTMPS, SRT, RTP, RTSP, WebRTC/WHIP, MPEG-TS ve HTTP Push ingest
 - HLS, LL-HLS, DASH, HTTP-FLV, MP4, WebM ve ses cikislari
 - stream lifecycle, subscriber fanout ve recording akisi
 - FFmpeg tabanli live transcode ve ABR omurgasi
-- OBS Enhanced RTMP / multitrack video kabul ve dagitim zinciri
+- OBS Enhanced RTMP / multitrack zinciri
 
 Karar:
 
@@ -33,210 +41,157 @@ Karar:
 
 ### 2.2 OBS Multitrack ve ABR
 
-Bu tur itibariyla:
+Durum:
 
 - OBS normal RTMP baglantisi calisiyor
 - OBS `Cok kanalli Video` baglantisi calisiyor
 - multitrack video katmanlari HLS varyantlarina baglanabiliyor
-- HLS master alternate-audio group uretebiliyor
-- DASH preview daha gec fallback yapan ve uzun izleme icin daha stabil ayarlarla calisiyor
-- player QoE telemetrisi kalite gecisi ve audio switch sayaclarini da topluyor
-- player audio secimi artik oturumlar arasi tercih olarak saklanabiliyor ve HLS / DASH fallback'lerinde korunabiliyor
-- canli dogrulamada DASH MPD artik 2 video + 1 audio representation uretiyor
-- varsayilan video ve audio track secimi policy ve runtime seviyesinde uygulanabiliyor
-- player tarafinda audio track secici cikabiliyor
+- DASH MPD coklu representation uretebiliyor
+- alternate audio group ve player tarafinda ses izi secimi var
+- kalite gecisi ve audio switch verisi telemetry / rapora yaziliyor
+- `audio-only DASH` manifest uretimi cekirdekte tamam
 
 Karar:
 
-- OBS multitrack artik ilk faz demo degil, gercek urun omurgasina yaklasti
-- ama audio-only DASH davranisi ve daha genis codec / oynatici saha testi hala gerekli
+- OBS multitrack artik demo degil, urun omurgasina yakin
+- ama `audio-only DASH` farkli istemcilerle saha testine muhtac
 
-### 2.3 Yonetim ve Operasyon
+### 2.3 Operasyon ve Tanilama
 
-Bugun elde olanlar:
+Durum:
 
-- setup wizard
-- admin paneli
-- stream olusturma, duzenleme ve silme
-- embed ve player link uretimi
-- player template sistemi
-- Operasyon Merkezi
+- `Operasyon Merkezi`
 - canli QoE, telemetry, track ve manifest gorunurlugu
 - kullanim ve tanilama rehberleri
-- runtime lisans modeli
-- backup omurgasi
-- object storage / archive omurgasi
-- Depolama ve Arsiv Merkezi
-- Linux servis ve deploy akisi
-- ayni VPS uzerinde kurulu MinIO ve SFTP laboratuvar hedefleri
+- Prometheus ve OTel-benzeri cikis
+- QoE riskli yayinlar ve saglik uyari mantigi
 
 Karar:
 
 - teknik operator ve destek tarafinda artik urun hissi veren bir panel var
 
-## 3. Bugun Kapanan Onemli Fazlar
+### 2.4 Depolama, Arsiv ve Yedek
 
-### 3.1 Player, Preview ve Embed
+Durum:
 
-Kapananlar:
-
-- `play`, `embed`, `iframe` ve direct link akisi
-- template preview hizalama
-- framing, `403` ve sahte `offline` sorunlari
-- MP4 preview davranisinin panelde daha dogru konumlandirilmasi
-- DASH preview icin daha stabil retry ve fallback mantigi
-
-### 3.2 QoE ve Observability
-
-Kapananlar:
-
-- player heartbeat tabanli QoE telemetrisi
-- stall, reconnect, waiting ve buffer runtime verisi
-- SQLite kalici telemetry ornekleri
-- stream detay ve Operasyon Merkezi grafik kartlari
-- track bazli bitrate / runtime ornekleri
-- kalite gecisi ve ses izi degisimi raporlari
-- Prometheus `/metrics` cikisi
-- OTel-benzeri `/api/observability/otel` cikisi
-- retention cleanup
-- aktif oturum oranina gore ayarlanan daha akilli QoE esikleri
-- saglik ekraninda QoE riskli yayinlar tablosu
-- Teshis ekraninda opsiyonel cikislari gereksiz kirmizi gostermeyen daha dogru durum mantigi
-
-### 3.3 Archive ve Object Storage
-
-Kapananlar:
-
-- recording kutuphanesi icin object storage metadata tablosu
-- lokal arsiv klasoru modu
-- S3 / MinIO uyumlu archive upload / restore akisi
-- SFTP hedefi ile arsiv ve yedek yukleme akisi
-- MinIO / S3 upload yolundaki eksik `Content-Length` hatasi kapatildi
-- otomatik arsiv senkronu
-- panelden arsive gonderme ve geri yukleme
-- saglik raporunda arsiv ozet gorunurlugu
-- sistem yedeklerini ayni archive omurgasina baglama
-- kayit / depolama / yedek yonetimini tek `Depolama ve Arsiv Merkezi` ekraninda birlestirme
-- ayni VPS uzerindeki MinIO ve SFTP hedeflerinde recording + backup upload / restore saha testi basariyla tamamlandi
-
-### 3.5 Kayit ve Depolama Merkezi
-
-Kapananlar:
-
-- varsayilan kayit formati `mp4` olacak sekilde akisi guncelleme
-- tum kayit baslatma akislari ve hizli kayit endpoint'lerini `mp4` varsayilanina cekme
-- `mp4` ve `mkv` secildiginde guvenli `TS capture` alip kapanista `ffmpeg copy remux` ile izlenebilir dosya uretme
-- gecici `.capture.ts` dosyalarini kayit kutuphanesinden gizleme
-- mevcut `TS`, `FLV` ve `MKV` kayitlari panelden `MP4 Hazirla` ile donusturebilme
-- kayit onizleme panelini oynatilabilir formatlara gore daha durust hale getirme
-- `Depolama ve Arsiv Merkezi` ekranindaki sayfa kilitlenmesi / renderer crash zincirini kapatma
-- `MP4 Hazirla` isini arka plan remux isi olarak surdurup ayni ekranda durumunu gosterebilme
-- recording TS paketlemesini duzelterek yeni kayitlari MP4'e daha guvenilir cevrilebilir hale getirme
-- sistem yedegi silme ve benzeri storage aksiyonlarini tam sayfa yeniden cizmeden daha guvenli hale getirme
+- `Depolama ve Arsiv Merkezi`
+- kayit, arsiv ve sistem yedegini tek merkezde yonetim
+- varsayilan `mp4` recording
+- `ham capture + finalize/remux` modeli
+- arka plan `MP4 Hazirla` isi
+- ayri kayit hedefi ve ayri sistem yedegi hedefi
+- lokal, S3/MinIO, SFTP ve rclone tabanli bulut hedefleri
+- `Baglantiyi Test Et`
+- ayni VPS uzerinde MinIO + SFTP saha testi basarili
 
 Karar:
 
-- kayit tarafi sadece ham dosya toplamak yerine artik gercek kutuphane ve arsiv mantigina yaklasti
+- kayit tarafi sadece ham dosya toplamaktan cikti, gercek kutuphane / arsiv mantigina yaklasti
 
-### 3.4 Linux Urunlestirme
+## 3. Bu Turda Kapanan Onemli Fazlar
+
+### 3.1 Storage UI ve Crash Hatti
 
 Kapananlar:
 
-- systemd servisi
-- servis kullanicisi ile calisma
-- health endpoint ile servis dogrulamasi
-- canli binary degistirip servis restart etme akisi
+- storage ekranindaki tam sayfa donma / renderer crash zinciri
+- buton aksiyonlarinda tam rerender yerine parcali yenileme
+- `MP4 Hazirla` isini arka plan isi olarak surdurme
+- sistem yedegi silme ve recording aksiyonlarini calisir hale getirme
 
-Karar:
+### 3.2 Recording ve Remux
 
-- Linux tarafinda artik kur, deploy et, health kontrolu al akisi tekrar edilebilir durumda
+Kapananlar:
 
-## 4. Bugun Hala Beta veya Sertlestirme Gerektiren Alanlar
+- varsayilan kayit formatini `mp4`e cekme
+- yeni kayitlarda daha temiz TS capture uretme
+- MP4 remux icin kaynagi guvenilir hale getirme
+- `TS`, `FLV` ve `MKV` kayitlari panelden `MP4 Hazirla` ile donusturebilme
 
-Asagidaki basliklar henuz tam production-ready degil:
+### 3.3 Storage ve Bulut Genisleme
 
-- `audio-only DASH` icin eklenen `audio.mpd` ve audio-only init segment akisinin farkli client'larda saha dogrulamasi
-- kalite gecisi ve audio switch verisinin daha ileri alarm otomasyonu ve daha uzun rapor katmanina baglanmasi
-- dusuk bant genisligi icin ABR profil merdiveninin daha uzun benchmarklarla tekrar optimizasyonu
-- multi-node origin-edge cluster mimarisi
-- harici bir bucket ile gercek AWS S3 saha testinin alinmasi
-- ayni VPS uzerindeki MinIO ve SFTP laboratuvar hedeflerinde daha uzun sureli sertlestirme testleri
-- kayit finalize/remux akisinin uzun sureli, buyuk dosyali ve servis restart senaryolarinda sertlestirilmesi
-- onceki bozuk `TS` kayitlar icin kullaniciyi yonlendiren kurtarma / acik uyari akislarinin eklenmesi
-- `Depolama ve Arsiv Merkezi` ekraninin daha sade, teknik terimi azaltan bir UX'e kavusmasi
-- `Google Drive` ve `OneDrive` gibi populer cloud hedefleri icin basit entegrasyon seceneklerinin eklenmesi
-- signed URL, oturum tokeni, hotlink korumasi ve watermark gibi dusuk butceye uygun playback guvenligi katmanlari
-- tam DRM icin gerekli anahtar servisi, DRM abstraction ve lisans sunucusu hazirligi
-- RBAC, audit log ve SSO
-- DRM, SSAI ve monetizasyon
+Kapananlar:
+
+- basit / gelismis mod
+- kayit ve yedek icin ayri hedefler
+- S3 uyumlu saglayici presetleri
+- `Cloudflare R2`, `Backblaze B2`, `Wasabi`, `Spaces`, `Linode`, `Scaleway`, `IDrive e2`
+- `SFTP`
+- rclone tabanli `Google Drive`, `OneDrive`, `Dropbox`, `Google Cloud Storage`, `Azure Blob`, `Box`, `pCloud`, `MEGA`, `Nextcloud`, `WebDAV` profilleri
+- hedef bazli baglanti testi
+
+### 3.4 Audio-only DASH
+
+Kapananlar:
+
+- `audio-only DASH` icin ayri `audio.mpd`
+- audio-only init segment uretimi
+
+## 4. Hala Beta veya Sertlestirme Gerektiren Alanlar
+
+- `audio-only DASH` icin farkli client saha dogrulamasi
+- harici AWS S3 bucket ile gercek saha testi
+- rclone tabanli Google Drive / OneDrive / Dropbox akisini gercek hesaplarla dogrulama
+- ayni VPS uzerindeki MinIO + SFTP laboratuvar hedeflerini uzun sureli senaryolarla sertlestirme
+- kayit finalize/remux akisinin buyuk dosya ve servis restart senaryolarinda sertlestirilmesi
+- onceki bozuk `TS` kayitlar icin kurtarma / uyari akisi
+- storage ekraninin daha da sade, teknik terimi azaltan UX'e kavusmasi
+- signed URL, playback token, hotlink korumasi ve watermark gibi playback security fazi
+- AES-128 key servis ve DRM hazirligi
+- RBAC, audit log, SSO
+- multi-node origin-edge
 - kapsamli yuk testi ve soak testi
 
-Karar:
-
-- cekirdek urun guclu
-- enterprise fark yaratan katmanlar henuz eksik
-
-## 5. 25 Mart 2026 Teknik Dogrulama
+## 5. Canli Dogrulama Durumu
 
 Yerelde:
 
-- `go build ./cmd/fluxstream/` gecti
-- `go build ./cmd/fluxstream-license/` gecti
-- `go test ./...` gecti
-- admin JS sentaks kontrolu gecti
-- lokal arsiv upload / restore akisi sentetik testte gecti
-- recording TS paketleme birim testleri eklendi ve gecti
-- yeni kayitlar icin MP4 finalize / remux kaynak akisi duzeltildi
+- `go build ./cmd/fluxstream/`
+- `go build ./cmd/fluxstream-license/`
+- `go test ./...`
+- admin JS sentaks kontrolu
 
-Host:
+Canli host:
 
 - host: `23.94.220.222`
-- systemd servis: `fluxstream`
-- servis durumu: `active`
-- health: `http://127.0.0.1:8844/api/health` -> `{"status":"ok","version":"2.0.0"}`
-- canli deploy hash: `ba7bc219c325435e8a654bc67ec3ae711d6a84efe9e5109f7b4c22cfb234e5dc`
-- canli dogrulama: HLS master `2` video katmani, DASH MPD `3` representation (2 video + 1 audio)
-- yayin dogrulamasi: `test / live_14957742f633b59863173e5a` stream'i ile kontrol edildi
-- storage merkezi crash duzeltmesi ve yeni recording paketleme zinciri hosta yuklendi
-- recording varsayilan formati canli ayarlarda da `mp4` olarak guncellendi
-- MinIO test ortami: `127.0.0.1:9002`, bucket `fluxstream-archive-test`
-- SFTP test ortami: `fluxarchive@127.0.0.1:/srv/fluxarchive-store`
-- ayni VPS uzerinde hem recording hem backup icin upload + yerelden silme + restore dogrulamasi gecti
+- servis: `fluxstream`
+- health: `http://127.0.0.1:8844/api/health`
+- onceki canli dogrulama: HLS master `2` video katmani, DASH MPD `3` representation
+- ayni VPS uzerinde MinIO test ortami ve ayri SFTP hedefi ile recording + backup upload / restore basariyla dogrulandi
 
-Karar:
+Not:
 
-- canli deploy ve servis guncelleme akisi calisiyor
-- DASH/HLS multitrack zinciri artik sahada daha guven verici durumda
-- storage / recording tarafi da yeni kayitlarda daha guvenilir noktaya geldi
+- ayni VPS uzerindeki MinIO + SFTP entegrasyonu gercek entegrasyonu kanitlar
+- ama gercek felaket yedegi ya da dis ortam dayanikliligi anlamina gelmez
 
 ## 6. Rakiplere Gore Bugunku Konum
 
-FluxStream'in bugun guclu oldugu taraflar:
+Guclu taraflar:
 
 - tek binary ile kolay kurulum
 - ayni urunde admin paneli + stream CRUD + embed + template + operasyon merkezi
-- zengin output matrisi ve ses cikis cesitliligi
-- OBS multitrack icin panel destekli kullanim rehberi
-- tek node urunlesme hissi veren pratik kurulum ve yonetim akisi
+- zengin output matrisi
+- OBS multitrack ve telemetry gorunurlugu
+- storage / arsiv / yedek omurgasinin urunlesmeye yaklasmasi
 
-FluxStream'in bugun zayif oldugu taraflar:
+Zayif taraflar:
 
 - cluster ve autoscaling yok
-- object storage akisi yeni eklendi ama daha genis saha testi yok
+- gercek dis ortam storage sertlestirmesi eksik
 - kurumsal guvenlik katmanlari dar
 - DRM ve SSAI yok
-- test ve benchmark kapsami dar
+- test ve benchmark kapsami sinirli
 
 ## 7. Duz ve Duru Soz
 
-Benim bugunku gorusum su:
+Benim bugunku gorusum:
 
 Evet, FluxStream artik iyi bir medya sunucusu oldu.
 Daha dogru tanim:
 
 - iyi bir tek-node medya sunucusu
 - urunlesmis bir yayin cekirdegi
-- operasyon merkezi olan bir canli dagitim urunu
+- operasyon merkezi ve depolama omurgasi olan canli dagitim urunu
 
 Su alanlar icin artik ciddi bicimde kullanilabilir:
 
@@ -249,22 +204,20 @@ Ama bugun hala su cumleyi kurmam:
 
 - Wowza / Ant / Red5 / Nimble sinifinda tam enterprise dengi oldu
 
-Bunu demek icin su basliklarin kapanmasi gerekiyor:
+Bunu demek icin kapanmasi gereken fark yaratan alanlar:
 
 - multi-node cluster
 - audit / SSO / RBAC
-- daha derin observability ve alarm
-- yuk testi ve operasyonel sertlestirme
+- daha derin observability ve alarm otomasyonu
+- playback security ve DRM
+- gercek dis ortam storage / failover testleri
 
 ## 8. Siradaki En Dogru Hedefler
 
-Bana gore bundan sonraki en mantikli sira su:
-
-1. `Depolama ve Arsiv Merkezi` ekranini sade ve daha anlasilir hale getir
-2. harici bir bucket ile gercek AWS S3 saha testi yap
-3. ayni VPS uzerindeki MinIO ve SFTP laboratuvar hedeflerini uzun sureli senaryolarla yeniden zorla
-4. `audio-only DASH` ve uzun sureli recording/finalize davranisini sertlestir
-5. dusuk butceye uygun playback guvenligi katmanlarini ekle
+1. `Depolama ve Arsiv Merkezi` ekraninin kullanici dilini daha da sadeleştir
+2. harici bir AWS S3 bucket ile gercek saha testi al
+3. rclone tabanli populer bulut hedeflerini gercek hesaplarla dogrula
+4. `audio-only DASH` ve uzun recording/finalize davranisini sertlestir
+5. playback guvenligi fazina gir
 6. sonra tam DRM mimarisini tasarla
-7. sonra multi-node origin-edge mimarisine gec
-8. RBAC, audit log ve SSO katmanini ekle
+7. daha sonra origin-edge ve enterprise guvenlik fazina gec

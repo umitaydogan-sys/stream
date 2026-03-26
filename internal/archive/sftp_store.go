@@ -81,6 +81,19 @@ func (s *sftpStore) DownloadFile(ctx context.Context, objectKey, destPath string
 	return info.Size(), nil
 }
 
+func (s *sftpStore) DeleteObject(ctx context.Context, objectKey string) error {
+	if err := s.ensureTools(); err != nil {
+		return err
+	}
+	remotePath := s.remoteObjectPath(objectKey)
+	args := append(s.baseSSHArgs(), s.remoteHost(), "rm -f -- "+shellQuote(remotePath))
+	cmd := exec.CommandContext(ctx, "ssh", args...)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("sftp silme hatasi: %v: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
 func (s *sftpStore) ensureTools() error {
 	if _, err := exec.LookPath("ssh"); err != nil {
 		return fmt.Errorf("ssh araci bulunamadi")

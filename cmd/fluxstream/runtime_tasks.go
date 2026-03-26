@@ -121,6 +121,9 @@ func startMaintenanceLoops(ctxDone <-chan struct{}, cfg *config.Manager, db *sto
 				if !cfg.GetBool("archive_enabled", false) || !cfg.GetBool("archive_auto_upload", false) {
 					return
 				}
+				if !archiveManager.ShouldRunRecordingSchedule(time.Now()) {
+					return
+				}
 				uploaded, err := archiveManager.SyncPending(context.Background(), cfg.GetInt("archive_batch_size", 3))
 				if err != nil {
 					_ = db.AddLog("WARN", "archive", fmt.Sprintf("Arsiv senkronizasyonu basarisiz: %v", err))
@@ -152,6 +155,9 @@ func startMaintenanceLoops(ctxDone <-chan struct{}, cfg *config.Manager, db *sto
 			defer ticker.Stop()
 			runBackupArchiveSync := func() {
 				if !cfg.GetBool("backup_archive_enabled", false) || !cfg.GetBool("backup_archive_auto_upload", false) {
+					return
+				}
+				if !archiveManager.ShouldRunBackupSchedule(time.Now()) {
 					return
 				}
 				uploaded, err := archiveManager.SyncPendingBackups(context.Background(), cfg.GetInt("backup_archive_batch_size", 2))
@@ -344,7 +350,7 @@ func buildHealthReport(cfg *config.Manager, db *storage.SQLiteDB, stats storage.
 		}
 		if cfg.GetBool("archive_enabled", false) {
 			switch {
-			case !archiveSummary.Configured:
+			case !archiveSummary.RecordingConfigured:
 				alerts = append(alerts, systemAlert{
 					Level:       "warning",
 					Code:        "archive_config_invalid",
@@ -364,7 +370,7 @@ func buildHealthReport(cfg *config.Manager, db *storage.SQLiteDB, stats storage.
 		}
 		if cfg.GetBool("backup_archive_enabled", false) {
 			switch {
-			case !archiveSummary.Configured:
+			case !archiveSummary.BackupConfigured:
 				alerts = append(alerts, systemAlert{
 					Level:       "warning",
 					Code:        "backup_archive_config_invalid",
