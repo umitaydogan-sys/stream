@@ -759,48 +759,83 @@ async function renderDashboard(c){
   const fmtItems=Object.entries((analytics&&analytics.viewers_by_format)||{}).sort((a,b)=>b[1]-a[1]).map(([label,value])=>({label:label,value:value}));
   const topStreams=((analytics&&analytics.top_streams)||[]).slice(0,5);
   const alerts=Array.isArray(health&&health.alerts)?health.alerts:[];
+  const healthStatus=String((health&&health.status)||'ok').toUpperCase();
+  const healthTone=healthStatus==='OK'?'green':(healthStatus==='WARNING'?'orange':'red');
+  const bwIn=stats.bandwidth_in||0;const bwOut=stats.bandwidth_out||0;
+  const memUsed=stats.memory_used_mb||0;const memTotal=stats.memory_total_mb||0;
+  const memPct=memTotal>0?Math.round((memUsed/memTotal)*100):0;
   c.innerHTML=
-    '<div class="page-header"><h1 class="page-title">Dashboard</h1><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-secondary btn-sm" onclick="navigate(\'analytics\')"><i class="bi bi-graph-up"></i> Analitik</button><button class="btn btn-primary btn-sm" onclick="navigate(\'create-stream\')"><i class="bi bi-plus-circle"></i> Yeni Yayin</button></div></div>'+
-    '<div class="card-grid card-grid-4" style="margin-bottom:24px">'+
-      statCard('purple','bi-broadcast',fmtInt(stats.active_streams||0),'Aktif Yayin','streams','Canli stream listesini ac')+
-      statCard('blue','bi-people-fill',fmtInt(stats.total_viewers||0),'Aktif Izleyici','viewers','Anlik izleyici oturumlarini ac')+
-      statCard('green','bi-clock-history',formatUptime(stats.uptime_seconds),'Calisma Suresi','analytics','24 saatlik hareketleri ac')+
-      statCard('red','bi-memory',(stats.memory_used_mb||0)+' MB','Bellek Kullanimi','transcode-jobs','Transcode ve sistem detaylarini ac')+
-    '</div>'+
-    '<div class="quick-grid" style="margin-bottom:24px">'+
-      '<div class="card">'+
-        '<div class="card-header"><div class="card-title"><i class="bi bi-broadcast-pin title-icon"></i>Aktif Yayinlar</div><button class="btn btn-sm btn-primary" onclick="navigate(\'streams\')">Tumunu Ac</button></div>'+
-        (live.length===0
-          ?'<div class="empty-state"><div class="icon"><i class="bi bi-broadcast"></i></div><h3>Aktif yayin yok</h3><p style="color:var(--text-muted)">Yeni bir yayin olusturun ve OBS ile baglanin</p></div>'
-          :'<div class="card-grid card-grid-2">'+live.map(streamCard).join('')+'</div>')+
-      '</div>'+
-      '<div class="card"><div class="card-title" style="margin-bottom:12px"><i class="bi bi-lightning-charge title-icon"></i>Hizli Bakis</div>'+
-        '<div class="metric-list">'+
-          '<div class="metric-row"><span>Toplam giris veri</span><strong>'+formatBytes(stats.bandwidth_in||0)+'</strong></div>'+
-          '<div class="metric-row"><span>Toplam cikis veri</span><strong>'+formatBytes(stats.bandwidth_out||0)+'</strong></div>'+
-          '<div class="metric-row"><span>Bellek ayagi</span><strong>'+(stats.memory_total_mb||0)+' MB</strong></div>'+
-          '<div class="metric-row"><span>Top format</span><strong>'+(fmtItems[0]?escHtml(fmtItems[0].label):'Yok')+'</strong></div>'+
-          '<div class="metric-row"><span>Saglik durumu</span><strong>'+escHtml(String((health&&health.status)||'ok').toUpperCase())+'</strong></div>'+
+    '<div class="studio-page">'+
+      '<div class="studio-hero">'+
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px">'+
+          '<div><h1 class="studio-hero-title">Komuta Merkezi</h1>'+
+          '<p class="studio-hero-sub">Yayinlar, izleyiciler, sistem sagligi ve performans metrikleri tek bakista. Kartlara tiklayarak hizlica ilgili ekrana gecin.</p></div>'+
+          '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
+            '<button class="btn btn-secondary btn-sm" onclick="navigate(\'analytics\')"><i class="bi bi-graph-up"></i> Analitik</button>'+
+            '<button class="btn btn-secondary btn-sm" onclick="navigate(\'operations-center\')"><i class="bi bi-sliders"></i> Operasyon</button>'+
+            '<button class="btn btn-primary btn-sm" onclick="navigate(\'create-stream\')"><i class="bi bi-plus-circle"></i> Yeni Yayin</button>'+
+          '</div>'+
         '</div>'+
-        '<div style="display:flex;gap:10px;margin-top:14px"><button class="btn btn-secondary btn-sm" onclick="openSystemControl()">Sunucu Kontrol</button><button class="btn btn-secondary btn-sm" onclick="navigate(\'settings-health\')">Saglik</button></div>'+
+        '<div class="studio-pill-row" style="margin-top:14px">'+
+          '<span class="studio-pill '+(healthTone==='green'?'active':'')+'"><i class="bi bi-heart-pulse-fill"></i> Sistem: '+healthStatus+'</span>'+
+          '<span class="studio-pill '+(live.length>0?'active':'')+'"><i class="bi bi-broadcast"></i> '+fmtInt(live.length)+' Canli Yayin</span>'+
+          '<span class="studio-pill"><i class="bi bi-people-fill"></i> '+fmtInt(stats.total_viewers||0)+' Izleyici</span>'+
+          '<span class="studio-pill"><i class="bi bi-clock-history"></i> '+formatUptime(stats.uptime_seconds)+'</span>'+
+        '</div>'+
       '</div>'+
-    '</div>'+
-    '<div class="insight-grid">'+
-      '<div class="card"><div class="card-header"><h3 class="card-title">24 Saat Izleyici Akisi</h3><button class="btn btn-sm btn-secondary" onclick="navigate(\'analytics\')">Detay</button></div><div class="card-body">'+renderTimelineChart((analytics&&analytics.viewers_timeline)||[],'Henuz izleyici verisi yok',function(v){return String(v)})+'</div></div>'+
-      '<div class="card"><div class="card-header"><h3 class="card-title">Format Dagilimi</h3><button class="btn btn-sm btn-secondary" onclick="navigate(\'embed-advanced\')">Embed</button></div><div class="card-body">'+renderBarList(fmtItems,'Henuz format verisi yok',function(v){return String(v)})+'</div></div>'+
-      '<div class="card"><div class="card-header"><h3 class="card-title">Populer Yayinlar</h3><button class="btn btn-sm btn-secondary" onclick="navigate(\'analytics\')">Analitik</button></div><div class="card-body">'+
-        (topStreams.length?topStreams.map(function(s){
-          const label=escHtml(s.stream_name||shortKey(s.stream_key));
-          const sid=findStreamIdByKey((streams||[]),s.stream_key);
-          const action=sid?' onclick="navigate(\'stream-detail-'+sid+'\')" style="cursor:pointer"':'';
-          return '<div class="metric-row"'+action+'><span>'+label+'</span><span class="badge">'+fmtInt(s.viewers||0)+' izleyici</span></div>';
-        }).join(''):'<div style="color:var(--text-muted)">Henuz populer yayin verisi yok</div>')+
-      '</div></div>'+
-      '<div class="card"><div class="card-header"><h3 class="card-title">Uyarilar</h3><button class="btn btn-sm btn-secondary" onclick="navigate(\'settings-health\')">Yonet</button></div><div class="card-body">'+
-        (alerts.length?alerts.slice(0,4).map(function(item){
-          return '<div class="metric-row"><span>'+escHtml(item.title||item.code||'Uyari')+'</span><span class="tag '+(item.level==='critical'?'tag-red':item.level==='warning'?'tag-yellow':'tag-blue')+'">'+escHtml(String(item.level||'info').toUpperCase())+'</span></div>';
-        }).join(''):'<div style="color:var(--text-muted)">Aktif uyari yok</div>')+
-      '</div></div>'+
+      '<div class="studio-kpi-grid">'+
+        '<div class="studio-kpi" onclick="navigate(\'streams\')" style="cursor:pointer"><div class="studio-kpi-label"><i class="bi bi-broadcast" style="margin-right:6px"></i>Aktif Yayin</div><div class="studio-kpi-value">'+fmtInt(stats.active_streams||0)+'</div><div class="studio-kpi-sub">'+fmtInt((streams||[]).length)+' toplam tanimli</div></div>'+
+        '<div class="studio-kpi" onclick="navigate(\'viewers\')" style="cursor:pointer"><div class="studio-kpi-label"><i class="bi bi-people-fill" style="margin-right:6px"></i>Aktif Izleyici</div><div class="studio-kpi-value">'+fmtInt(stats.total_viewers||0)+'</div><div class="studio-kpi-sub">Tum formatlardaki anlik oturumlar</div></div>'+
+        '<div class="studio-kpi" onclick="navigate(\'transcode-jobs\')" style="cursor:pointer"><div class="studio-kpi-label"><i class="bi bi-memory" style="margin-right:6px"></i>Bellek</div><div class="studio-kpi-value">'+memUsed+' <span style="font-size:16px;color:var(--text-muted)">MB</span></div><div class="studio-kpi-sub">'+memPct+'% kullanim · '+memTotal+' MB toplam</div></div>'+
+        '<div class="studio-kpi"><div class="studio-kpi-label"><i class="bi bi-arrow-down-up" style="margin-right:6px"></i>Bant Genisligi</div><div class="studio-kpi-value" style="font-size:22px">'+formatBytes(bwIn)+'</div><div class="studio-kpi-sub">'+formatBytes(bwOut)+' cikis</div></div>'+
+        '<div class="studio-kpi" onclick="navigate(\'settings-health\')" style="cursor:pointer"><div class="studio-kpi-label"><i class="bi bi-bell-fill" style="margin-right:6px"></i>Uyarilar</div><div class="studio-kpi-value" style="color:'+(alerts.length>0?'var(--danger)':'var(--success)')+'">'+fmtInt(alerts.length)+'</div><div class="studio-kpi-sub">'+(alerts.length?escHtml(alerts[0].title||'Aktif uyari var'):'Sorun yok')+'</div></div>'+
+      '</div>'+
+      '<div class="studio-grid studio-grid-2">'+
+        '<div class="studio-card">'+
+          '<div class="studio-section-title"><span><i class="bi bi-broadcast-pin" style="margin-right:8px;color:var(--accent)"></i>Aktif Yayinlar</span><button class="btn btn-sm btn-secondary" onclick="navigate(\'streams\')">Tumu</button></div>'+
+          (live.length===0
+            ?'<div class="studio-empty"><i class="bi bi-broadcast" style="font-size:32px;display:block;margin-bottom:10px;opacity:.4"></i>Aktif yayin yok<br><span style="font-size:12px">Yeni bir yayin olusturun ve OBS ile baglanin</span></div>'
+            :'<div style="display:grid;gap:10px">'+live.slice(0,6).map(function(s){
+              return '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border:1px solid var(--border);border-radius:14px;cursor:pointer;transition:all .15s;background:linear-gradient(180deg,#fff,#f8fbff)" onclick="navigate(\'stream-detail-'+s.id+'\')">'+
+                '<span class="badge badge-live">CANLI</span>'+
+                '<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escHtml(s.name)+'</div><div style="font-size:12px;color:var(--text-muted)">'+escHtml(s.input_codec||'-')+' · '+fmtInt(s.viewer_count||0)+' izleyici</div></div>'+
+              '</div>';
+            }).join('')+'</div>')+
+        '</div>'+
+        '<div class="studio-card">'+
+          '<div class="studio-section-title"><span><i class="bi bi-lightning-charge" style="margin-right:8px;color:var(--warning)"></i>Hizli Operasyon</span></div>'+
+          '<div class="metric-list">'+
+            '<div class="metric-row"><span>Toplam giris</span><strong>'+formatBytes(bwIn)+'</strong></div>'+
+            '<div class="metric-row"><span>Toplam cikis</span><strong>'+formatBytes(bwOut)+'</strong></div>'+
+            '<div class="metric-row"><span>Top format</span><strong>'+(fmtItems[0]?escHtml(fmtItems[0].label):'Yok')+'</strong></div>'+
+            '<div class="metric-row"><span>Saglik</span><strong><span class="tag tag-'+(healthTone==='green'?'green':(healthTone==='orange'?'yellow':'red'))+'">'+healthStatus+'</span></strong></div>'+
+          '</div>'+
+          '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">'+
+            '<button class="btn btn-sm btn-secondary" onclick="openSystemControl()"><i class="bi bi-gear"></i> Sunucu</button>'+
+            '<button class="btn btn-sm btn-secondary" onclick="navigate(\'settings-health\')"><i class="bi bi-heart-pulse"></i> Saglik</button>'+
+            '<button class="btn btn-sm btn-secondary" onclick="navigate(\'guided-settings\')"><i class="bi bi-magic"></i> Hizli Ayar</button>'+
+            '<button class="btn btn-sm btn-secondary" onclick="navigate(\'maintenance-center\')"><i class="bi bi-tools"></i> Bakim</button>'+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+      '<div style="display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">'+
+        '<div class="studio-card"><div class="studio-section-title" style="margin-bottom:8px"><span>24 Saat Izleyici</span><button class="btn btn-sm btn-secondary" onclick="navigate(\'analytics\')">Detay</button></div>'+renderTimelineChart((analytics&&analytics.viewers_timeline)||[],'Henuz izleyici verisi yok',function(v){return String(v)})+'</div>'+
+        '<div class="studio-card"><div class="studio-section-title" style="margin-bottom:8px"><span>Format Dagilimi</span><button class="btn btn-sm btn-secondary" onclick="navigate(\'embed-advanced\')">Embed</button></div>'+renderBarList(fmtItems,'Henuz format verisi yok',function(v){return String(v)})+'</div>'+
+        '<div class="studio-card"><div class="studio-section-title" style="margin-bottom:8px"><span>Populer Yayinlar</span><button class="btn btn-sm btn-secondary" onclick="navigate(\'analytics\')">Analitik</button></div>'+
+          (topStreams.length?topStreams.map(function(s){
+            const label=escHtml(s.stream_name||shortKey(s.stream_key));
+            const sid=findStreamIdByKey((streams||[]),s.stream_key);
+            const action=sid?' onclick="navigate(\'stream-detail-'+sid+'\')" style="cursor:pointer"':'';
+            return '<div class="metric-row"'+action+'><span>'+label+'</span><span class="badge">'+fmtInt(s.viewers||0)+' izleyici</span></div>';
+          }).join(''):'<div style="color:var(--text-muted)">Henuz veri yok</div>')+
+        '</div>'+
+        '<div class="studio-card"><div class="studio-section-title" style="margin-bottom:8px"><span>Uyarilar</span><button class="btn btn-sm btn-secondary" onclick="navigate(\'settings-health\')">Yonet</button></div>'+
+          (alerts.length?alerts.slice(0,5).map(function(item){
+            var tone=item.level==='critical'?'critical':item.level==='warning'?'warning':'info';
+            return '<div class="studio-alert '+tone+'" style="margin-bottom:6px"><div style="display:flex;justify-content:space-between;gap:8px"><strong style="font-size:13px">'+escHtml(item.title||item.code||'Uyari')+'</strong><span class="tag '+(item.level==='critical'?'tag-red':item.level==='warning'?'tag-yellow':'tag-blue')+'">'+escHtml(String(item.level||'info').toUpperCase())+'</span></div>'+(item.description?'<div style="font-size:12px;color:var(--text-muted);margin-top:4px">'+escHtml(item.description)+'</div>':'')+'</div>';
+          }).join(''):'<div class="studio-empty" style="padding:18px"><i class="bi bi-check-circle" style="font-size:24px;color:var(--success);display:block;margin-bottom:6px"></i>Aktif uyari yok</div>')+
+        '</div>'+
+      '</div>'+
     '</div>';
   schedulePageRefresh('dashboard',5000);
 }
@@ -1212,22 +1247,65 @@ function startStreamTelemetryLoop(id){
 // ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â STREAMS LIST ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â
 async function renderStreams(c){
   const streams=await api('/api/streams')||[];
+  const live=streams.filter(s=>s.status==='live');
+  const offline=streams.filter(s=>s.status!=='live');
+  const totalViewers=streams.reduce((a,s)=>a+(s.viewer_count||0),0);
+  window._streamsFilter=window._streamsFilter||'all';
+  const filter=window._streamsFilter;
+  const filtered=filter==='live'?live:(filter==='offline'?offline:streams);
   c.innerHTML=
-    '<div class="page-header"><h1 class="page-title">Yayinlar</h1>'+
-      '<button class="btn btn-primary" onclick="navigate(\'create-stream\')">+ Yeni Yayin</button></div>'+
-    '<div class="card">'+(streams.length===0
-      ?'<div class="empty-state"><div class="icon"><i class="bi bi-broadcast"></i></div><h3>Henuz yayin yok</h3><p style="color:var(--text-muted)">Ilk yayininizi olusturun</p></div>'
-      :'<table><thead><tr><th>Yayin</th><th>Durum</th><th>Stream Key</th><th>Izleyici</th><th>Codec</th><th></th></tr></thead><tbody>'+
-        streams.map(s=>'<tr onclick="navigate(\'stream-detail-'+s.id+'\')" style="cursor:pointer">'+
-          '<td><strong>'+escHtml(s.name)+'</strong></td>'+
-          '<td><span class="badge badge-'+s.status+'">'+(s.status==='live'?'CANLI':'Cevrimdisi')+'</span></td>'+
-          '<td><code style="font-size:12px;color:var(--accent)">'+s.stream_key+'</code></td>'+
-          '<td>'+(s.viewer_count||0)+'</td>'+
-          '<td style="font-size:12px;color:var(--text-muted)">'+(s.input_codec||'-')+'</td>'+
-          '<td><button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteStream('+s.id+')"><i class="bi bi-trash"></i></button></td>'+
-        '</tr>').join('')+
-      '</tbody></table>')+
+    '<div class="studio-page">'+
+      '<div class="studio-hero">'+
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px">'+
+          '<div><h1 class="studio-hero-title">Yayin Yonetimi</h1>'+
+          '<p class="studio-hero-sub">Tum yayinlarinizi buradan olusturun, izleyin ve yonetin. Canli yayinlara tiklayarak detay ekranina gecin.</p></div>'+
+          '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
+            '<button class="btn btn-secondary btn-sm" onclick="navigate(\'operations-center\')"><i class="bi bi-sliders"></i> Operasyon</button>'+
+            '<button class="btn btn-primary" onclick="navigate(\'create-stream\')"><i class="bi bi-plus-circle"></i> Yeni Yayin</button>'+
+          '</div>'+
+        '</div>'+
+        '<div class="studio-pill-row" style="margin-top:14px">'+
+          '<span class="studio-pill active"><i class="bi bi-collection"></i> '+fmtInt(streams.length)+' Toplam</span>'+
+          '<span class="studio-pill '+(live.length>0?'active':'')+'"><i class="bi bi-broadcast"></i> '+fmtInt(live.length)+' Canli</span>'+
+          '<span class="studio-pill"><i class="bi bi-people-fill"></i> '+fmtInt(totalViewers)+' Izleyici</span>'+
+        '</div>'+
+      '</div>'+
+      '<div class="studio-toolbar">'+
+        '<div class="studio-toolbar-group">'+
+          '<div class="segmented">'+
+            '<button class="segment '+(filter==='all'?'active':'')+'" onclick="window._streamsFilter=\'all\';navigate(\'streams\')">Tumu ('+streams.length+')</button>'+
+            '<button class="segment '+(filter==='live'?'active':'')+'" onclick="window._streamsFilter=\'live\';navigate(\'streams\')">Canli ('+live.length+')</button>'+
+            '<button class="segment '+(filter==='offline'?'active':'')+'" onclick="window._streamsFilter=\'offline\';navigate(\'streams\')">Cevrimdisi ('+offline.length+')</button>'+
+          '</div>'+
+        '</div>'+
+        '<div class="studio-toolbar-group">'+
+          '<button class="btn btn-sm btn-secondary" onclick="navigate(\'embed-codes\')"><i class="bi bi-code-slash"></i> Embed Kodlari</button>'+
+        '</div>'+
+      '</div>'+
+      (filtered.length===0
+        ?'<div class="studio-empty" style="padding:48px"><i class="bi bi-broadcast" style="font-size:42px;display:block;margin-bottom:14px;opacity:.4"></i><div style="font-size:16px;font-weight:700;margin-bottom:6px">'+(filter==='all'?'Henuz yayin yok':'Bu filtrede yayin yok')+'</div><div style="color:var(--text-muted);font-size:13px">'+(filter==='all'?'Ilk yayininizi olusturmak icin yukardaki butonu kullanin':'Filtreyi degistirerek diger yayinlari gorebilirsiniz')+'</div></div>'
+        :'<div style="display:grid;gap:12px">'+filtered.map(function(s){
+          const isLive=s.status==='live';
+          const borderColor=isLive?'rgba(239,68,68,.2)':'var(--border)';
+          const bgGrad=isLive?'linear-gradient(180deg,#fff 0%,#fef8f8 100%)':'linear-gradient(180deg,#fff 0%,#f8fbff 100%)';
+          return '<div style="display:flex;align-items:center;gap:16px;padding:16px 20px;border:1px solid '+borderColor+';border-radius:18px;cursor:pointer;transition:all .18s;background:'+bgGrad+'" onclick="navigate(\'stream-detail-'+s.id+'\')" onmouseover="this.style.transform=\'translateY(-2px)\';this.style.boxShadow=\'0 12px 28px rgba(37,99,235,.08)\'" onmouseout="this.style.transform=\'none\';this.style.boxShadow=\'none\'">'+
+            '<div style="flex-shrink:0"><span class="badge badge-'+(isLive?'live':'offline')+'">'+(isLive?'CANLI':'Cevrimdisi')+'</span></div>'+
+            '<div style="flex:1;min-width:0">'+
+              '<div style="font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escHtml(s.name)+'</div>'+
+              '<div style="font-size:12px;color:var(--text-muted);margin-top:2px"><code style="color:var(--accent)">'+escHtml(s.stream_key)+'</code></div>'+
+            '</div>'+
+            '<div style="display:flex;align-items:center;gap:16px;flex-shrink:0">'+
+              (isLive?'<div style="text-align:center"><div style="font-size:18px;font-weight:800;color:var(--text-primary)">'+fmtInt(s.viewer_count||0)+'</div><div style="font-size:11px;color:var(--text-muted)">izleyici</div></div>':'')+
+              '<div style="text-align:center;min-width:60px"><div style="font-size:12px;font-weight:600;color:var(--text-secondary)">'+escHtml(s.input_codec||'-')+'</div><div style="font-size:11px;color:var(--text-muted)">codec</div></div>'+
+              '<div style="display:flex;gap:6px">'+
+                '<button class="btn btn-sm btn-secondary btn-icon" onclick="event.stopPropagation();navigate(\'operations-center\');setTimeout(function(){if(window.operationsCenterState)window.operationsCenterState.selectedStreamId=\''+s.id+'\'},100)" title="Operasyon"><i class="bi bi-sliders"></i></button>'+
+                '<button class="btn btn-sm btn-danger btn-icon" onclick="event.stopPropagation();deleteStream('+s.id+')" title="Sil"><i class="bi bi-trash"></i></button>'+
+              '</div>'+
+            '</div>'+
+          '</div>';
+        }).join('')+'</div>')+
     '</div>';
+  schedulePageRefresh('streams',5000);
 }
 async function deleteStream(id){
   if(!confirm('Bu yayini silmek istediginize emin misiniz?'))return;
@@ -1752,6 +1830,7 @@ function renderOperationsDiagnosticsBody(data,urls){
       }).join('')+'</div>'+
       '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">'+
         '<button class="btn btn-secondary btn-sm" onclick=\'openTextInspectModal("DASH MPD",'+JSON.stringify((urls&&urls.dash)||'')+')\'>MPD XML Goster</button>'+
+        '<button class="btn btn-secondary btn-sm" onclick=\'openTextInspectModal("DASH Ses MPD",'+JSON.stringify((urls&&urls.dash_audio)||'')+')\'>DASH Ses MPD</button>'+
         '<button class="btn btn-secondary btn-sm" onclick=\'openTextInspectModal("HLS Master",'+JSON.stringify((urls&&urls.hls)||'')+')\'>HLS Master Goster</button>'+
         '<button class="btn btn-secondary btn-sm" onclick=\'openTextInspectModal("HLS Media",'+JSON.stringify((urls&&urls.hls_media)||'')+')\'>HLS Media Goster</button>'+
         '<button class="btn btn-secondary btn-sm" onclick=\'openTextInspectModal("Prometheus Metrics","/metrics")\'>Prometheus Metrics</button>'+
@@ -2130,30 +2209,53 @@ async function renderEmbedCodes(c){
 // ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â SETTINGS - GENERAL ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â
 async function renderSettingsGeneral(c){
   const s=await api('/api/settings');
+  window._generalAdvanced=window._generalAdvanced||false;
+  const adv=window._generalAdvanced;
   c.innerHTML=
-    '<div class="page-header"><h1 class="page-title">Genel Ayarlar</h1></div>'+
-    '<div class="card-grid card-grid-2">'+
-      '<div class="card">'+
-        '<div class="card-title" style="margin-bottom:16px">Kimlik ve Yerellesme</div>'+
-        settingInput('server_name','Sunucu Adi',s.server_name||'FluxStream','text','Sunucu goruntuleme adi')+
-        settingSelect('language','Dil',s.language||'tr',[{value:'tr',label:'Turkce'},{value:'en',label:'English'},{value:'de',label:'Deutsch'},{value:'es',label:'Espanol'},{value:'fr',label:'Francais'}],'Kurulumda secilen dil burada degistirilebilir. Login, setup ve panel kabugu bu secime gore acilir.')+
-        settingInput('timezone','Saat Dilimi',s.timezone||'Europe/Istanbul','text','Tarih ve saat gosterimleri bu timezone ile yorumlanir.')+
-        '<div class="form-group"><label class="form-label">Tema</label><select class="form-select setting-input" data-key="theme"><option value="light" '+((s.theme||'light')==='light'?'selected':'')+'>Light</option><option value="dark" '+((s.theme||'')==='dark'?'selected':'')+'>Dark</option><option value="minimal" '+((s.theme||'')==='minimal'?'selected':'')+'>Minimal</option></select><div class="form-hint">Admin panelinin gorsel yonunu belirler. Su an acik tema varsayilandir.</div></div>'+
-        '<div class="setting-row"><div><div class="setting-label">Kolay mod acik</div><div class="setting-desc">Yeni kurulumlarda rehber odakli ayarlari one cikarir.</div></div><label class="toggle"><input type="checkbox" class="setting-input" data-key="guided_mode_enabled" '+(s.guided_mode_enabled!=='false'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+    '<div class="studio-page">'+
+      '<div class="studio-hero">'+
+        '<h1 class="studio-hero-title"><i class="bi bi-gear" style="margin-right:10px"></i>Genel Ayarlar</h1>'+
+        '<p class="studio-hero-sub">Sunucunun omurgasini olusturan temel yapilandirma ayarlari. Basit mod en sik kullanilan ayarlari gosterir; gelismis mod tum teknik alanlari acar.</p>'+
       '</div>'+
-      '<div class="card">'+
-        '<div class="card-title" style="margin-bottom:16px">Sunucu ve Panel Varsayilanlari</div>'+
-        settingInput('http_port','HTTP Port',s.http_port||'8844','number','Web arayuzu portu')+
-        settingInput('https_port','HTTPS Port',s.https_port||'443','number','SSL portu')+
-        settingInput('embed_domain','Varsayilan Public Domain',s.embed_domain||'','text','Link uretiminde kullanilan ilk alan adi. Bossa mevcut host kullanilir.')+
-        settingInput('embed_http_port','Varsayilan Public HTTP Port',s.embed_http_port||s.http_port||'8844','number','Embed ve player linkleri icin')+
-        settingInput('embed_https_port','Varsayilan Public HTTPS Port',s.embed_https_port||s.https_port||'443','number','SSL ile uretilen linkler icin')+
-        '<div class="setting-row"><div><div class="setting-label">Player kalite secici</div><div class="setting-desc">ABR yayinlarda kullanici kaliteyi elle de secebilir.</div></div><label class="toggle"><input type="checkbox" class="setting-input" data-key="player_quality_selector" '+(s.player_quality_selector!=='false'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
-        '<div class="setting-row"><div><div class="setting-label">Otomatik bakim</div><div class="setting-desc">Temizleme ve bakim islerini zamanli calistirir.</div></div><label class="toggle"><input type="checkbox" class="setting-input" data-key="maintenance_auto_cleanup" '+(s.maintenance_auto_cleanup!=='false'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
-        settingInput('recordings_retention_days','Kayit Saklama Suresi (gun)',s.recordings_retention_days||'30','number','0 verilirse otomatik silme yapilmaz.')+
+      '<div class="studio-toolbar">'+
+        '<div class="studio-toolbar-group"><div class="segmented"><button class="segment '+(!adv?'active':'')+'" onclick="window._generalAdvanced=false;navigate(\'settings-general\')">Basit Mod</button><button class="segment '+(adv?'active':'')+'" onclick="window._generalAdvanced=true;navigate(\'settings-general\')">Gelismis Mod</button></div></div>'+
+        '<div class="studio-toolbar-group"><button class="btn btn-primary btn-sm" onclick="saveGeneralSettingsExtended()"><i class="bi bi-check-lg"></i> Tum Ayarlari Kaydet</button></div>'+
       '</div>'+
-    '</div>'+
-    '<div style="margin-top:16px"><button class="btn btn-primary" onclick="saveGeneralSettingsExtended()">Kaydet</button></div>';
+      '<div class="studio-grid studio-grid-2">'+
+        '<div class="studio-card">'+
+          '<div class="studio-section-title"><span><i class="bi bi-person-badge" style="margin-right:8px;color:var(--accent)"></i>Kimlik ve Yerellesme</span></div>'+
+          '<div class="studio-section-sub" style="margin-bottom:12px">Sunucu adi, dil ve saat dilimi ayarlari.</div>'+
+          settingInput('server_name','Sunucu Adi',s.server_name||'FluxStream','text','Panel basliginda ve embed kodlarinda goruntulenir.')+
+          settingSelect('language','Dil',s.language||'tr',[{value:'tr',label:'Turkce'},{value:'en',label:'English'},{value:'de',label:'Deutsch'},{value:'es',label:'Espanol'},{value:'fr',label:'Francais'}],'Login, setup ve panel arayuzu bu dilde acilir.')+
+          settingInput('timezone','Saat Dilimi',s.timezone||'Europe/Istanbul','text','Tarih ve saat gosterimleri bu timezone ile yorumlanir.')+
+          '<div class="form-group"><label class="form-label">Tema</label><select class="form-select setting-input" data-key="theme"><option value="light" '+((s.theme||'light')==='light'?'selected':'')+'>Acik (Light)</option><option value="dark" '+((s.theme||'')==='dark'?'selected':'')+'>Koyu (Dark)</option><option value="minimal" '+((s.theme||'')==='minimal'?'selected':'')+'>Minimal</option></select><div class="form-hint">Admin panelinin gorsel temasini belirler.</div></div>'+
+          '<div class="setting-row"><div><div class="setting-label">Kolay Mod</div><div class="setting-desc">Acikken Hizli Ayarlar ekrani varsayilan olarak one cikar.</div></div><label class="toggle"><input type="checkbox" class="setting-input" data-key="guided_mode_enabled" '+(s.guided_mode_enabled!=='false'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+        '</div>'+
+        '<div class="studio-card">'+
+          '<div class="studio-section-title"><span><i class="bi bi-globe" style="margin-right:8px;color:var(--accent)"></i>Public Erisim ve Portlar</span></div>'+
+          '<div class="studio-section-sub" style="margin-bottom:12px">Embed linkleri ve player URL\'leri bu ayarlara gore uretilir.</div>'+
+          settingInput('embed_domain','Public Domain / IP',s.embed_domain||'','text','Bossa mevcut host kullanilir. Ornek: stream.ornek.com')+
+          '<div class="studio-form-grid">'+
+            settingInput('embed_http_port','Public HTTP Port',s.embed_http_port||s.http_port||'8844','number','Embed linklerinde')+
+            settingInput('embed_https_port','Public HTTPS Port',s.embed_https_port||s.https_port||'443','number','SSL linklerinde')+
+          '</div>'+
+          '<div class="setting-row"><div><div class="setting-label">Player Kalite Secici</div><div class="setting-desc">ABR yayinlarda izleyici kaliteyi elle secebilir.</div></div><label class="toggle"><input type="checkbox" class="setting-input" data-key="player_quality_selector" '+(s.player_quality_selector!=='false'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+        '</div>'+
+      '</div>'+
+      (adv?'<div class="studio-grid studio-grid-2">'+
+        '<div class="studio-card">'+
+          '<div class="studio-section-title"><span><i class="bi bi-hdd-rack" style="margin-right:8px;color:var(--text-muted)"></i>Sunucu Portlari</span><span class="tag tag-blue">Gelismis</span></div>'+
+          '<div class="studio-section-sub" style="margin-bottom:12px">Degistirirseniz sunucu restart gerektirir.</div>'+
+          settingInput('http_port','Web HTTP Port',s.http_port||'8844','number','Admin paneli portu')+
+          settingInput('https_port','Web HTTPS Port',s.https_port||'443','number','SSL portu')+
+        '</div>'+
+        '<div class="studio-card">'+
+          '<div class="studio-section-title"><span><i class="bi bi-tools" style="margin-right:8px;color:var(--text-muted)"></i>Bakim ve Saklama</span><span class="tag tag-blue">Gelismis</span></div>'+
+          '<div class="setting-row"><div><div class="setting-label">Otomatik Bakim</div><div class="setting-desc">Temizleme ve bakim islerini zamanli calistirir.</div></div><label class="toggle"><input type="checkbox" class="setting-input" data-key="maintenance_auto_cleanup" '+(s.maintenance_auto_cleanup!=='false'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+          settingInput('recordings_retention_days','Kayit Saklama (gun)',s.recordings_retention_days||'30','number','0 = sinirsiz')+
+        '</div>'+
+      '</div>':'')+
+    '</div>';
 }
 
 // ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â SETTINGS - PROTOCOLS ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â
@@ -2162,43 +2264,68 @@ async function renderSettingsEmbed(c){
   const publicConfig=getPublicBase(s);
   const streamHost=getConfiguredDomain(s);
   c.innerHTML=
-    '<div class="page-header"><h1 class="page-title">Alan Adi ve Embed</h1></div>'+
-    '<div class="card" style="max-width:760px;margin-bottom:16px">'+
-      '<div class="card-title" style="margin-bottom:12px">Public Erisim Ayarlari</div>'+
-      '<div style="font-size:13px;color:var(--text-muted);line-height:1.7;margin-bottom:16px">Bu sayfa, embed kodlari ve izleme linklerinde kullanilan public alan adini belirler. Web erisimi HTTP/HTTPS portlarindan gider, yayin gonderimi ise RTMP/RTMPS gibi kendi portlarindan devam eder.</div>'+
-      settingInput('embed_domain','Public Domain / IP',s.embed_domain||'','text','Bos birakirsaniz panelin acildigi host kullanilir. Ornek: stream.ornek.com')+
-      settingInput('embed_http_port','Public HTTP Port',s.embed_http_port||s.http_port||'8844','number','HTTP uzerinden uretilen player ve embed linkleri icin')+
-      settingInput('embed_https_port','Public HTTPS Port',s.embed_https_port||s.https_port||'443','number','SSL aktifse genelde 443 kullanilir')+
-      '<div class="setting-row"><div><div class="setting-label">Embed Linklerinde HTTPS Kullan</div><div class="setting-desc">Yalnizca SSL etkin ve sertifika hazirsa player ve embed linkleri HTTPS olarak uretilir. Hazir degilse sistem HTTP kullanir.</div></div>'+
-        '<label class="toggle"><input type="checkbox" class="setting-input" data-key="embed_use_https" '+(shouldUsePublicHTTPS(s)?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
-      '<button class="btn btn-primary" style="margin-top:8px" onclick="saveSettingsCategory(\'embed\')">Kaydet</button>'+
-    '</div>'+
-    '<div class="card" style="max-width:760px">'+
-      '<div class="card-title" style="margin-bottom:12px">Canli Ornek</div>'+
-      copyField('Player Base URL',publicConfig.base)+
-      copyField('RTMP Sunucu','rtmp://'+streamHost+':'+(s.rtmp_port||'1935')+'/live')+
-      copyField('RTMPS Sunucu','rtmps://'+streamHost+':'+(s.rtmps_port||'1936')+'/live')+
+    '<div class="studio-page">'+
+      '<div class="studio-hero">'+
+        '<h1 class="studio-hero-title"><i class="bi bi-globe2" style="margin-right:10px"></i>Alan Adi ve Embed</h1>'+
+        '<p class="studio-hero-sub">Embed kodlari ve izleme linklerinde kullanilan public alan adini buradan belirleyin. Web erisimi HTTP/HTTPS portlarindan gider, yayin gonderimi RTMP/RTMPS portlarindan devam eder.</p>'+
+      '</div>'+
+      '<div class="studio-grid studio-grid-2">'+
+        '<div class="studio-card">'+
+          '<div class="studio-section-title"><span>Public Erisim Ayarlari</span></div>'+
+          '<div class="studio-section-sub" style="margin-bottom:12px">Bu alanlar uretilen tum embed ve player linklerini etkiler.</div>'+
+          settingInput('embed_domain','Public Domain / IP',s.embed_domain||'','text','Bos birakirsaniz mevcut host kullanilir. Ornek: stream.ornek.com')+
+          '<div class="studio-form-grid">'+
+            settingInput('embed_http_port','Public HTTP Port',s.embed_http_port||s.http_port||'8844','number','HTTP linkleri icin')+
+            settingInput('embed_https_port','Public HTTPS Port',s.embed_https_port||s.https_port||'443','number','HTTPS linkleri icin')+
+          '</div>'+
+          '<div class="setting-row"><div><div class="setting-label">HTTPS Link Uret</div><div class="setting-desc">SSL etkin ve sertifika hazirsa embed linkleri HTTPS olur.</div></div><label class="toggle"><input type="checkbox" class="setting-input" data-key="embed_use_https" '+(shouldUsePublicHTTPS(s)?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+          '<button class="btn btn-primary" style="margin-top:12px" onclick="saveSettingsCategory(\'embed\')"><i class="bi bi-check-lg"></i> Kaydet</button>'+
+        '</div>'+
+        '<div class="studio-card">'+
+          '<div class="studio-section-title"><span>Canli Onizleme</span></div>'+
+          '<div class="studio-section-sub" style="margin-bottom:12px">Mevcut ayarlarla uretilen ornek URL\'ler. Kopyalayip kullanabilirsiniz.</div>'+
+          copyField('Player Base URL',publicConfig.base)+
+          copyField('RTMP Sunucu','rtmp://'+streamHost+':'+(s.rtmp_port||'1935')+'/live')+
+          copyField('RTMPS Sunucu','rtmps://'+streamHost+':'+(s.rtmps_port||'1936')+'/live')+
+          '<div class="studio-alert info" style="margin-top:12px"><i class="bi bi-info-circle" style="margin-right:6px"></i>Bu URL\'ler sol paneldeki ayarlara gore otomatik uretilir. Ayarlar degisince buradaki ornekler de guncellenir.</div>'+
+        '</div>'+
+      '</div>'+
     '</div>';
 }
 
 async function renderSettingsProtocols(c){
   const s=await api('/api/settings');
+  const protos=[
+    {name:'RTMP',desc:'En yaygin - OBS, Wirecast, vMix',icon:'bi-broadcast',key:'rtmp_enabled',port:'rtmp_port',def:'1935',extra:[settingInput('rtmp_chunk_size','Chunk Size',s.rtmp_chunk_size||'4096','number',''),settingInput('rtmp_max_conns','Maks Baglanti',s.rtmp_max_conns||'100','number','')]},
+    {name:'RTMPS',desc:'Sifreli RTMP - guvenli aglar',icon:'bi-lock',key:'rtmps_enabled',port:'rtmps_port',def:'1936',extra:[]},
+    {name:'SRT',desc:'Dusuk gecikme + guvenilmez ag',icon:'bi-lightning',key:'srt_enabled',port:'srt_port',def:'9000',extra:[settingInput('srt_latency','Latency (ms)',s.srt_latency||'120','number','')]},
+    {name:'RTP',desc:'Profesyonel encoder push',icon:'bi-arrow-right-circle',key:'rtp_enabled',port:'rtp_port',def:'5004',extra:[]},
+    {name:'RTSP',desc:'IP kameralar, profesyonel encoderlar',icon:'bi-camera-video',key:'rtsp_enabled',port:'rtsp_port',def:'8554',extra:[]},
+    {name:'WebRTC/WHIP',desc:'Tarayicidan dogrudan yayin',icon:'bi-browser-chrome',key:'webrtc_enabled',port:'webrtc_port',def:'8855',extra:[]},
+    {name:'MPEG-TS',desc:'Uydu alici, profesyonel broadcast',icon:'bi-reception-4',key:'mpegts_enabled',port:'mpegts_port',def:'9001',extra:[]}
+  ];
+  const activeCount=protos.filter(function(p){return s[p.key]==='true'}).length;
   c.innerHTML=
-    '<div class="page-header"><h1 class="page-title">Giris Protokolleri</h1>'+
-      '<p style="color:var(--text-muted);font-size:13px">Encoder\'lardan kabul edilen protokoller</p></div>'+
-    protoCard('RTMP','En yaygin - OBS, Wirecast, vMix','rtmp_enabled',s,'rtmp_port',s.rtmp_port||'1935',[
-      settingInput('rtmp_chunk_size','Chunk Size',s.rtmp_chunk_size||'4096','number',''),
-      settingInput('rtmp_max_conns','Maks Baglanti',s.rtmp_max_conns||'100','number',''),
-    ])+
-    protoCard('RTMPS','Sifreli RTMP - guvenli aglar','rtmps_enabled',s,'rtmps_port',s.rtmps_port||'1936',[])+
-    protoCard('SRT','Dusuk gecikme + guvenilmez aglarda guclu','srt_enabled',s,'srt_port',s.srt_port||'9000',[
-      settingInput('srt_latency','Latency (ms)',s.srt_latency||'120','number',''),
-    ])+
-    protoCard('RTP','Profesyonel encoder push','rtp_enabled',s,'rtp_port',s.rtp_port||'5004',[])+
-    protoCard('RTSP','IP kameralar, profesyonel encoderlar','rtsp_enabled',s,'rtsp_port',s.rtsp_port||'8554',[])+
-    protoCard('WebRTC/WHIP','Tarayicidan dogrudan yayin','webrtc_enabled',s,'webrtc_port',s.webrtc_port||'8855',[])+
-    protoCard('MPEG-TS','Uydu alici, profesyonel broadcast','mpegts_enabled',s,'mpegts_port',s.mpegts_port||'9001',[])+
-    '<button class="btn btn-primary" onclick="saveSettingsCategory(\'protocols\')">Tum Protokolleri Kaydet</button>';
+    '<div class="studio-page">'+
+      '<div class="studio-hero">'+
+        '<h1 class="studio-hero-title"><i class="bi bi-arrow-down-circle" style="margin-right:10px"></i>Giris Protokolleri</h1>'+
+        '<p class="studio-hero-sub">Encoder\'lardan kabul edilen yayin protokollerini buradan yonetin. Kullanmadiginiz protokolleri kapatarak guvenlik yuzeyini daraltabilirsiniz.</p>'+
+        '<div class="studio-pill-row" style="margin-top:14px"><span class="studio-pill active"><i class="bi bi-check-circle"></i> '+activeCount+'/'+protos.length+' Aktif</span></div>'+
+      '</div>'+
+      '<div style="display:grid;gap:14px">'+
+        protos.map(function(p){
+          var enabled=s[p.key]==='true';
+          return '<div class="studio-card" style="border-left:4px solid '+(enabled?'var(--success)':'var(--border)')+'">'+
+            '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap">'+
+              '<div style="display:flex;align-items:center;gap:12px"><i class="bi '+p.icon+'" style="font-size:22px;color:'+(enabled?'var(--accent)':'var(--text-muted)')+'"></i><div><div style="font-weight:700;font-size:15px">'+p.name+' <span class="tag '+(enabled?'tag-green':'tag-red')+'">'+(enabled?'Aktif':'Kapali')+'</span></div><div style="font-size:12px;color:var(--text-muted)">'+p.desc+'</div></div></div>'+
+              '<div style="display:flex;align-items:center;gap:14px"><div style="font-size:13px;color:var(--text-secondary)">Port: <strong>'+(s[p.port]||p.def)+'</strong></div><label class="toggle"><input type="checkbox" class="setting-input" data-key="'+p.key+'" '+(enabled?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+            '</div>'+
+            '<div class="studio-form-grid" style="margin-top:10px">'+settingInput(p.port,'Port',s[p.port]||p.def,'number','')+p.extra.join('')+'</div>'+
+          '</div>';
+        }).join('')+
+      '</div>'+
+      '<div style="margin-top:16px"><button class="btn btn-primary" onclick="saveSettingsCategory(\'protocols\')"><i class="bi bi-check-lg"></i> Tum Protokolleri Kaydet</button></div>'+
+    '</div>';
 }
 function protoCard(name,desc,enableKey,s,portKey,portVal,extra){
   const enabled=s[enableKey]==='true';
@@ -2215,27 +2342,39 @@ function protoCard(name,desc,enableKey,s,portKey,portVal,extra){
 // ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â SETTINGS - OUTPUTS ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â
 async function renderSettingsOutputs(c){
   const s=await api('/api/settings');
+  const outs=[
+    {name:'HLS',desc:'Apple HLS - en uyumlu, adaptif',icon:'bi-play-circle',key:'hls_enabled',cat:'video',extra:[settingInput('hls_segment_duration','Segment (sn)',s.hls_segment_duration||'2','number',''),settingInput('hls_playlist_length','Playlist Uzunlugu',s.hls_playlist_length||'6','number','')]},
+    {name:'Low Latency HLS',desc:'2 saniye alti gecikme',icon:'bi-lightning',key:'hls_ll_enabled',cat:'video',extra:[]},
+    {name:'DASH',desc:'MPEG-DASH adaptive streaming',icon:'bi-speedometer2',key:'dash_enabled',cat:'video',extra:[settingInput('dash_segment_duration','Segment (sn)',s.dash_segment_duration||'2','number','')]},
+    {name:'HTTP-FLV',desc:'Ultra dusuk gecikme (~1sn)',icon:'bi-film',key:'httpflv_enabled',cat:'video',extra:[]},
+    {name:'WebRTC/WHEP',desc:'Sub-second gecikme (<500ms)',icon:'bi-webcam',key:'whep_enabled',cat:'video',extra:[]},
+    {name:'MP3',desc:'MP3 ses akisi',icon:'bi-music-note-beamed',key:'mp3_enabled',cat:'audio',extra:[settingInput('mp3_bitrate','Bitrate (kbps)',s.mp3_bitrate||'128','number','')]},
+    {name:'AAC',desc:'Yuksek kalite ses',icon:'bi-soundwave',key:'aac_out_enabled',cat:'audio',extra:[]},
+    {name:'Icecast',desc:'Icecast uyumlu akis',icon:'bi-broadcast',key:'icecast_enabled',cat:'audio',extra:[settingInput('icecast_port','Port',s.icecast_port||'8000','number','')]}
+  ];
+  const videoOuts=outs.filter(function(o){return o.cat==='video'});
+  const audioOuts=outs.filter(function(o){return o.cat==='audio'});
+  const activeCount=outs.filter(function(o){return s[o.key]==='true'}).length;
+  function renderOutputItem(o){
+    var enabled=s[o.key]==='true';
+    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border:1px solid '+(enabled?'rgba(16,185,129,.2)':'var(--border)')+';border-radius:16px;background:'+(enabled?'linear-gradient(180deg,#f0fdf4,#f8fbff)':'#fff')+'">'+
+      '<div style="display:flex;align-items:center;gap:12px"><i class="bi '+o.icon+'" style="font-size:20px;color:'+(enabled?'var(--success)':'var(--text-muted)')+'"></i><div><div style="font-weight:700;font-size:14px">'+o.name+' <span class="tag '+(enabled?'tag-green':'tag-red')+'" style="margin-left:4px">'+(enabled?'Acik':'Kapali')+'</span></div><div style="font-size:12px;color:var(--text-muted)">'+o.desc+'</div></div></div>'+
+      '<label class="toggle"><input type="checkbox" class="setting-input" data-key="'+o.key+'" '+(enabled?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+      (o.extra.length?'<div class="studio-form-grid" style="margin-top:6px;padding-left:44px">'+o.extra.join('')+'</div>':'');
+  }
   c.innerHTML=
-    '<div class="page-header"><h1 class="page-title">Cikis Formatlari</h1>'+
-      '<p style="color:var(--text-muted);font-size:13px">Izleyicilere sunulan formatlar</p></div>'+
-    outputCard('HLS','Apple HLS - en uyumlu','hls_enabled',s,[
-      settingInput('hls_segment_duration','Segment Suresi (sn)',s.hls_segment_duration||'2','number',''),
-      settingInput('hls_playlist_length','Playlist Uzunlugu',s.hls_playlist_length||'6','number',''),
-    ])+
-    outputCard('Low Latency HLS','2 saniye alti gecikme','hls_ll_enabled',s,[])+
-    outputCard('DASH','MPEG-DASH adaptive','dash_enabled',s,[
-      settingInput('dash_segment_duration','Segment Suresi (sn)',s.dash_segment_duration||'2','number',''),
-    ])+
-    outputCard('HTTP-FLV','Ultra dusuk gecikme (~1sn)','httpflv_enabled',s,[])+
-    outputCard('WebRTC/WHEP','Sub-second gecikme (<500ms)','whep_enabled',s,[])+
-    outputCard('MP3/Icecast','MP3 ses akisi','mp3_enabled',s,[
-      settingInput('mp3_bitrate','Bitrate (kbps)',s.mp3_bitrate||'128','number',''),
-    ])+
-    outputCard('AAC','Yuksek kalite ses','aac_out_enabled',s,[])+
-    outputCard('Icecast','Icecast uyumlu akis','icecast_enabled',s,[
-      settingInput('icecast_port','Icecast Port',s.icecast_port||'8000','number',''),
-    ])+
-    '<button class="btn btn-primary" onclick="saveSettingsCategory(\'outputs\')">Tum Cikislari Kaydet</button>';
+    '<div class="studio-page">'+
+      '<div class="studio-hero">'+
+        '<h1 class="studio-hero-title"><i class="bi bi-arrow-up-circle" style="margin-right:10px"></i>Cikis Formatlari</h1>'+
+        '<p class="studio-hero-sub">Izleyicilere sunulan video ve ses formatlarini buradan yonetin. Kullanmadiginiz formatlari kapatarak sunucu yukunu azaltabilirsiniz.</p>'+
+        '<div class="studio-pill-row" style="margin-top:14px"><span class="studio-pill active"><i class="bi bi-check-circle"></i> '+activeCount+'/'+outs.length+' Aktif Format</span></div>'+
+      '</div>'+
+      '<div class="studio-grid studio-grid-2">'+
+        '<div class="studio-card"><div class="studio-section-title"><span><i class="bi bi-camera-video" style="margin-right:8px;color:var(--accent)"></i>Video Formatlari</span></div><div style="display:grid;gap:10px;margin-top:10px">'+videoOuts.map(renderOutputItem).join('')+'</div></div>'+
+        '<div class="studio-card"><div class="studio-section-title"><span><i class="bi bi-music-note-beamed" style="margin-right:8px;color:var(--accent)"></i>Ses Formatlari</span></div><div style="display:grid;gap:10px;margin-top:10px">'+audioOuts.map(renderOutputItem).join('')+'</div></div>'+
+      '</div>'+
+      '<div style="margin-top:16px"><button class="btn btn-primary" onclick="saveSettingsCategory(\'outputs\')"><i class="bi bi-check-lg"></i> Tum Cikislari Kaydet</button></div>'+
+    '</div>';
 }
 function outputCard(name,desc,enableKey,s,extra){
   const enabled=s[enableKey]==='true';
@@ -2309,16 +2448,45 @@ async function uploadSSL(target){
 // ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â SETTINGS - SECURITY ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â
 async function renderSettingsSecurity(c){
   const s=await api('/api/settings');
+  const streamKeyOn=s.stream_key_required==='true';
+  const tokenOn=s.token_enabled==='true';
+  const riskLevel=(!streamKeyOn&&!tokenOn)?'Dusuk':(streamKeyOn&&tokenOn?'Yuksek':'Orta');
+  const riskTone=riskLevel==='Yuksek'?'green':(riskLevel==='Orta'?'yellow':'red');
   c.innerHTML=
-    '<div class="page-header"><h1 class="page-title">Guvenlik Ayarlari</h1></div>'+
-    '<div class="card" style="max-width:700px">'+
-      '<div class="setting-row"><div><div class="setting-label">Stream Key Zorunlu</div><div class="setting-desc">Yayin icin stream key gerektirir</div></div>'+
-        '<label class="toggle"><input type="checkbox" class="setting-input" data-key="stream_key_required" '+(s.stream_key_required==='true'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
-      '<div class="setting-row"><div><div class="setting-label">Token Dogrulama</div><div class="setting-desc">Izleme icin token gerektirir</div></div>'+
-        '<label class="toggle"><input type="checkbox" class="setting-input" data-key="token_enabled" '+(s.token_enabled==='true'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
-      settingInput('token_duration','Token Suresi (sn)',s.token_duration||'60','number','')+
-      settingInput('rate_limit','Rate Limit (istek/sn)',s.rate_limit||'100','number','')+
-      '<button class="btn btn-primary" style="margin-top:8px" onclick="saveSettingsCategory(\'security\')">Kaydet</button>'+
+    '<div class="studio-page">'+
+      '<div class="studio-hero">'+
+        '<h1 class="studio-hero-title"><i class="bi bi-shield-lock" style="margin-right:10px"></i>Guvenlik Ayarlari</h1>'+
+        '<p class="studio-hero-sub">Yayin gonderimine ve izleme erisimini koruma altina alan ayarlar. Koruma seviyesi arttirilirsa yetkisiz erisim engellenir ancak entegrasyon karmasikligi artar.</p>'+
+        '<div class="studio-pill-row" style="margin-top:14px">'+
+          '<span class="studio-pill '+(riskTone==='green'?'active':'')+'"><i class="bi bi-shield-check"></i> Koruma: '+riskLevel+'</span>'+
+          '<span class="studio-pill '+(streamKeyOn?'active':'')+'"><i class="bi bi-key"></i> Stream Key: '+(streamKeyOn?'Zorunlu':'Serbest')+'</span>'+
+          '<span class="studio-pill '+(tokenOn?'active':'')+'"><i class="bi bi-lock"></i> Token: '+(tokenOn?'Aktif':'Kapali')+'</span>'+
+        '</div>'+
+      '</div>'+
+      '<div class="studio-grid studio-grid-2">'+
+        '<div class="studio-card">'+
+          '<div class="studio-section-title"><span><i class="bi bi-key" style="margin-right:8px;color:var(--accent)"></i>Yayin Korumasi</span></div>'+
+          '<div class="studio-section-sub" style="margin-bottom:14px">Encoder\'larin yayin gonderirken dogrulama gereksinimi.</div>'+
+          '<div class="setting-row"><div><div class="setting-label">Stream Key Zorunlu</div><div class="setting-desc">Kapatilirsa herhangi bir key ile yayin gonderilebilir. <strong>Onerilir: Acik</strong></div></div>'+
+            '<label class="toggle"><input type="checkbox" class="setting-input" data-key="stream_key_required" '+(streamKeyOn?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+          (!streamKeyOn?'<div class="studio-alert warning" style="margin-top:10px"><i class="bi bi-exclamation-triangle" style="margin-right:6px"></i><strong>Risk:</strong> Stream key kontrolu kapali. Herkes RTMP ile yayin gonderebilir.</div>':'')+
+        '</div>'+
+        '<div class="studio-card">'+
+          '<div class="studio-section-title"><span><i class="bi bi-lock" style="margin-right:8px;color:var(--accent)"></i>Izleme Korumasi</span></div>'+
+          '<div class="studio-section-sub" style="margin-bottom:14px">Izleyicilerin yayin izlerken token sunmasini zorunlu kilar.</div>'+
+          '<div class="setting-row"><div><div class="setting-label">Token Dogrulama</div><div class="setting-desc">Acilirsa izleme linkleri gecerli token olmadan calismaz.</div></div>'+
+            '<label class="toggle"><input type="checkbox" class="setting-input" data-key="token_enabled" '+(tokenOn?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+          settingInput('token_duration','Token Gecerlilik Suresi (sn)',s.token_duration||'60','number','Token uretildikten sonra bu kadar sure gecerli kalir. Onerilen: 60-3600')+
+          (tokenOn?'<div class="studio-alert info" style="margin-top:10px"><i class="bi bi-info-circle" style="margin-right:6px"></i>Token uretimi icin <a href="#" onclick="navigate(\'security-tokens\');return false" style="color:var(--accent);font-weight:600">Tokenlar</a> ekranini kullanin.</div>':'')+
+        '</div>'+
+      '</div>'+
+      '<div class="studio-card">'+
+        '<div class="studio-section-title"><span><i class="bi bi-speedometer" style="margin-right:8px;color:var(--accent)"></i>Trafik Sinirlamasi</span></div>'+
+        '<div class="studio-form-grid" style="margin-top:10px">'+
+          settingInput('rate_limit','Rate Limit (istek/sn)',s.rate_limit||'100','number','Ani ve asiri istekleri sinirlar. Cok dusuk degerler normal izleyicileri de etkileyebilir. Onerilen: 50-200')+
+        '</div>'+
+      '</div>'+
+      '<div style="margin-top:16px"><button class="btn btn-primary" onclick="saveSettingsCategory(\'security\')"><i class="bi bi-check-lg"></i> Guvenlik Ayarlarini Kaydet</button></div>'+
     '</div>';
 }
 
@@ -2558,18 +2726,40 @@ async function renderSettingsStorage(c){
 // ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â SETTINGS - TRANSCODE ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â
 async function renderSettingsTranscode(c){
   const s=await api('/api/settings');
+  const gpuMode=(s.gpu_accel||'none').toUpperCase();
+  const gpuIcons={NONE:'bi-cpu',NVENC:'bi-gpu-card',QSV:'bi-gpu-card',AMF:'bi-gpu-card'};
   c.innerHTML=
-    '<div class="page-header"><h1 class="page-title">Transkod / FFmpeg</h1></div>'+
-    '<div class="card" style="max-width:700px">'+
-      settingInput('ffmpeg_path','FFmpeg Yolu',s.ffmpeg_path||'ffmpeg','text','FFmpeg calistirilabilir dosya yolu')+
-      '<div class="form-group"><label class="form-label">GPU Hizlandirma</label>'+
-        '<select class="form-select setting-input" data-key="gpu_accel">'+
-          '<option value="none" '+(s.gpu_accel==='none'?'selected':'')+'>Yok (CPU)</option>'+
-          '<option value="nvenc" '+(s.gpu_accel==='nvenc'?'selected':'')+'>NVIDIA NVENC</option>'+
-          '<option value="qsv" '+(s.gpu_accel==='qsv'?'selected':'')+'>Intel Quick Sync</option>'+
-          '<option value="amf" '+(s.gpu_accel==='amf'?'selected':'')+'>AMD AMF</option>'+
-        '</select></div>'+
-      '<button class="btn btn-primary" style="margin-top:8px" onclick="saveSettingsCategory(\'transcode\')">Kaydet</button>'+
+    '<div class="studio-page">'+
+      '<div class="studio-hero">'+
+        '<h1 class="studio-hero-title"><i class="bi bi-cpu" style="margin-right:10px"></i>Transkod / FFmpeg</h1>'+
+        '<p class="studio-hero-sub">Canli transkod ve ABR katman uretimi icin FFmpeg yapilandirmasi. GPU hizlandirma aktifse performans onemli olcude artar.</p>'+
+        '<div class="studio-pill-row" style="margin-top:14px"><span class="studio-pill active"><i class="bi '+(gpuIcons[gpuMode]||'bi-cpu')+'"></i> GPU: '+gpuMode+'</span></div>'+
+      '</div>'+
+      '<div class="studio-grid studio-grid-2">'+
+        '<div class="studio-card">'+
+          '<div class="studio-section-title"><span>FFmpeg Ayarlari</span></div>'+
+          settingInput('ffmpeg_path','FFmpeg Yolu',s.ffmpeg_path||'ffmpeg','text','FFmpeg calistirilabilir dosya yolu. Sistem PATH\'inde ise sadece "ffmpeg" yeterli.')+
+          '<div class="form-group"><label class="form-label">GPU Hizlandirma</label>'+
+            '<select class="form-select setting-input" data-key="gpu_accel">'+
+              '<option value="none" '+(s.gpu_accel==='none'||!s.gpu_accel?'selected':'')+'>Yok (CPU)</option>'+
+              '<option value="nvenc" '+(s.gpu_accel==='nvenc'?'selected':'')+'>NVIDIA NVENC</option>'+
+              '<option value="qsv" '+(s.gpu_accel==='qsv'?'selected':'')+'>Intel Quick Sync</option>'+
+              '<option value="amf" '+(s.gpu_accel==='amf'?'selected':'')+'>AMD AMF</option>'+
+            '</select>'+
+            '<div class="form-hint">GPU varsa encoding islemleri donanim uzerinden yapilir. CPU yukunu onemli olcude azaltir.</div>'+
+          '</div>'+
+          '<button class="btn btn-primary" style="margin-top:8px" onclick="saveSettingsCategory(\'transcode\')"><i class="bi bi-check-lg"></i> Kaydet</button>'+
+        '</div>'+
+        '<div class="studio-card">'+
+          '<div class="studio-section-title"><span>Oneri ve Bilgilendirme</span></div>'+
+          '<div class="studio-alert info" style="margin-bottom:10px"><i class="bi bi-lightbulb" style="margin-right:6px"></i><strong>Onerilen:</strong> ffmpeg 5.x veya 6.x, GPU mevcut ise nvenc secimi CPU yukunu %80 azaltir.</div>'+
+          '<div class="metric-list">'+
+            '<div class="metric-row"><span>Aktif GPU modu</span><strong>'+gpuMode+'</strong></div>'+
+            '<div class="metric-row"><span>Mevcut yol</span><span class="mono-wrap" style="max-width:300px">'+escHtml(s.ffmpeg_path||'ffmpeg')+'</span></div>'+
+          '</div>'+
+          '<div style="margin-top:14px"><button class="btn btn-sm btn-secondary" onclick="navigate(\'transcode-jobs\')"><i class="bi bi-list-task"></i> Transcode Islerini Gor</button></div>'+
+        '</div>'+
+      '</div>'+
     '</div>';
 }
 
@@ -2577,54 +2767,46 @@ async function renderGuidedSettings(c){
   const [s,health]=await Promise.all([api('/api/settings'),api('/api/health/report')]);
   const alerts=Array.isArray(health&&health.alerts)?health.alerts:[];
   const publicConfig=getPublicBase(s);
+  const healthStatus=String((health&&health.status)||'ok').toUpperCase();
+  const currentPreset=s.abr_profile_set||'balanced';
   c.innerHTML=
-    '<div class="page-header"><h1 class="page-title">Kolay Ayarlar</h1><div style="color:var(--text-muted);font-size:13px">En sik kullanilan tum ayarlar aciklamalariyla burada toplanir.</div></div>'+
-    '<div class="card" style="margin-bottom:16px">'+
-      '<div class="card-title" style="margin-bottom:10px">1. Yayin Profili Sec</div>'+
-      '<div class="form-hint" style="margin-bottom:14px">Hazir profiller bir cocugun bile anlayabilecegi kadar sade tutuldu. Isterseniz sonra detay ekranlarindan ince ayar yapabilirsiniz.</div>'+
-      '<div class="card-grid card-grid-3">'+
-        presetCard('TV / Dengeli','Canli TV, YouTube benzeri genel kullanim. Adaptif kalite merdiveni acilir, 1080p-360p katmanlari kullanilir.','balanced','bi-broadcast-pin')+
-        presetCard('Mobil / Hafif','Zayif baglantilar ve daha dusuk CPU kullanimi icin. Daha kucuk bitrate merdiveni kullanilir.','mobile','bi-phone')+
-        presetCard('Dusuk Bant / Dayanikli','Kesinti riskini azaltmak ve agresif kalite cikislarini sinirlamak icin. Dusuk bitrate merdiveni kullanilir.','resilient','bi-wifi-off')+
-        presetCard('Radyo / Audio','Ses yayinlarina uygun sade ayar. Video gerekmiyorsa depolama ve transcode yukunu azaltir.','radio','bi-mic-fill')+
-      '</div>'+
-    '</div>'+
-    '<div class="card-grid card-grid-2">'+
-      '<div class="card">'+
-        '<div class="card-title" style="margin-bottom:12px">2. Public Erisim</div>'+
-        settingInput('embed_domain','Public Domain / IP',s.embed_domain||'','text','Canli sunucuda localhost yerine uretilen tum embed ve player linkleri burada kullanilir.')+
-        settingInput('embed_http_port','Public HTTP Port',s.embed_http_port||s.http_port||'8844','number','HTTP linklerinde kullanilan public port. Kurulumda verdiginiz web portu genelde dogru baslangic degeridir.')+
-        settingInput('embed_https_port','Public HTTPS Port',s.embed_https_port||s.https_port||'443','number','HTTPS linklerinde kullanilan public port. SSL reverse proxy veya farkli bir port kullaniyorsaniz burayi degistirin.')+
-        '<div class="setting-row"><div><div class="setting-label">HTTPS Link Uret</div><div class="setting-desc">Yalnizca SSL etkin ve sertifika hazirsa embed linkleri HTTPS olarak uretilir. Hazir degilse HTTP kullanilir. 443 sabit degildir.</div></div>'+
-        '<label class="toggle"><input type="checkbox" class="guided-input" data-key="embed_use_https" '+(shouldUsePublicHTTPS(s)?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
-        '<div class="form-hint" style="margin-top:12px;line-height:1.7">Ornek player tabani: <code>'+escHtml(publicConfig.base)+'</code></div>'+
-        '<div style="margin-top:12px"><button class="btn btn-primary" onclick="saveGuidedPublic()">Public Ayarlari Kaydet</button></div>'+
-      '</div>'+
-      '<div class="card">'+
-        '<div class="card-title" style="margin-bottom:12px">3. Kayit ve Temizlik</div>'+
-        '<div class="form-group"><label class="form-label">Kayitlari Kac Gun Tut</label><input class="form-input guided-input" data-key="recordings_retention_days" type="number" value="'+escHtml(s.recordings_retention_days||'30')+'"><div class="form-hint">Bu sureyi asan kayitlar otomatik silinir.</div></div>'+
-        '<div class="form-group"><label class="form-label">Her Yayinda En Fazla Kac Kayit Sakla</label><input class="form-input guided-input" data-key="recordings_keep_latest" type="number" value="'+escHtml(s.recordings_keep_latest||'10')+'"><div class="form-hint">Disk kontrolu icin eski kayitlar trim edilir.</div></div>'+
-        '<div class="setting-row"><div><div class="setting-label">Otomatik Bakim</div><div class="setting-desc">Kayit ve analytics temizlik islemleri belirli araliklarla otomatik calisir.</div></div>'+
-        '<label class="toggle"><input type="checkbox" class="guided-input" data-key="maintenance_auto_cleanup" '+(s.maintenance_auto_cleanup==='true'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
-        '<div style="display:flex;gap:10px;margin-top:12px"><button class="btn btn-primary" onclick="saveGuidedStorage()">Depolama Ayarlarini Kaydet</button><button class="btn btn-secondary" onclick="runMaintenance()">Bakimi Simdi Calistir</button></div>'+
-      '</div>'+
-    '</div>'+
-    '<div class="card-grid card-grid-2" style="margin-top:16px">'+
-      '<div class="card">'+
-        '<div class="card-title" style="margin-bottom:12px">4. Guvenlik</div>'+
-        '<div class="setting-row"><div><div class="setting-label">Playback Token</div><div class="setting-desc">Acilirsa izleyici linklerinde gecerli token aranir.</div></div><label class="toggle"><input type="checkbox" class="guided-input" data-key="token_enabled" '+(s.token_enabled==='true'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
-        '<div class="form-group" style="margin-top:16px"><label class="form-label">Rate Limit</label><input class="form-input guided-input" data-key="rate_limit" type="number" value="'+escHtml(s.rate_limit||'100')+'"><div class="form-hint">Ani ve asiri istekleri sinirlar.</div></div>'+
-        '<div style="margin-top:12px"><button class="btn btn-primary" onclick="saveGuidedSecurity()">Guvenligi Kaydet</button></div>'+
-      '</div>'+
-      '<div class="card">'+
-        '<div class="card-title" style="margin-bottom:12px">5. Sistem Durumu</div>'+
-        '<div class="metric-list">'+
-          '<div class="metric-row"><span>Genel durum</span><strong>'+escHtml(String((health&&health.status)||'ok').toUpperCase())+'</strong></div>'+
-          '<div class="metric-row"><span>Aktif uyari</span><strong>'+fmtInt(alerts.length)+'</strong></div>'+
-          '<div class="metric-row"><span>ABR</span><strong>'+(s.abr_enabled==='true'?'Acik':'Kapali')+'</strong></div>'+
-          '<div class="metric-row"><span>Kalici analitik</span><strong>'+(s.analytics_persist_enabled==='true'?'Acik':'Kapali')+'</strong></div>'+
+    '<div class="studio-page"><div class="studio-hero"><h1 class="studio-hero-title"><i class="bi bi-magic" style="margin-right:10px"></i>Hizli Ayarlar</h1><p class="studio-hero-sub">Ilk kurulum veya gunluk kullanim icin en sik ihtiyac duyulan ayarlar tek ekranda. Her blogu bagimsiz kaydedebilirsiniz.</p><div class="studio-pill-row" style="margin-top:14px"><span class="studio-pill active"><i class="bi bi-speedometer2"></i> Profil: '+escHtml(currentPreset.charAt(0).toUpperCase()+currentPreset.slice(1))+'</span><span class="studio-pill"><i class="bi bi-heart-pulse-fill"></i> '+healthStatus+'</span><span class="studio-pill"><i class="bi bi-bell"></i> '+fmtInt(alerts.length)+' Uyari</span></div></div>'+
+    '<div class="studio-card"><div class="studio-section-title"><span><i class="bi bi-broadcast-pin" style="margin-right:8px;color:var(--accent)"></i>1. Yayin Profili</span><span class="tag tag-blue">Tek tikla uygula</span></div>'+
+      '<div class="studio-section-sub" style="margin-bottom:14px">Hazir profiller onerilen en iyi ayar kombinasyonlarini icinde tasir.</div>'+
+      '<div class="studio-option-grid">'+
+        '<div class="studio-option-card '+(currentPreset==='balanced'?'active':'')+'" onclick="applyDeliveryPreset(\'balanced\')"><div style="font-size:28px;margin-bottom:8px"><i class="bi bi-broadcast-pin"></i></div><div class="studio-option-title">TV / Dengeli</div><div class="studio-option-meta">Canli TV, YouTube benzeri. Adaptif kalite merdiveni.</div></div>'+
+        '<div class="studio-option-card '+(currentPreset==='mobile'?'active':'')+'" onclick="applyDeliveryPreset(\'mobile\')"><div style="font-size:28px;margin-bottom:8px"><i class="bi bi-phone"></i></div><div class="studio-option-title">Mobil / Hafif</div><div class="studio-option-meta">Zayif baglanti ve dusuk CPU icin optimize.</div></div>'+
+        '<div class="studio-option-card '+(currentPreset==='resilient'?'active':'')+'" onclick="applyDeliveryPreset(\'resilient\')"><div style="font-size:28px;margin-bottom:8px"><i class="bi bi-wifi-off"></i></div><div class="studio-option-title">Dayanikli</div><div class="studio-option-meta">Kesinti riskini azaltir ve bitrate sinirlar.</div></div>'+
+        '<div class="studio-option-card '+(currentPreset==='radio'?'active':'')+'" onclick="applyDeliveryPreset(\'radio\')"><div style="font-size:28px;margin-bottom:8px"><i class="bi bi-mic-fill"></i></div><div class="studio-option-title">Radyo / Audio</div><div class="studio-option-meta">Ses yayinlari icin sade ayar.</div></div>'+
+      '</div></div>'+
+      '<div class="studio-grid studio-grid-2">'+
+        '<div class="studio-card"><div class="studio-section-title"><span><i class="bi bi-globe" style="margin-right:8px;color:var(--accent)"></i>2. Public Erisim</span></div>'+
+          '<div class="studio-section-sub" style="margin-bottom:12px">Embed ve player linkleri bu ayarlara gore uretilir.</div>'+
+          settingInput('embed_domain','Public Domain / IP',s.embed_domain||'','text','Bos birakirsaniz mevcut host kullanilir.')+
+          '<div class="studio-form-grid">'+settingInput('embed_http_port','HTTP Port',s.embed_http_port||s.http_port||'8844','number','')+settingInput('embed_https_port','HTTPS Port',s.embed_https_port||s.https_port||'443','number','')+'</div>'+
+          '<div class="setting-row"><div><div class="setting-label">HTTPS Link Uret</div><div class="setting-desc">SSL etkin ve sertifika hazirsa linkleri HTTPS yapar.</div></div><label class="toggle"><input type="checkbox" class="guided-input" data-key="embed_use_https" '+(shouldUsePublicHTTPS(s)?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+          '<div class="studio-alert info" style="margin-top:10px"><i class="bi bi-link-45deg" style="margin-right:6px"></i>Ornek: <code>'+escHtml(publicConfig.base)+'</code></div>'+
+          '<div style="margin-top:12px"><button class="btn btn-primary" onclick="saveGuidedPublic()"><i class="bi bi-check-lg"></i> Kaydet</button></div>'+
         '</div>'+
-        '<div style="display:flex;gap:10px;margin-top:14px"><button class="btn btn-secondary" onclick="navigate(\'settings-health\')">Saglik Ekranini Ac</button><button class="btn btn-secondary" onclick="openSystemControl()">Sunucu Kontrol</button></div>'+
+        '<div class="studio-card"><div class="studio-section-title"><span><i class="bi bi-hdd" style="margin-right:8px;color:var(--accent)"></i>3. Kayit ve Temizlik</span></div>'+
+          '<div class="studio-section-sub" style="margin-bottom:12px">Kayitlarin ne kadar saklanacagini ve otomatik bakimi ayarlayin.</div>'+
+          '<div class="form-group"><label class="form-label">Kayit Saklama (gun)</label><input class="form-input guided-input" data-key="recordings_retention_days" type="number" value="'+escHtml(s.recordings_retention_days||'30')+'"><div class="form-hint">0 = sinirsiz. Onerilen: 30</div></div>'+
+          '<div class="form-group"><label class="form-label">Yayin Basina Maks Kayit</label><input class="form-input guided-input" data-key="recordings_keep_latest" type="number" value="'+escHtml(s.recordings_keep_latest||'10')+'"><div class="form-hint">Eski kayitlar otomatik budanir.</div></div>'+
+          '<div class="setting-row"><div><div class="setting-label">Otomatik Bakim</div><div class="setting-desc">Kayit ve analytics temizligi periyodik calisir.</div></div><label class="toggle"><input type="checkbox" class="guided-input" data-key="maintenance_auto_cleanup" '+(s.maintenance_auto_cleanup==='true'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+          '<div style="display:flex;gap:10px;margin-top:12px"><button class="btn btn-primary" onclick="saveGuidedStorage()"><i class="bi bi-check-lg"></i> Kaydet</button><button class="btn btn-secondary" onclick="runMaintenance()"><i class="bi bi-arrow-repeat"></i> Bakimi Calistir</button></div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="studio-grid studio-grid-2">'+
+        '<div class="studio-card"><div class="studio-section-title"><span><i class="bi bi-shield-lock" style="margin-right:8px;color:var(--accent)"></i>4. Guvenlik</span></div>'+
+          '<div class="setting-row"><div><div class="setting-label">Playback Token Zorunlu</div><div class="setting-desc">Acilirsa izleyicilerde gecerli token aranir.</div></div><label class="toggle"><input type="checkbox" class="guided-input" data-key="token_enabled" '+(s.token_enabled==='true'?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+          '<div class="form-group" style="margin-top:16px"><label class="form-label">Rate Limit (istek/sn)</label><input class="form-input guided-input" data-key="rate_limit" type="number" value="'+escHtml(s.rate_limit||'100')+'"><div class="form-hint">Onerilen: 100</div></div>'+
+          '<div style="margin-top:12px"><button class="btn btn-primary" onclick="saveGuidedSecurity()"><i class="bi bi-check-lg"></i> Kaydet</button></div>'+
+        '</div>'+
+        '<div class="studio-card"><div class="studio-section-title"><span><i class="bi bi-heart-pulse" style="margin-right:8px;color:'+(healthStatus==='OK'?'var(--success)':'var(--warning)')+'"></i>5. Sistem Durumu</span></div>'+
+          '<div class="metric-list" style="margin-top:8px"><div class="metric-row"><span>Durum</span><strong><span class="tag tag-'+(healthStatus==='OK'?'green':'yellow')+'">'+healthStatus+'</span></strong></div><div class="metric-row"><span>Uyarilar</span><strong>'+fmtInt(alerts.length)+'</strong></div><div class="metric-row"><span>ABR</span><strong><span class="tag '+(s.abr_enabled==='true'?'tag-green':'tag-yellow')+'">'+(s.abr_enabled==='true'?'Acik':'Kapali')+'</span></strong></div><div class="metric-row"><span>Analitik</span><strong>'+(s.analytics_persist_enabled==='true'?'Acik':'Kapali')+'</strong></div></div>'+
+          (alerts.length?'<div class="studio-alert warning" style="margin-top:12px"><strong>'+escHtml(alerts[0].title||'Uyari')+'</strong></div>':'')+
+          '<div style="display:flex;gap:10px;margin-top:14px"><button class="btn btn-secondary" onclick="navigate(\'settings-health\')"><i class="bi bi-heart-pulse"></i> Saglik</button><button class="btn btn-secondary" onclick="openSystemControl()"><i class="bi bi-gear"></i> Sunucu</button></div>'+
+        '</div>'+
       '</div>'+
     '</div>';
 }
@@ -2910,6 +3092,7 @@ async function loadDiagnostics(){
       '<div class="metric-row"><span>ABR Profil</span><strong>'+escHtml(data.abr_profile_set||'balanced')+'</strong></div>'+
       '<div class="metric-row"><span>HLS varyant sayisi</span><strong>'+fmtInt(hlsVariants)+'</strong></div>'+
       '<div class="metric-row"><span>DASH representation sayisi</span><strong>'+fmtInt(dashRepresentations)+'</strong></div>'+
+      '<div class="metric-row"><span>DASH ses representation</span><strong>'+fmtInt(data.dash_audio_representation_count||0)+'</strong></div>'+
       '<div class="metric-row"><span>Player telemetrisi</span><strong>'+fmtInt(telemetry.active_sessions||0)+' aktif / '+fmtInt(telemetry.total_stalls||0)+' stall</strong></div>'+
       '<div class="metric-row"><span>Kalite gecisi</span><strong>'+fmtInt(telemetry.total_quality_transitions||0)+'</strong></div>'+
       '<div class="metric-row"><span>Ses gecisi</span><strong>'+fmtInt(telemetry.total_audio_switches||0)+'</strong></div>'+
@@ -4071,7 +4254,8 @@ function renderStorageHiddenField(key,value){
 function renderStorageCenter(data,restoreCmd){
   const settings=(data&&data.settings)||{};
   return '<div class="storage-shell">'+
-    '<div class="page-header"><h1 class="page-title">Depolama ve Arsiv Merkezi</h1><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-primary" onclick="showRecordModal()">Kayit Baslat</button><button class="btn btn-secondary" onclick="createSystemBackupFromStorage(false)">Hafif Yedek Al</button><button class="btn btn-secondary" onclick="createSystemBackupFromStorage(true)">Kayitlarla Yedek Al</button></div></div>'+
+    '<div class="page-header"><h1 class="page-title">Depolama ve Arsiv Merkezi</h1><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-primary" onclick="showRecordModal()">Kayit Baslat</button><button class="btn btn-secondary" onclick="createSystemBackupFromStorage(false)">Hafif Yedek Al</button><button class="btn btn-secondary" onclick="createSystemBackupFromStorage(true)">Kayitlarla Yedek Al</button><button class="btn btn-secondary" onclick="loadPage(\'maintenance-center\')">Bakim ve Servis</button></div></div>'+
+    '<div class="studio-alert info" style="margin-bottom:16px"><strong>Rol ayrimi</strong><div style="margin-top:8px" class="form-hint">Bu merkez kayit, arsiv ve harici hedefleri yonetir. Servis durumu, upgrade ve offline restore komutlari icin <strong>Bakim ve Yedek</strong> sayfasini kullan.</div></div>'+
     '<div id="storage-active-banner"></div>'+
     '<div id="storage-remux-jobs"></div>'+
     '<div class="storage-hero">'+
@@ -4858,7 +5042,8 @@ async function renderMaintenanceCenter(c){
     : '<button class="btn btn-primary" onclick="restartServer()">Yeniden Baslat</button>'+
       '<button class="btn btn-danger" onclick="stopServer()">Durdur</button>';
   c.innerHTML=
-    '<div class="page-header"><h1 class="page-title">Bakim ve Yedek</h1><div style="color:var(--text-muted);font-size:13px">Servis durumu, tek tikla yedek alma ve temiz geri donus komutlari burada toplanir.</div></div>'+
+    '<div class="page-header"><h1 class="page-title">Bakim ve Yedek</h1><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><div style="color:var(--text-muted);font-size:13px">Servis durumu, tek tikla yedek alma ve temiz geri donus komutlari burada toplanir.</div><button class="btn btn-secondary" onclick="loadPage(\'settings-storage\')">Depolama ve Arsiv Merkezine Git</button></div></div>'+
+    '<div class="studio-alert info" style="margin-bottom:16px"><strong>Bu sayfa ne icin?</strong><div style="margin-top:8px" class="form-hint">Servis aksiyonlari, upgrade plani ve geri donus komutlari burada kalir. Kayit arsivi, bulut hedefleri ve senkron kuyruklari ise <strong>Depolama ve Arsiv Merkezi</strong> icinde yonetilir.</div></div>'+
     '<div class="card-grid card-grid-4" style="margin-bottom:16px">'+
       statCard(status.active?'green':'red','bi-hdd-network',status.active?'AKTIF':'DURDU','Servis Durumu')+
       statCard(status.enabled?'blue':'orange','bi-toggle-on',status.enabled?'ACIK':'KAPALI','Otomatik Baslangic')+

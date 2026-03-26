@@ -24,6 +24,18 @@ En yeni kazanım:
 
 aynı urun diliyle panel icine oturdu.
 
+## 0.1 Son Cekirdek Sertlestirme Sonucu
+
+Bu fazdan hemen sonra cekirdekte su kapanislar yapildi:
+
+- `Analitik Merkezi` acilisindeki istemci hatasi kapandi
+- `require_signed_url` aktif streamlerde sadece sorgu parametreli `v2` signed URL kabul edilir hale geldi
+- domain / referrer / host eslesmesi daha guvenli host siniri mantigina cekildi
+- tokenli HLS / DASH teslimat artik daha korumali `private, no-store` cache basliklari kullaniyor
+- `audio-only DASH` tarafinda `audio.mpd`, `audio_init.mp4` ve `audio_*.m4s` icin daha net istemci uyumlulugu saglandi
+- teshis ekraninda `Audio-only DASH manifest` ve `DASH ses representation` artik gorunur
+- `Bakim ve Yedek` ile `Depolama ve Arsiv Merkezi` gorev ayrimi panel icinde daha net
+
 ## 1. Genel Karar
 
 FluxStream artik prototip seviyesini asti.
@@ -195,6 +207,7 @@ Canli host:
 - host: `23.94.220.222`
 - servis: `fluxstream`
 - health: `http://127.0.0.1:8844/api/health`
+- guncel Linux binary SHA256: `44E5A33FD771B67934CF0187F2A0F9ABCE5A6DE544F77F3F7B00A97321DA9E70`
 - onceki canli dogrulama: HLS master `2` video katmani, DASH MPD `3` representation
 - ayni VPS uzerinde MinIO test ortami ve ayri SFTP hedefi ile recording + backup upload / restore basariyla dogrulandi
 

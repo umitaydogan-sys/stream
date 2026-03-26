@@ -5,11 +5,12 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/json"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -18,8 +19,8 @@ import (
 
 // TokenManager manages viewer authentication tokens
 type TokenManager struct {
-	secret      []byte
-	duration    time.Duration
+	secret   []byte
+	duration time.Duration
 }
 
 // PlaybackTokenClaims stores optional restrictions for signed playback links.
@@ -181,24 +182,61 @@ func (tm *TokenManager) sign(payloadEnc string) string {
 }
 
 func requestMatchesDomain(r *http.Request, domain string) bool {
-	domain = strings.ToLower(strings.TrimSpace(domain))
+	domain = strings.TrimSpace(domain)
 	if domain == "" || r == nil {
 		return true
 	}
 	candidates := []string{
-		strings.ToLower(strings.TrimSpace(r.Header.Get("Origin"))),
-		strings.ToLower(strings.TrimSpace(r.Referer())),
-		strings.ToLower(strings.TrimSpace(r.Host)),
+		strings.TrimSpace(r.Header.Get("Origin")),
+		strings.TrimSpace(r.Referer()),
+		strings.TrimSpace(r.Host),
 	}
-	for _, candidate := range candidates {
-		if candidate == "" {
+	for _, rule := range strings.Split(domain, ",") {
+		rule = strings.TrimSpace(rule)
+		if rule == "" {
 			continue
 		}
-		if strings.Contains(candidate, domain) {
-			return true
+		for _, candidate := range candidates {
+			if requestHostMatchesRule(candidate, rule) {
+				return true
+			}
 		}
 	}
 	return false
+}
+
+func requestHostMatchesRule(candidate, rule string) bool {
+	candidateHost := normalizeRequestHost(candidate)
+	ruleHost := normalizeRequestHost(rule)
+	if candidateHost == "" || ruleHost == "" {
+		return false
+	}
+	if strings.HasPrefix(ruleHost, "*.") {
+		ruleHost = strings.TrimPrefix(ruleHost, "*.")
+	}
+	return candidateHost == ruleHost || strings.HasSuffix(candidateHost, "."+ruleHost)
+}
+
+func normalizeRequestHost(raw string) string {
+	raw = strings.TrimSpace(strings.ToLower(raw))
+	if raw == "" {
+		return ""
+	}
+	if !strings.Contains(raw, "://") && strings.Contains(raw, "/") {
+		raw = strings.Split(raw, "/")[0]
+	}
+	if strings.Contains(raw, "://") {
+		if parsed, err := url.Parse(raw); err == nil {
+			raw = parsed.Host
+		}
+	}
+	if strings.Contains(raw, "/") {
+		raw = strings.Split(raw, "/")[0]
+	}
+	if host, _, err := net.SplitHostPort(raw); err == nil {
+		raw = host
+	}
+	return strings.Trim(raw, "[]")
 }
 
 func normalizePlaybackFormat(format string) string {
@@ -226,8 +264,8 @@ type RateLimiter struct {
 }
 
 type ipState struct {
-	count    int
-	resetAt  time.Time
+	count   int
+	resetAt time.Time
 }
 
 // NewRateLimiter creates a new rate limiter

@@ -647,6 +647,53 @@ func registerStudioAdminRoutes(
 			"applied":     req.ApplyStreamPolicy,
 		})
 	})
+
+	webServer.RegisterAdminHandler("/api/admin/security/stream-policy/reset", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", 405)
+			return
+		}
+		var req struct {
+			StreamKey         string `json:"stream_key"`
+			ClearDomainLock   bool   `json:"clear_domain_lock"`
+			ClearIPWhitelist  bool   `json:"clear_ip_whitelist"`
+		}
+		if err := decodeJSON(r, &req); err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+		streamKey := strings.TrimSpace(req.StreamKey)
+		if streamKey == "" {
+			http.Error(w, "Stream key gerekli", 400)
+			return
+		}
+		st, err := db.GetStreamByKey(streamKey)
+		if err != nil || st == nil {
+			http.Error(w, "Stream bulunamadi", 404)
+			return
+		}
+		policy := streampolicy.ParsePolicyJSON(st.PolicyJSON)
+		policy.RequirePlaybackToken = false
+		policy.RequireSignedURL = false
+		st.PolicyJSON = streampolicy.EncodePolicyJSON(policy)
+		if req.ClearDomainLock {
+			st.DomainLock = ""
+		}
+		if req.ClearIPWhitelist {
+			st.IPWhitelist = ""
+		}
+		if err := db.UpdateStream(st); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		jsonResp(w, map[string]interface{}{
+			"success":        true,
+			"stream_key":     st.StreamKey,
+			"policy_json":    st.PolicyJSON,
+			"domain_lock":    st.DomainLock,
+			"ip_whitelist":   st.IPWhitelist,
+		})
+	})
 }
 
 type aggregatedTelemetrySummary struct {

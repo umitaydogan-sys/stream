@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/fluxstream/fluxstream/internal/config"
@@ -47,9 +48,19 @@ func makePlaybackAuthorizer(cfg *config.Manager, db *storage.SQLiteDB, tokenMgr 
 			}
 		}
 		needsToken := cfg.GetBool("token_enabled", false) || policy.RequirePlaybackToken || policy.RequireSignedURL
-		token := strings.TrimSpace(r.URL.Query().Get("token"))
+		queryToken := strings.TrimSpace(r.URL.Query().Get("token"))
+		headerToken := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+		token := queryToken
 		if token == "" {
-			token = strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+			token = headerToken
+		}
+		if policy.RequireSignedURL {
+			if queryToken == "" {
+				return false, http.StatusUnauthorized, "Imzali playback baglantisi gerekli."
+			}
+			if !strings.HasPrefix(queryToken, "v2.") {
+				return false, http.StatusUnauthorized, "Imzali playback baglantisi gecersiz."
+			}
 		}
 		if token != "" {
 			if !tokenMgr.ValidatePlaybackToken(token, streamKey, format, r) {
@@ -128,17 +139,55 @@ func domainAllowed(raw string, r *http.Request) bool {
 	if raw == "" {
 		return true
 	}
-	originHost := strings.TrimSpace(r.Header.Get("Origin"))
-	refererHost := strings.TrimSpace(r.Referer())
-	targets := strings.Split(raw, ",")
-	for _, target := range targets {
-		target = strings.ToLower(strings.TrimSpace(target))
+	candidates := []string{
+		strings.TrimSpace(r.Header.Get("Origin")),
+		strings.TrimSpace(r.Referer()),
+		strings.TrimSpace(r.Host),
+	}
+	for _, target := range strings.Split(raw, ",") {
+		target = strings.TrimSpace(target)
 		if target == "" {
 			continue
 		}
-		if strings.Contains(strings.ToLower(originHost), target) || strings.Contains(strings.ToLower(refererHost), target) {
-			return true
+		for _, candidate := range candidates {
+			if domainCandidateMatches(candidate, target) {
+				return true
+			}
 		}
 	}
 	return false
+}
+
+func domainCandidateMatches(candidate, target string) bool {
+	candidateHost := normalizedRequestHost(candidate)
+	targetHost := normalizedRequestHost(target)
+	if candidateHost == "" || targetHost == "" {
+		return false
+	}
+	if strings.HasPrefix(targetHost, "*.") {
+		targetHost = strings.TrimPrefix(targetHost, "*.")
+	}
+	return candidateHost == targetHost || strings.HasSuffix(candidateHost, "."+targetHost)
+}
+
+func normalizedRequestHost(raw string) string {
+	raw = strings.TrimSpace(strings.ToLower(raw))
+	if raw == "" {
+		return ""
+	}
+	if !strings.Contains(raw, "://") && strings.Contains(raw, "/") {
+		raw = strings.Split(raw, "/")[0]
+	}
+	if strings.Contains(raw, "://") {
+		if parsed, err := url.Parse(raw); err == nil {
+			raw = parsed.Host
+		}
+	}
+	if strings.Contains(raw, "/") {
+		raw = strings.Split(raw, "/")[0]
+	}
+	if host, _, err := net.SplitHostPort(raw); err == nil {
+		raw = host
+	}
+	return strings.Trim(raw, "[]")
 }

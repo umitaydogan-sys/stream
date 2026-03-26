@@ -32,6 +32,16 @@ Tarih: 26 Mart 2026
 - [ ] yeni `Embed Studyosu` ve `Analitik Merkezi` ekranlarini canli veriyle uzun sureli operatör kullanim testine sok
 - [ ] playback guvenligi V1 akisini domain/IP/token zorlamasi ile canli stream policy senaryolarinda dogrula
 
+## 0.2 Bu Turda Kapanan Cekirdek Sertlestirme
+
+- [x] `Analitik Merkezi` acilisindeki eksik JS yardimci fonksiyon hatasini kapat
+- [x] `require_signed_url` aktif streamlerde sorgu parametreli `v2` signed URL zorlamasi getir
+- [x] domain / referrer eslesmesini gercek host ve subdomain sinirlari ile guvenli hale getir
+- [x] tokenli HLS / DASH teslimatta `private, no-store` cache davranisini uygula
+- [x] `audio.mpd`, `audio_init.mp4` ve `audio_*.m4s` icin audio odakli MIME / baslik davranisini sertlestir
+- [x] teshis ekranina `Audio-only DASH manifest` ve `DASH ses representation` gorunurlugu ekle
+- [x] `Bakim ve Yedek` ile `Depolama ve Arsiv Merkezi` rol ayrimini ekran ici yonlendirme ile netlestir
+
 ## 1. Bu Turda Kapanan Ana Basliklar
 
 - [x] tum kayit baslatma akislarinda varsayilan formati `mp4` yap

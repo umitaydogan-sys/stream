@@ -177,14 +177,14 @@
         preset.outputType='player';
         preset.security.tokenRequired=true;
         preset.security.signedURL=true;
-        preset.security.applyStreamPolicy=true;
+        preset.security.applyStreamPolicy=false;
         preset.options.sharePackage='private';
         break;
       case 'token':
         preset.outputType='iframe';
         preset.security.tokenRequired=true;
         preset.security.signedURL=true;
-        preset.security.applyStreamPolicy=true;
+        preset.security.applyStreamPolicy=false;
         break;
       case 'low_latency':
         preset.outputType='iframe';
@@ -217,6 +217,17 @@
     if(patch && patch.branding) target.branding=Object.assign({},target.branding||{},patch.branding);
     if(patch && patch.security) target.security=Object.assign({},target.security||{},patch.security);
     return target;
+  }
+
+  function studioStreamSecurityState(stream){
+    const policy=parseJSONSafeStudio((stream&&stream.policy_json)||'{}',{});
+    return {
+      requireToken:!!policy.require_playback_token,
+      requireSignedURL:!!policy.require_signed_url,
+      domainLock:String((stream&&stream.domain_lock)||'').trim(),
+      ipWhitelist:String((stream&&stream.ip_whitelist)||'').trim(),
+      active:!!(policy.require_playback_token || policy.require_signed_url || String((stream&&stream.domain_lock)||'').trim() || String((stream&&stream.ip_whitelist)||'').trim())
+    };
   }
 
   function studioBuildScriptEmbed(url,width,height){
@@ -268,6 +279,7 @@
   }
 
   async function studioFetchPlaybackBundle(state,stream,template){
+    const streamSecurity=studioStreamSecurityState(stream);
     const payload={
       stream_key:stream.stream_key,
       page:(state.outputType==='player'||state.outputType==='popup'||state.outputType==='audio')?'player':'embed',
@@ -278,12 +290,12 @@
       muted:!!state.options.muted,
       options:cloneJSON(state.options),
       security:{
-        signed_url:!!state.security.signedURL,
-        token_required:!!state.security.tokenRequired,
+        signed_url:!!(state.security.signedURL || streamSecurity.requireSignedURL),
+        token_required:!!(state.security.tokenRequired || streamSecurity.requireToken),
         session_bound:!!state.security.sessionBound,
         expiry_minutes:toNumber(state.security.expiryMinutes,60),
-        domain_restriction:state.security.domainRestriction||'',
-        ip_restriction:state.security.ipRestriction||'',
+        domain_restriction:state.security.domainRestriction||streamSecurity.domainLock||'',
+        ip_restriction:state.security.ipRestriction||streamSecurity.ipWhitelist||'',
         viewer_id:state.security.viewerID||'',
         watermark:(state.security.watermark||state.branding.watermarkText||'').trim()
       },
@@ -351,6 +363,7 @@
     if(state.outputType==='audio' && !String(state.primaryFormat||'').includes('audio')) warnings.push('Audio player secili ama format audio-only degil. HLS Ses veya DASH Ses tercih et.');
     if((state.security.domainRestriction||state.security.ipRestriction) && !state.security.signedURL && !state.security.tokenRequired) warnings.push('Domain veya IP kisiti icin sureli token veya signed URL secmek gerekir.');
     if(state.security.signedURL && !state.security.applyStreamPolicy) warnings.push('Signed URL olusturuldu. Kalici enforcement icin stream policy uygula secenegini de ac.');
+    if((state.useCase==='private' || state.useCase==='token') && !state.security.applyStreamPolicy) warnings.push('Gizli ve token korumali presetler varsayilan olarak sadece bu ekranda gecici link uretir. Kalici hale gelmesi icin Stream policy uygula secenegini bilerek acman gerekir.');
     if(bundle && !bundle.primaryURL) warnings.push('Uretilecek cikti henuz hazir degil.');
     if(!warnings.length) return '';
     return '<div class="studio-alert warning"><strong>Dikkat edilmesi gerekenler</strong><ul style="margin:10px 0 0 18px;padding:0">'+warnings.map(function(item){return '<li>'+escHtml(item)+'</li>';}).join('')+'</ul></div>';
@@ -367,6 +380,7 @@
     if(!state.streamKey && streamList[0]) state.streamKey=streamList[0].stream_key;
     const stream=streamList.find(function(item){return item.stream_key===state.streamKey;}) || streamList[0] || null;
     if(stream && !state.streamKey) state.streamKey=stream.stream_key;
+    const streamSecurity=studioStreamSecurityState(stream);
     const template=studioSelectedTemplate(Array.isArray(templates)?templates:[],state.templateId);
     const playbackResult=stream?await studioFetchPlaybackBundle(state,stream,template):null;
     const codeBundle=studioBuildCodeBundle(playbackResult||{},state);
@@ -422,7 +436,10 @@
             studioField('Referrer policy','<select id="studio-embed-referrer" class="input">'+studioSelectOptions([['strict-origin-when-cross-origin','Strict origin when cross origin'],['origin','Origin'],['same-origin','Same origin'],['no-referrer','No referrer']],state.options.referrerPolicy)+'</select>','Gomme sayfasina iliskin tavsiye edilen policy.')+
             studioField('Paylasim paketi','<select id="studio-embed-share-package" class="input">'+studioSelectOptions([['general','Genel'],['newsroom','Haber sitesi'],['corporate','Kurumsal duyuru'],['audio','Sadece ses'],['private','Gizli yayin']],state.options.sharePackage)+'</select>','Profil ile birlikte saklanir.')+
           '</div></div>'+
-          '<div class="studio-card"><div><h2 class="studio-section-title">Playback guvenligi v1</h2><div class="studio-section-sub">Signed URL, sureli token, domain ve IP kisiti, iframe baglamasi ve watermark tek merkezde yonetilir.</div></div><div class="studio-option-grid">'+
+          '<div class="studio-card"><div><h2 class="studio-section-title">Playback guvenligi v1</h2><div class="studio-section-sub">Signed URL, sureli token, domain ve IP kisiti, iframe baglamasi ve watermark tek merkezde yonetilir.</div></div>'+
+          '<div class="studio-alert info"><strong>Gizli preset nasil calisir?</strong><div style="margin-top:8px" class="form-hint">Gizli ve Token Korumali secenekleri varsayilan olarak sadece bu ekranda gecici link uretir. Tum paneli veya tum izleyicileri kilitlemez. Kalici bir politika istiyorsan ayrica <strong>Stream policy uygula</strong> secenegini bilerek acmalisin.</div></div>'+
+          (streamSecurity.active?'<div class="studio-alert warning"><strong>Bu streamde kalici playback korumasi aktif</strong><div style="margin-top:8px" class="form-hint">Bu nedenle onizleme ve diger ekranlar token veya signed URL bekliyor olabilir. Eski normale donmek icin alttaki dugme ile korumayi temizleyebilirsin.</div><div style="margin-top:12px"><button class="btn btn-danger btn-sm" id="studio-sec-reset-policy">Kalici korumayi kaldir</button></div></div>':'')+
+          '<div class="studio-option-grid">'+
             '<label class="card" style="padding:14px"><div style="display:flex;justify-content:space-between;gap:12px"><div><strong>Signed URL</strong><div class="form-hint">Imzali player ve manifest baglantisi uretir.</div></div><input type="checkbox" id="studio-sec-signed" '+(state.security.signedURL?'checked':'')+'></div></label>'+
             '<label class="card" style="padding:14px"><div style="display:flex;justify-content:space-between;gap:12px"><div><strong>Token zorunlu</strong><div class="form-hint">Playback token uretir.</div></div><input type="checkbox" id="studio-sec-token" '+(state.security.tokenRequired?'checked':'')+'></div></label>'+
             '<label class="card" style="padding:14px"><div style="display:flex;justify-content:space-between;gap:12px"><div><strong>Oturuma bagli</strong><div class="form-hint">Viewer ID ile bagli izleme baglantisi hazirlar.</div></div><input type="checkbox" id="studio-sec-session" '+(state.security.sessionBound?'checked':'')+'></div></label>'+
@@ -460,6 +477,18 @@
     const saveBtn=document.getElementById('studio-embed-save-profile'); if(saveBtn) saveBtn.onclick=async function(){ if(!state.streamKey){ toast('Once stream secin','warning'); return; } const name=(document.getElementById('studio-embed-name')||{}).value || state.profileName || 'Yeni embed profili'; const payload={stream_key:state.streamKey,name:name,use_case:state.useCase,mode:state.mode,primary_format:state.primaryFormat,width:state.width,height:state.height,theme:state.theme,options_json:JSON.stringify(state.options||{}),branding_json:JSON.stringify(state.branding||{}),security_json:JSON.stringify(state.security||{}),notes:state.notes||''}; const path=state.profileId?('/api/admin/embed-profiles/'+state.profileId):'/api/admin/embed-profiles'; const method=state.profileId?'PUT':'POST'; const res=await api(path,{method:method,body:payload}); if(!res || res.error){ toast('Embed profili kaydedilemedi','error'); return; } state.profileName=name; if(res.item && res.item.id) state.profileId=res.item.id; toast('Embed profili kaydedildi'); studioRerender('embed-codes'); };
     document.querySelectorAll('[data-profile-load]').forEach(function(btn){ btn.onclick=function(){ state.profileId=toNumber(btn.getAttribute('data-profile-load'),0); const load=document.getElementById('studio-embed-load-profile'); if(load) load.click(); }; });
     document.querySelectorAll('[data-profile-delete]').forEach(function(btn){ btn.onclick=async function(){ const id=toNumber(btn.getAttribute('data-profile-delete'),0); if(!id || !confirm('Bu embed profili silinsin mi?')) return; const res=await api('/api/admin/embed-profiles/'+id,{method:'DELETE'}); if(!res || res.error){ toast('Profil silinemedi','error'); return; } if(state.profileId===id) state.profileId=0; toast('Profil silindi'); studioRerender('embed-codes'); }; });
+    const resetPolicy=document.getElementById('studio-sec-reset-policy');
+    if(resetPolicy) resetPolicy.onclick=async function(){
+      if(!state.streamKey || !confirm('Bu stream icin kalici playback guvenligini kaldirmak istiyor musunuz?')) return;
+      const res=await api('/api/admin/security/stream-policy/reset',{method:'POST',body:{stream_key:state.streamKey,clear_domain_lock:true,clear_ip_whitelist:false}});
+      if(!res || res.error){
+        toast((res&&res.message)||'Kalici koruma kaldirilamadi','error');
+        return;
+      }
+      state.security.applyStreamPolicy=false;
+      toast('Kalici playback korumasi kaldirildi');
+      studioRerender('embed-codes');
+    };
   }
 
   window.renderEmbedCodes = async function(container){
@@ -718,5 +747,181 @@
     const applyCurrent=document.getElementById('studio-abr-apply-current'); if(applyCurrent) applyCurrent.onclick=async function(){ const payload={profile_set:state.profileSet||'custom-profile',profiles_json:abrLayersToJSON(state.layers),stream_key:state.streamKey||'',scope:state.scope||'global'}; const res=await api('/api/admin/abr-profiles/direct-apply',{method:'POST',body:payload}); if(!res || res.error){ toast('Profil uygulanamadi','error'); return; } toast('ABR profili uygulandi'); studioRerender('settings-abr'); };
     const saveBtn=document.getElementById('studio-abr-save'); if(saveBtn) saveBtn.onclick=async function(){ const payload={profile_set:state.profileSet||'custom-profile',name:state.name||state.profileSet||'Yeni profil',scope:state.scope||'global',stream_key:state.scope==='stream'?(state.streamKey||''):'',description:state.description||'',preset:state.profileSet||'',profiles_json:abrLayersToJSON(state.layers),summary_json:JSON.stringify(summarizeABRLayers(state.layers))}; const path=state.profileId?('/api/admin/abr-profiles/'+state.profileId):'/api/admin/abr-profiles'; const method=state.profileId?'PUT':'POST'; const res=await api(path,{method:method,body:payload}); if(!res || res.error){ toast('ABR profili kaydedilemedi','error'); return; } if(res.item && res.item.id) state.profileId=res.item.id; toast('ABR profili kaydedildi'); studioRerender('settings-abr'); };
     const deleteBtn=document.getElementById('studio-abr-delete'); if(deleteBtn) deleteBtn.onclick=async function(){ if(!state.profileId || !confirm('Secili kayitli ABR profili silinsin mi?')) return; const res=await api('/api/admin/abr-profiles/'+state.profileId,{method:'DELETE'}); if(!res || res.error){ toast('ABR profili silinemedi','error'); return; } state.profileId=0; toast('ABR profili silindi'); studioRerender('settings-abr'); };
+  };
+
+  function transcodePresetCards(current){
+    const cards=[
+      {key:'none',title:'CPU Modu',desc:'Ek GPU yoksa veya stabiliteyi onceliyorsan klasik encoder yolu.',badge:'Guvenli'},
+      {key:'nvenc',title:'NVIDIA NVENC',desc:'Yuksek yogunluklu canli yayinlar icin GPU uzerinden hizli encode.',badge:'NVIDIA'},
+      {key:'qsv',title:'Intel Quick Sync',desc:'Ofis ve mini PC sinifinda dusuk watt ile hizli donanim encode.',badge:'Intel'},
+      {key:'amf',title:'AMD AMF',desc:'AMD GPU bulunan sistemlerde donanim hizlandirma.',badge:'AMD'}
+    ];
+    return cards.map(function(item){
+      return '<button type="button" class="studio-option-card'+(item.key===current?' active':'')+'" data-transcode-gpu="'+escHtml(item.key)+'">'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px"><h4 class="studio-option-title">'+escHtml(item.title)+'</h4><span class="studio-chip'+(item.key===current?' active':'')+'">'+escHtml(item.badge)+'</span></div>'+
+        '<div class="studio-option-meta">'+escHtml(item.desc)+'</div></button>';
+    }).join('');
+  }
+
+  window.renderSettingsTranscode = async function(container){
+    const [settings,status,jobs]=await Promise.all([
+      api('/api/settings'),
+      api('/api/transcode/status'),
+      api('/api/transcode/jobs')
+    ]);
+    const s=settings||{};
+    const st=status||{};
+    const list=Array.isArray(jobs)?jobs:[];
+    const live=list.filter(function(item){ return item.status==='running'; });
+    const gpu=String((s.gpu_accel||st.gpu_accel||'none')).toLowerCase();
+    const ffmpegVersion=String(st.ffmpeg_version||'bilinmiyor');
+    const liveOptions=st.live_options||{};
+    const presets=(liveOptions.profiles||[]).map(function(item){ return {label:item.name||((item.width&&item.height)?(item.height+'p'):'audio'),value:item.bitrate||item.audio_rate||'-'}; });
+    container.innerHTML=
+      '<div class="studio-page">'+
+        '<section class="studio-hero"><h1 class="studio-hero-title">Transkod / FFmpeg Merkezi</h1><div class="studio-hero-sub">FFmpeg yolu, GPU hizlandirma, canli ABR merdiveni ve calisan isler artik ayni ekranda. Teknik ayrintilar gorunur, ama kararlar kartlar ve oneriler uzerinden verilir.</div><div class="studio-pill-row" style="margin-top:14px"><span class="studio-pill active">GPU: '+escHtml(gpu.toUpperCase())+'</span><span class="studio-pill">Aktif is: '+fmtInt(st.active_jobs||0)+'</span><span class="studio-pill">Profil: '+escHtml(liveOptions.profile_set||s.abr_profile_set||'balanced')+'</span></div></section>'+
+        '<div class="studio-kpi-grid">'+
+          renderAnalyticsKPI('Aktif Is',fmtInt(st.active_jobs||0),'FFmpeg ve canli repack islemleri')+
+          renderAnalyticsKPI('Toplam Kayitli Is',fmtInt(st.total_jobs||list.length||0),'Durum kaydi tutulan tum isler')+
+          renderAnalyticsKPI('Calisan HLS / DASH',fmtInt(live.length),'Su an calisan transcode isleri')+
+          renderAnalyticsKPI('GPU Modu',gpu.toUpperCase(),'Secili hizlandirma katmani')+
+          renderAnalyticsKPI('Segment',fmtStudioNumber(liveOptions.segment_duration||2,0)+' sn','Canli cikis parcasi')+
+          renderAnalyticsKPI('Playlist',fmtInt(liveOptions.playlist_length||10),'Tutulan medya pencere boyu')+
+          renderAnalyticsKPI('Audio Passthrough',liveOptions.audio_passthrough?'Acik':'Kapali','Ses dogrudan kopyalaniyor mu')+
+          renderAnalyticsKPI('FFmpeg',ffmpegVersion.split(' ').slice(0,2).join(' ')||ffmpegVersion,'Calisan encoder surumu')+
+        '</div>'+
+        '<div class="studio-grid studio-grid-2">'+
+          '<div class="studio-card soft"><div><h2 class="studio-section-title">Hizlandirma secimi</h2><div class="studio-section-sub">Sunucudaki encoder yolunu kartlardan sec, sonra alttaki ayari kaydet.</div></div><div class="studio-option-grid">'+transcodePresetCards(gpu)+'</div><div class="studio-grid studio-grid-2">'+
+            studioField('FFmpeg yolu','<input id="studio-transcode-path" class="input" value="'+escHtml(s.ffmpeg_path||st.ffmpeg_path||'ffmpeg')+'">','Tam yol veya PATH icindeki ad yeterlidir.')+
+            studioField('GPU modu','<select id="studio-transcode-gpu" class="input">'+studioSelectOptions([['none','CPU / Yok'],['nvenc','NVIDIA NVENC'],['qsv','Intel Quick Sync'],['amf','AMD AMF']],gpu)+'</select>','Donanim hizlandirma secimi.')+
+          '</div><div class="studio-chip-row"><button class="btn btn-primary" id="studio-transcode-save">FFmpeg Ayarlarini Kaydet</button><button class="btn btn-secondary" id="studio-transcode-open-jobs">Transcode Islerini Ac</button></div></div>'+
+          '<div class="studio-card"><div><h2 class="studio-section-title">Canli ABR ozet karti</h2><div class="studio-section-sub">Mevcut profile gore sunucunun uretecegi katmanlar ve maliyet ozeti.</div></div><div class="studio-chip-row">'+(presets.length?presets.map(function(item){ return '<span class="studio-chip active">'+escHtml(item.label)+' • '+escHtml(item.value)+'</span>'; }).join(''):'<span class="studio-chip">Canli katman bilgisi yok</span>')+'</div><div class="metric-list">'+
+            '<div class="metric-row"><span>Profil seti</span><strong>'+escHtml(liveOptions.profile_set||s.abr_profile_set||'balanced')+'</strong></div>'+
+            '<div class="metric-row"><span>ABR</span><strong>'+(liveOptions.abr_enabled?'Acik':'Kapali')+'</strong></div>'+
+            '<div class="metric-row"><span>Master playlist</span><strong>'+(liveOptions.master_enabled?'Acik':'Kapali')+'</strong></div>'+
+            '<div class="metric-row"><span>FFmpeg yolu</span><span class="mono-wrap">'+escHtml(st.ffmpeg_path||s.ffmpeg_path||'ffmpeg')+'</span></div>'+
+          '</div><div class="studio-alert info"><strong>Oneri</strong><div style="margin-top:8px" class="form-hint">'+(gpu==='none'?'GPU yoksa Dayanikli veya Mobil profil daha guvenli olur.':'Donanim hizlandirma acik. Canli yogunlukte yine de segment ve bitrate merdivenini izlemek iyi olur.')+'</div></div></div>'+
+        '</div>'+
+        '<div class="studio-card"><div class="studio-section-title">Canli ve son isler</div><div class="studio-section-sub">Bu sayfa ayar merkezidir; ayrintili job izleme icin Transcode Isleri sayfasina gecebilirsin.</div>'+(list.length?'<div style="overflow:auto"><table class="studio-table"><thead><tr><th>ID</th><th>Stream</th><th>Tip</th><th>Durum</th><th>Baslangic</th><th>Cikti</th></tr></thead><tbody>'+list.slice(0,8).map(function(job){ return '<tr><td><code>'+escHtml(shortKey(job.id||'-'))+'</code></td><td><code>'+escHtml(shortKey(job.stream_key||'-'))+'</code></td><td>'+escHtml(job.type||'-')+'</td><td><span class="studio-chip'+(job.status==='running'?' active':'')+'">'+escHtml(job.status||'-')+'</span></td><td>'+escHtml(fmtLocaleDateTime(job.started_at))+'</td><td class="mono-wrap">'+escHtml(job.output_dir||'-')+'</td></tr>'; }).join('')+'</tbody></table></div>':'<div class="empty-state" style="padding:26px"><div class="icon"><i class="bi bi-list-task"></i></div><h3>Henuz transcode isi yok</h3><p style="color:var(--text-muted)">Canli yayin basladiginda burada FFmpeg ve cikis islerini goreceksin.</p></div>')+'</div>'+
+      '</div>';
+    document.querySelectorAll('[data-transcode-gpu]').forEach(function(btn){ btn.onclick=function(){ const key=btn.getAttribute('data-transcode-gpu')||'none'; const select=document.getElementById('studio-transcode-gpu'); if(select) select.value=key; }; });
+    const save=document.getElementById('studio-transcode-save');
+    if(save) save.onclick=async function(){
+      const path=(document.getElementById('studio-transcode-path')||{}).value||'ffmpeg';
+      const gpuValue=(document.getElementById('studio-transcode-gpu')||{}).value||'none';
+      const res=await saveSettingsValues('transcode',{ffmpeg_path:path,gpu_accel:gpuValue},true);
+      if(res && res.success!==false){
+        toast('Transcode ayarlari kaydedildi');
+        studioRerender('settings-transcode');
+      }else{
+        toast((res&&res.message)||'Transcode ayarlari kaydedilemedi','error');
+      }
+    };
+    const openJobs=document.getElementById('studio-transcode-open-jobs');
+    if(openJobs) openJobs.onclick=function(){ navigate('transcode-jobs'); };
+    if(typeof schedulePageRefresh==='function') schedulePageRefresh('settings-transcode',15000);
+  };
+
+  window.renderViewers = async function(container){
+    const [viewers,stats,bans]=await Promise.all([
+      api('/api/viewers'),
+      api('/api/stats/viewers'),
+      api('/api/security/bans')
+    ]);
+    const data=viewers||{};
+    const stat=stats||{};
+    const sessions=Array.isArray(data.sessions)?data.sessions:[];
+    const banList=Array.isArray(bans)?bans:[];
+    const viewerTimeline=(Array.isArray(stat.timeline)?stat.timeline:[]).map(function(item){ return {timestamp:item.timestamp,value:Number(item.value||0)}; });
+    const formatBars=Object.keys(stat.by_format||{}).map(function(key){ return {label:key.toUpperCase(),value:Number(stat.by_format[key]||0)}; }).sort(function(a,b){ return b.value-a.value; });
+    const countryBars=Object.keys(stat.by_country||{}).map(function(key){ return {label:key,value:Number(stat.by_country[key]||0)}; }).sort(function(a,b){ return b.value-a.value; }).slice(0,8);
+    container.innerHTML=
+      '<div class="studio-page">'+
+        '<section class="studio-hero"><h1 class="studio-hero-title">Izleyici Merkezi</h1><div class="studio-hero-sub">Canli izleyici sayisi, oturum dagilimi, format kullanimi ve IP yasaklari ayni panelde. Destek ve operasyon akisi icin hizli aksiyonlarla sade tutuldu.</div><div class="studio-pill-row" style="margin-top:14px"><span class="studio-pill active">Canli: '+fmtInt(data.active||0)+'</span><span class="studio-pill">Toplam: '+fmtInt(data.total||0)+'</span><span class="studio-pill">Peak: '+fmtInt(stat.peak||0)+'</span></div></section>'+
+        '<div class="studio-kpi-grid">'+
+          renderAnalyticsKPI('Aktif Izleyici',fmtInt(data.active||0),'Su an acik baglantilar')+
+          renderAnalyticsKPI('Toplam Izleyici',fmtInt(data.total||0),'Tum zamanlar toplami')+
+          renderAnalyticsKPI('Tepe Izleyici',fmtInt(stat.peak||0),'Simdiye kadar gorulen en yuksek an')+
+          renderAnalyticsKPI('Yasakli IP',fmtInt(data.banned||0),'Aktif ban kayitlari')+
+          renderAnalyticsKPI('Format Cesidi',fmtInt(formatBars.length),'Ayni anda kullanilan teslimatlar')+
+          renderAnalyticsKPI('Ulke Cesidi',fmtInt(countryBars.length),'Son pencere ulke dagilimi')+
+        '</div>'+
+        '<div class="studio-grid studio-grid-2"><div class="studio-chart-card"><div class="studio-section-title">Izleyici trendi</div><div class="studio-section-sub">Son snapshot penceresindeki izleyici zaman serisi.</div><div class="studio-chart-wrap">'+renderTimelineChart(viewerTimeline,'Izleyici verisi yok',function(v){ return fmtInt(v); },{meta:'Izleyici timeline'})+'</div></div><div class="studio-chart-card"><div class="studio-section-title">Format ve ulke dagilimi</div><div class="studio-section-sub">En cok kullanilan oynatim tipleri ve ulkeler.</div><div class="studio-grid" style="gap:14px"><div>'+renderBarList(formatBars,'Format verisi yok',function(v){ return fmtInt(v); })+'</div><div>'+renderBarList(countryBars,'Ulke verisi yok',function(v){ return fmtInt(v); })+'</div></div></div></div>'+
+        '<div class="studio-grid studio-grid-2"><div class="studio-card"><div class="studio-section-title">Aktif oturumlar</div><div class="studio-section-sub">Canli izleyici oturumlari, format ve trafik bilgileriyle listelenir.</div>'+(sessions.length?'<div style="overflow:auto"><table class="studio-table"><thead><tr><th>Yayin</th><th>Format</th><th>IP</th><th>Ulke</th><th>Sure</th><th>Trafik</th><th>Son gorulme</th></tr></thead><tbody>'+sessions.map(function(sess){ return '<tr><td><strong>'+escHtml(sess.stream_name||shortKey(sess.stream_key||'-'))+'</strong><div class="form-hint"><code>'+escHtml(sess.stream_key||'-')+'</code></div></td><td><span class="studio-chip active">'+escHtml(String(sess.format||'-').toUpperCase())+'</span></td><td><code>'+escHtml(sess.ip||'-')+'</code></td><td>'+escHtml(sess.country||'-')+'</td><td>'+escHtml(formatDurationSeconds(sess.duration_seconds||0))+'</td><td>'+escHtml(fmtBytes(sess.bytes_sent||0))+'</td><td>'+escHtml(fmtLocaleDateTime(sess.last_seen))+'</td></tr>'; }).join('')+'</tbody></table></div>':'<div class="empty-state" style="padding:26px"><div class="icon"><i class="bi bi-people"></i></div><h3>Aktif oturum yok</h3><p style="color:var(--text-muted)">Su an canli izleyici baglantisi gorunmuyor.</p></div>')+'</div>'+
+        '<div class="studio-card"><div class="studio-section-title">IP yasaklama</div><div class="studio-section-sub">Sorunlu istemcileri gecici veya kalici olarak engelle.</div><div class="studio-grid studio-grid-2">'+
+          studioField('IP adresi','<input id="studio-ban-ip" class="input" placeholder="203.0.113.10">','Yasaklanacak istemci.')+
+          studioField('Sure (dk)','<input id="studio-ban-dur" class="input" type="number" min="0" placeholder="60">','0 ise kalici sayilir.')+
+          studioField('Neden','<input id="studio-ban-reason" class="input" placeholder="Yuksek trafik / kotuye kullanim">','Loglarda gorunecek not.')+
+          studioField('Hizli not','<select id="studio-ban-preset" class="input">'+studioSelectOptions([['','Ozel neden'],['abuse','Kotuye kullanim'],['load','Asiri istek'],['geo','Bolge kisiti'],['ops','Operasyon karari']],'')+'</select>','Hizli neden secimi.')+
+        '</div><div class="studio-chip-row"><button class="btn btn-danger" id="studio-ban-save">IP Yasakla</button><button class="btn btn-secondary" id="studio-ban-refresh">Listeyi Yenile</button></div>'+(banList.length?'<div style="overflow:auto;margin-top:14px"><table class="studio-table"><thead><tr><th>IP</th><th>Neden</th><th>Tarih</th><th>Islem</th></tr></thead><tbody>'+banList.map(function(item){ return '<tr><td><code>'+escHtml(item.IP||item.ip||'-')+'</code></td><td>'+escHtml(item.Reason||item.reason||'-')+'</td><td>'+escHtml(fmtLocaleDateTime(item.BannedAt||item.banned_at))+'</td><td><button class="btn btn-secondary btn-sm" data-unban-ip="'+escHtml(item.IP||item.ip||'')+'">Kaldir</button></td></tr>'; }).join('')+'</tbody></table></div>':'<div class="form-hint" style="margin-top:12px">Aktif yasakli IP kaydi yok.</div>')+'</div></div>'+
+      '</div>';
+    const preset=document.getElementById('studio-ban-preset');
+    if(preset) preset.onchange=function(){
+      const reason=document.getElementById('studio-ban-reason');
+      const labels={abuse:'Kotuye kullanim',load:'Asiri istek',geo:'Bolge kisiti',ops:'Operasyon karari'};
+      if(reason && labels[preset.value]) reason.value=labels[preset.value];
+    };
+    const save=document.getElementById('studio-ban-save');
+    if(save) save.onclick=async function(){
+      const ip=(document.getElementById('studio-ban-ip')||{}).value||'';
+      const reason=(document.getElementById('studio-ban-reason')||{}).value||'Manuel';
+      const duration=toNumber((document.getElementById('studio-ban-dur')||{}).value,0);
+      if(!ip){ toast('Yasaklamak icin IP girin','warning'); return; }
+      const res=await api('/api/security/bans',{method:'POST',body:{ip:ip,reason:reason,duration_minutes:duration}});
+      if(res && res.status==='banned'){
+        toast('IP yasaklandi');
+        studioRerender('viewers');
+      }else{
+        toast((res&&res.message)||'IP yasaklanamadi','error');
+      }
+    };
+    const refresh=document.getElementById('studio-ban-refresh');
+    if(refresh) refresh.onclick=function(){ studioRerender('viewers'); };
+    document.querySelectorAll('[data-unban-ip]').forEach(function(btn){ btn.onclick=async function(){ const ip=btn.getAttribute('data-unban-ip')||''; if(!ip) return; const res=await api('/api/security/bans',{method:'DELETE',body:{ip:ip}}); if(res && res.status==='unbanned'){ toast('IP engeli kaldirildi'); studioRerender('viewers'); } else { toast((res&&res.message)||'IP engeli kaldirilamadi','error'); } }; });
+    if(typeof schedulePageRefresh==='function') schedulePageRefresh('viewers',10000);
+  };
+
+  window.renderTranscodeJobs = async function(container){
+    const [status,jobs,streams]=await Promise.all([
+      api('/api/transcode/status'),
+      api('/api/transcode/jobs'),
+      api('/api/streams')
+    ]);
+    const st=status||{};
+    const list=Array.isArray(jobs)?jobs:[];
+    const streamList=Array.isArray(streams)?streams:[];
+    const streamNames={};
+    streamList.forEach(function(item){ streamNames[item.stream_key]=item.name||item.stream_key; });
+    const running=list.filter(function(item){ return item.status==='running'; });
+    const completed=list.filter(function(item){ return item.status==='completed'; });
+    const errored=list.filter(function(item){ return item.status==='error'; });
+    const byType={};
+    list.forEach(function(item){ byType[item.type||'other']=(byType[item.type||'other']||0)+1; });
+    const typeBars=Object.keys(byType).map(function(key){ return {label:key,value:byType[key]}; }).sort(function(a,b){ return b.value-a.value; });
+    container.innerHTML=
+      '<div class="studio-page">'+
+        '<section class="studio-hero"><h1 class="studio-hero-title">Transcode Isleri Merkezi</h1><div class="studio-hero-sub">Canli HLS, DASH ve remux islerinin durumunu, hata satirlarini ve cikti dizinlerini tek bakista izle. Teknik ayrinti gerekirken de okunakli kalacak sekilde duzenlendi.</div><div class="studio-pill-row" style="margin-top:14px"><span class="studio-pill active">Aktif: '+fmtInt(st.active_jobs||running.length)+'</span><span class="studio-pill">GPU: '+escHtml(String(st.gpu_accel||'none').toUpperCase())+'</span><span class="studio-pill">FFmpeg: '+escHtml((String(st.ffmpeg_version||'bilinmiyor').split(' ').slice(0,2).join(' ')||String(st.ffmpeg_version||'bilinmiyor')) )+'</span></div></section>'+
+        '<div class="studio-kpi-grid">'+
+          renderAnalyticsKPI('Calisan Is',fmtInt(running.length),'Su an devam eden job')+
+          renderAnalyticsKPI('Tamamlanan',fmtInt(completed.length),'Sorunsuz biten job')+
+          renderAnalyticsKPI('Hatali',fmtInt(errored.length),'Elle bakilmasi gereken isler')+
+          renderAnalyticsKPI('Toplam',fmtInt(list.length),'Kayitli transcode job satiri')+
+          renderAnalyticsKPI('HLS / DASH',fmtInt(list.filter(function(item){ return item.type==='live_hls'||item.type==='live_dash'; }).length),'Canli cikis turleri')+
+          renderAnalyticsKPI('Profil',escHtml((st.live_options&&st.live_options.profile_set)||'balanced'),'Varsayilan canli merdiven')+
+        '</div>'+
+        '<div class="studio-grid studio-grid-2"><div class="studio-chart-card"><div class="studio-section-title">Is tipi dagilimi</div><div class="studio-section-sub">Canli cikis turleri ve job tipi yogunlugu.</div>'+renderBarList(typeBars,'Job verisi yok',function(v){ return fmtInt(v); })+'</div><div class="studio-card"><div class="studio-section-title">FFmpeg ve ortam</div><div class="metric-list">'+
+          '<div class="metric-row"><span>FFmpeg yolu</span><span class="mono-wrap">'+escHtml(st.ffmpeg_path||'-')+'</span></div>'+
+          '<div class="metric-row"><span>OS / Mimari</span><strong>'+escHtml((st.os||'-')+' / '+(st.arch||'-'))+'</strong></div>'+
+          '<div class="metric-row"><span>ABR profil seti</span><strong>'+escHtml((st.live_options&&st.live_options.profile_set)||'balanced')+'</strong></div>'+
+          '<div class="metric-row"><span>Audio passthrough</span><strong>'+((st.live_options&&st.live_options.audio_passthrough)?'Acik':'Kapali')+'</strong></div>'+
+          '<div class="metric-row"><span>Segment / Playlist</span><strong>'+fmtInt((st.live_options&&st.live_options.segment_duration)||2)+' sn / '+fmtInt((st.live_options&&st.live_options.playlist_length)||10)+'</strong></div>'+
+        '</div><div class="studio-chip-row"><button class="btn btn-secondary" id="studio-jobs-open-settings">Transcode Ayarlarina Git</button><button class="btn btn-secondary" id="studio-jobs-refresh">Yenile</button></div></div></div>'+
+        '<div class="studio-card"><div class="studio-section-title">Job listesi</div><div class="studio-section-sub">Hata varsa en basta gorunur. Ayrinti satirinda cikti dizini ve manifest yolu korunur.</div>'+(list.length?'<div style="overflow:auto"><table class="studio-table"><thead><tr><th>ID</th><th>Yayin</th><th>Tip</th><th>Durum</th><th>Baslangic</th><th>PID</th><th>Cikti</th><th>Hata</th></tr></thead><tbody>'+list.map(function(job){ const tone=job.status==='running'?' active':''; return '<tr><td><code>'+escHtml(shortKey(job.id||'-'))+'</code></td><td><strong>'+escHtml(streamNames[job.stream_key]||shortKey(job.stream_key||'-'))+'</strong><div class="form-hint"><code>'+escHtml(job.stream_key||'-')+'</code></div></td><td>'+escHtml(job.type||'-')+'</td><td><span class="studio-chip'+tone+'">'+escHtml(job.status||'-')+'</span></td><td>'+escHtml(fmtLocaleDateTime(job.started_at))+'</td><td>'+escHtml(String(job.pid||'-'))+'</td><td><div class="mono-wrap">'+escHtml(job.output_dir||'-')+'</div>'+(job.manifest_path?'<div class="form-hint mono-wrap">'+escHtml(job.manifest_path)+'</div>':'')+'</td><td style="max-width:320px;color:'+(job.error?'#dc2626':'var(--text-muted)')+'">'+escHtml(job.error||'-')+'</td></tr>'; }).join('')+'</tbody></table></div>':'<div class="empty-state" style="padding:26px"><div class="icon"><i class="bi bi-list-task"></i></div><h3>Job bulunmuyor</h3><p style="color:var(--text-muted)">Canli yayin veya donusum baslayinca bu liste dolacak.</p></div>')+'</div>'+
+      '</div>';
+    const openSettings=document.getElementById('studio-jobs-open-settings');
+    if(openSettings) openSettings.onclick=function(){ navigate('settings-transcode'); };
+    const refresh=document.getElementById('studio-jobs-refresh');
+    if(refresh) refresh.onclick=function(){ studioRerender('transcode-jobs'); };
+    if(typeof schedulePageRefresh==='function') schedulePageRefresh('transcode-jobs',10000);
   };
 })();

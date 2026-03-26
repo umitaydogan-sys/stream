@@ -36,7 +36,21 @@ VPS:
 - servis: `active`
 - health: `http://127.0.0.1:8844/api/health`
 - Linux binary SHA256:
-  `5E8E09B68B632CF427CDB6068A62AFEEF19C5266FF848C16EC853308D95D6686`
+  `44E5A33FD771B67934CF0187F2A0F9ABCE5A6DE544F77F3F7B00A97321DA9E70`
+
+## 0.2 Son Cekirdek Sertlestirme Paketi
+
+Bu faz kapandiktan sonra cekirdek tarafta cakismaz bir sertlestirme turu daha uygulandi.
+
+Bu turda:
+
+- `Analitik Merkezi` acilisini kiran eksik istemci yardimcisi kapatildi
+- `require_signed_url` aktif streamlerde sadece sorgu parametreli `v2` signed URL kabul edilir hale getirildi
+- domain / referrer eslesmesi alt dizi mantigindan cikarilip gercek host ve subdomain siniri ile guvenli hale getirildi
+- tokenli HLS / DASH teslimatta cache davranisi `private, no-store` seviyesine cekildi
+- `audio.mpd`, `audio_init.mp4` ve `audio_*.m4s` icin daha net audio MIME ve baslik davranisi eklendi
+- teshis tarafina `Audio-only DASH manifest` ve `DASH ses representation` gorunurlugu eklendi
+- `Bakim ve Yedek` ile `Depolama ve Arsiv Merkezi` arasindaki rol ayrimi sayfa icinden netlestirildi
 
 Yeni statik dosyalar:
 

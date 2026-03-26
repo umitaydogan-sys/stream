@@ -860,7 +860,7 @@ func (s *Server) handleHLS(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-cache, no-store")
 	} else if strings.HasSuffix(path, ".ts") {
 		w.Header().Set("Content-Type", "video/mp2t")
-		w.Header().Set("Cache-Control", "public, max-age=30")
+		w.Header().Set("Cache-Control", playbackCacheControl(r, "public, max-age=30"))
 	}
 	format := "hls"
 	switch {
@@ -926,13 +926,17 @@ func (s *Server) handleDASH(w http.ResponseWriter, r *http.Request) {
 	case strings.HasSuffix(cleanPath, ".mpd"):
 		w.Header().Set("Content-Type", "application/dash+xml")
 		w.Header().Set("Cache-Control", "no-cache, no-store")
+	case strings.HasSuffix(cleanPath, "audio.m4s"), strings.HasSuffix(cleanPath, "audio_init.mp4"):
+		w.Header().Set("Content-Type", "audio/mp4")
+		w.Header().Set("Cache-Control", playbackCacheControl(r, "public, max-age=30"))
 	case strings.HasSuffix(cleanPath, ".m4s"), strings.HasSuffix(cleanPath, ".mp4"):
 		w.Header().Set("Content-Type", "video/iso.segment")
-		w.Header().Set("Cache-Control", "public, max-age=30")
+		w.Header().Set("Cache-Control", playbackCacheControl(r, "public, max-age=30"))
 	}
 	format := "dash"
 	if strings.HasSuffix(cleanPath, "audio.mpd") {
 		format = "dash_audio"
+		w.Header().Set("X-FluxStream-DASH-Mode", "audio-only")
 	}
 	if !s.authorizePlayback(w, r, streamKey, format) {
 		return
@@ -943,6 +947,16 @@ func (s *Server) handleDASH(w http.ResponseWriter, r *http.Request) {
 		}
 		http.ServeFile(rw, r, filePath)
 	})
+}
+
+func playbackCacheControl(r *http.Request, defaultValue string) string {
+	if r == nil {
+		return defaultValue
+	}
+	if strings.TrimSpace(r.URL.Query().Get("token")) != "" || strings.TrimSpace(r.Header.Get("Authorization")) != "" {
+		return "private, no-store"
+	}
+	return defaultValue
 }
 
 func newestManifestVariant(path string) string {

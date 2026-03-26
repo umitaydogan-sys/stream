@@ -24,11 +24,14 @@ func buildStreamDiagnostics(st *storage.Stream, cfg *config.Manager, dataDir str
 		hlsMasterPath = filepath.Join(liveRoot, "master.m3u8")
 	}
 	dashManifestPath := ""
+	audioDashManifestPath := ""
 	if dashRoot != "" {
 		dashManifestPath = filepath.Join(dashRoot, "manifest.mpd")
+		audioDashManifestPath = filepath.Join(dashRoot, "audio.mpd")
 	}
 	hlsVariantCount := countInTextFile(hlsMasterPath, "#EXT-X-STREAM-INF")
 	dashRepresentationCount := countInTextFile(dashManifestPath, "<Representation")
+	audioDashRepresentationCount := countInTextFile(audioDashManifestPath, "<Representation")
 	llHLSPath := ""
 	if liveRoot != "" {
 		llHLSPath = filepath.Join(liveRoot, "ll.m3u8")
@@ -48,29 +51,31 @@ func buildStreamDiagnostics(st *storage.Stream, cfg *config.Manager, dataDir str
 		diagnosticCheck("hls_master", diagnosticStatusABRMaster(hlsEnabled, abrEnabled, abrMasterEnabled, streamLive, fileExists(hlsMasterPath), hlsVariantCount), "Adaptif HLS master playlist", ""),
 		diagnosticCheck("ll_hls", diagnosticStatusOptionalOutput(llHLSEnabled, streamLive, fileExists(llHLSPath)), "Low latency playlist", "LL-HLS kapaliysa bu alan sorun sayilmaz."),
 		diagnosticCheck("dash", diagnosticStatusDash(dashEnabled, streamLive, fileExists(dashManifestPath), dashRepresentationCount), "DASH manifest", "DASH kapaliysa veya repack yeni basliyorsa sari/mavi gorunebilir."),
+		diagnosticCheck("dash_audio", diagnosticStatusAudioDash(dashEnabled, streamLive, fileExists(audioDashManifestPath), audioDashRepresentationCount), "Audio-only DASH manifest", "Ses odakli istemciler ve radyo/podcast senaryolari icin ayrica uretilir."),
 		diagnosticCheck("recordings", diagnosticStatusRecording(recordingExpected, streamLive, folderHasFiles(filepath.Join(dataDir, "recordings", st.StreamKey))), "Kayit dosyalari", "Kayit pasifse ya da yayin yeni basladiysa hemen dosya gormeyebilirsin."),
 	}
 
 	outputFormats := strings.TrimSpace(st.OutputFormats)
 	return map[string]interface{}{
-		"stream_id":                 st.ID,
-		"stream_key":                st.StreamKey,
-		"stream_name":               st.Name,
-		"status":                    st.Status,
-		"output_formats":            outputFormats,
-		"policy_json":               st.PolicyJSON,
-		"checks":                    checks,
-		"abr_enabled":               cfg.GetBool("abr_enabled", false),
-		"abr_master_enabled":        abrMasterEnabled,
-		"abr_profile_set":           cfg.Get("abr_profile_set", "balanced"),
-		"hls_enabled":               hlsEnabled,
-		"dash_enabled":              dashEnabled,
-		"hls_ll_enabled":            llHLSEnabled,
-		"recording_system_enabled":  recordingSystemEnabled,
-		"recording_stream_enabled":  st.RecordEnabled,
-		"delivery_summary":          diagnosticDeliverySummary(abrEnabled, hlsVariantCount, dashEnabled, dashRepresentationCount),
-		"hls_variant_count":         hlsVariantCount,
-		"dash_representation_count": dashRepresentationCount,
+		"stream_id":                       st.ID,
+		"stream_key":                      st.StreamKey,
+		"stream_name":                     st.Name,
+		"status":                          st.Status,
+		"output_formats":                  outputFormats,
+		"policy_json":                     st.PolicyJSON,
+		"checks":                          checks,
+		"abr_enabled":                     cfg.GetBool("abr_enabled", false),
+		"abr_master_enabled":              abrMasterEnabled,
+		"abr_profile_set":                 cfg.Get("abr_profile_set", "balanced"),
+		"hls_enabled":                     hlsEnabled,
+		"dash_enabled":                    dashEnabled,
+		"hls_ll_enabled":                  llHLSEnabled,
+		"recording_system_enabled":        recordingSystemEnabled,
+		"recording_stream_enabled":        st.RecordEnabled,
+		"delivery_summary":                diagnosticDeliverySummary(abrEnabled, hlsVariantCount, dashEnabled, dashRepresentationCount, audioDashRepresentationCount),
+		"hls_variant_count":               hlsVariantCount,
+		"dash_representation_count":       dashRepresentationCount,
+		"dash_audio_representation_count": audioDashRepresentationCount,
 	}
 }
 
@@ -158,6 +163,19 @@ func diagnosticStatusDash(enabled, live, exists bool, representations int) strin
 	return "optional"
 }
 
+func diagnosticStatusAudioDash(enabled, live, exists bool, representations int) string {
+	if !enabled {
+		return "disabled"
+	}
+	if exists && representations > 0 {
+		return "ready"
+	}
+	if live {
+		return "waiting"
+	}
+	return "optional"
+}
+
 func diagnosticStatusRecording(expected, live, exists bool) string {
 	if !expected {
 		return "disabled"
@@ -171,7 +189,7 @@ func diagnosticStatusRecording(expected, live, exists bool) string {
 	return "optional"
 }
 
-func diagnosticDeliverySummary(abrEnabled bool, hlsVariants int, dashEnabled bool, dashRepresentations int) map[string]interface{} {
+func diagnosticDeliverySummary(abrEnabled bool, hlsVariants int, dashEnabled bool, dashRepresentations int, audioDashRepresentations int) map[string]interface{} {
 	label := "Tek kalite"
 	tone := "blue"
 	description := "ABR kapali; yayin tek kalite teslim ediliyor."
@@ -184,6 +202,9 @@ func diagnosticDeliverySummary(abrEnabled bool, hlsVariants int, dashEnabled boo
 			tone = "green"
 			if dashEnabled {
 				description = "HLS ve DASH tarafinda adaptif katmanlar hazir gorunuyor."
+				if audioDashRepresentations > 0 {
+					description += " Audio-only DASH manifest de hazir."
+				}
 			} else {
 				description = "HLS tarafinda adaptif katmanlar hazir; DASH kapali veya opsiyonel."
 			}

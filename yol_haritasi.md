@@ -31,6 +31,16 @@ flowchart TD
     S9[Audio-only DASH Cekirdegi] --> S10[Audio teslimat gorunurlugu]
 ```
 
+## 1.2 Son Cekirdek Sertlestirme
+
+```mermaid
+flowchart LR
+    A[Signed URL Omurgasi] --> B[V2 query signed URL zorlamasi]
+    C[Audio-only DASH] --> D[Audio MPD ve audio MIME sertlestirmesi]
+    E[Teshis] --> F[Audio-only DASH manifest gorunurlugu]
+    G[Maintenance] --> H[Storage ile rol ayriminin netlesmesi]
+```
+
 ## 2. Nereden Nereye Geldik
 
 ### 2.1 Yolculuk Ozeti
