@@ -2525,7 +2525,7 @@ function renderSSLProfileCard(target,title,status,s,enableKey,portKey,modeKey,ce
     stateTone='tag-green';
     stateLabel='Aktif';
     stateHelp=mode==='letsencrypt'
-      ?'Listener aktif. Let\\'s Encrypt challenge ve sertifika yenileme akisina hazir.'
+      ?"Listener aktif. Let's Encrypt challenge ve sertifika yenileme akisina hazir."
       :'Listener aktif. Yuklenen sertifika su an canli olarak kullaniliyor.';
   }else if(ready){
     stateTone='tag-yellow';
@@ -2534,7 +2534,7 @@ function renderSSLProfileCard(target,title,status,s,enableKey,portKey,modeKey,ce
   }else if(mode==='letsencrypt'){
     stateTone='tag-red';
     stateLabel='Bekliyor';
-    stateHelp='Let\\'s Encrypt icin domainin bu VPS\\'e yonlenmesi ve 80/443 portlarinin ulasilabilir olmasi gerekir.';
+    stateHelp="Let's Encrypt icin domainin bu VPS'e yonlenmesi ve 80/443 portlarinin ulasilabilir olmasi gerekir.";
   }
   return '<div class="card">'+
     '<div class="card-title" style="margin-bottom:10px">'+title+'</div>'+
