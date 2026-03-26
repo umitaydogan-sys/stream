@@ -7,6 +7,7 @@ Tarih: 26 Mart 2026
 Bu turda iki kritik alan birlikte kapatildi:
 
 - `Adaptive Teslimat Sonradan Acma` urun akisi eklendi
+- `ABR Profilleri ve Teslimat Merkezi` icine genel adaptive ac/kapa ve secure teslimat hizli ayarlari geri eklendi
 - Windows ve Linux dagitimlari yeniden uretildi
 - VPS'e temiz kurulum yapildi
 - tum temel urun dokumanlari yeni duruma gore hizalandi
@@ -35,6 +36,18 @@ Bu akista sunucu:
 - secilen `profile_set` degerini kaydeder
 - istenirse canli HLS/DASH transcode zincirini yeni profil ile yeniden kurar
 
+Ek urunlestirme:
+
+- `ABR Profilleri ve Teslimat Merkezi` artik genel `adaptive teslimat`
+  anahtarini tekrar sunuyor
+- global `ABR acik / kapali`, `master playlist`, `HLS`, `DASH`
+  kontrolleri ayni ekranda
+- `HTTPS link uret`, `Web HTTPS portu`, `Public HTTPS portu`,
+  `RTMPS ingest`, `RTMPS portu` gibi secure stream ayarlari hizli
+  kart halinde gorunuyor
+- kayitli profil seciminin yanina hazir preset secbox'i eklendi;
+  kullanici preset secip `Preseti Yukle` diyebiliyor
+
 ## 0.2 Bugunku Canli Durum
 
 Yerelde dogrulananlar:
@@ -52,12 +65,12 @@ Canli host:
 - servis: `active`
 - health: `http://127.0.0.1:8844/api/health`
 - canli Linux binary SHA256:
-  `15D7CE047BC886ACB39C2B594C669C0B150F9C706E7179E36056216A369923F4`
+  `2E18FF08103D166403832C5F57597567EF7F6910AB1BE6E534B4CA390D52570D`
 
 Windows paket hashleri:
 
 - portable / service `fluxstream.exe`:
-  `7A99F1A7E5FC2A75247C83A2A7DEB459DD18A65B10C435A6AD9A3C5C2E339C55`
+  `7339CC5296C8BF3AF520CDC440B4DAD52D8FA04BFE16D58D0233C39F199EC6D2`
 - installer `FluxStream-Setup.exe`:
   `F763F48D60E33FEEFC00C1D6DA7A0E99436613BD3145F888DD858FD623C9FB17`
 

@@ -9,6 +9,9 @@ Tarih: 26 Mart 2026
 - [x] `Stream Detayi` ekranina `Adaptive Teslimat` karti ekle
 - [x] `Sonraki yayinda etkinlestir` ve `Canli yayina hemen uygula` akisini ekle
 - [x] `balanced`, `mobile`, `resilient`, `radio` profil secimini urun akisina bagla
+- [x] `ABR Profilleri ve Teslimat Merkezi` icine genel adaptive ac/kapa kontrolunu geri ekle
+- [x] ayni ekrana `HTTPS` ve `RTMPS` secure teslimat hizli ayarlarini ekle
+- [x] kayitli profillerin yanina hazir preset secbox + `Preseti Yukle` akisini ekle
 - [x] Linux package'i yeniden uret
 - [x] Windows portable package'i yeniden uret
 - [x] Windows service package'i yeniden uret

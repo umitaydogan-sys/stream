@@ -12,6 +12,8 @@ Bu turun yeni kritik kazanimi:
 
 - tek kalite baslayan bir stream sonradan adaptive teslimata alinabiliyor
 - bu islem hem sonraki publish hem de canli yayin icin urun akisina baglandi
+- `ABR Profilleri ve Teslimat Merkezi` tekrar genel adaptive ac/kapa ve
+  secure teslimat hizli kontrol paneline kavustu
 
 ## 1. Bugunku Uretim Konumu
 
@@ -49,6 +51,8 @@ Etkisi:
 
 - kullanici artik kaynak yayin tek kalite olsa bile yayini adaptif teslimata donusturebiliyor
 - ABR artik sadece publish aninda teknik bir davranis degil, urun seviyesinde yonetilen bir teslimat ozelligi oldu
+- global adaptive ac/kapa, HLS/DASH ve secure HTTPS / RTMPS hizli ayarlari
+  ayni ekrandan kontrol edilebilir hale geldi
 
 ### 2.2 Platform Duzeyi Guclu Alanlar
 
@@ -84,13 +88,13 @@ Etkisi:
 Yerel buildler:
 
 - Windows portable `fluxstream.exe` SHA256:
-  `7A99F1A7E5FC2A75247C83A2A7DEB459DD18A65B10C435A6AD9A3C5C2E339C55`
+  `7339CC5296C8BF3AF520CDC440B4DAD52D8FA04BFE16D58D0233C39F199EC6D2`
 - Windows service `fluxstream.exe` SHA256:
-  `7A99F1A7E5FC2A75247C83A2A7DEB459DD18A65B10C435A6AD9A3C5C2E339C55`
+  `7339CC5296C8BF3AF520CDC440B4DAD52D8FA04BFE16D58D0233C39F199EC6D2`
 - Windows installer `FluxStream-Setup.exe` SHA256:
   `F763F48D60E33FEEFC00C1D6DA7A0E99436613BD3145F888DD858FD623C9FB17`
 - Linux `fluxstream` SHA256:
-  `15D7CE047BC886ACB39C2B594C669C0B150F9C706E7179E36056216A369923F4`
+  `2E18FF08103D166403832C5F57597567EF7F6910AB1BE6E534B4CA390D52570D`
 
 Canli host:
 
@@ -98,7 +102,7 @@ Canli host:
 - servis: `fluxstream`
 - health: `http://127.0.0.1:8844/api/health`
 - aktif Linux binary SHA256:
-  `15D7CE047BC886ACB39C2B594C669C0B150F9C706E7179E36056216A369923F4`
+  `2E18FF08103D166403832C5F57597567EF7F6910AB1BE6E534B4CA390D52570D`
 
 ## 5. Genel Degerlendirme
 

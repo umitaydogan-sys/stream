@@ -891,21 +891,37 @@
 
   window.renderSettingsABR = async function(container){
     const state=ensureABRState();
-    const [settings,streams,saved]=await Promise.all([api('/api/settings'),api('/api/streams'),api('/api/admin/abr-profiles')]);
+    const [settings,streams,saved,sslStatus]=await Promise.all([
+      api('/api/settings'),
+      api('/api/streams'),
+      api('/api/admin/abr-profiles'),
+      api('/api/ssl/status')
+    ]);
+    const s=settings||{};
     const streamList=Array.isArray(streams)?streams:[];
     if(!state.streamKey && streamList[0]) state.streamKey=streamList[0].stream_key;
     const stream=streamList.find(function(item){ return item.stream_key===state.streamKey; }) || streamList[0] || null;
     const diagnostics=stream?await api('/api/diagnostics/stream/'+stream.id):{};
     const savedProfiles=Array.isArray(saved)?saved:[];
-    const globalProfiles=parseABRProfilesJSON((settings&&settings.abr_profiles_json)||'{}');
+    const globalProfiles=parseABRProfilesJSON((s&&s.abr_profiles_json)||'{}');
     if(!state.layers || !state.layers.length){
-      const baseKey=state.profileSet || (settings&&settings.abr_profile_set) || 'balanced';
+      const baseKey=state.profileSet || (s&&s.abr_profile_set) || 'balanced';
       state.layers=cloneJSON(globalProfiles[baseKey] || (ABR_PRESETS[baseKey]&&ABR_PRESETS[baseKey].layers) || ABR_PRESETS.balanced.layers);
       state.profileSet=baseKey;
     }
     state.json=abrLayersToJSON(state.layers);
     const summary=summarizeABRLayers(state.layers);
     const recommendation=abrRecommendation(stream,diagnostics);
+    const presetSelectValue=ABR_PRESETS[state.profileSet]?state.profileSet:recommendation.preset;
+    const abrEnabled=isTruthy(s.abr_enabled);
+    const masterEnabled=s.abr_master_enabled!=='false';
+    const hlsEnabled=s.hls_enabled!=='false';
+    const dashEnabled=isTruthy(s.dash_enabled);
+    const embedHTTPS=isTruthy(s.embed_use_https);
+    const webSSL=(sslStatus&&sslStatus.web)||{};
+    const streamSSL=(sslStatus&&sslStatus.stream)||{};
+    const webSSLLabel=!isTruthy(s.ssl_enabled)?'Kapali':(webSSL.active?'Aktif':(webSSL.ready?'Yeniden Baslat':'Hazir Degil'));
+    const streamSSLLabel=!isTruthy(s.rtmps_enabled)?'Kapali':(streamSSL.active?'Aktif':(streamSSL.ready?'Yeniden Baslat':'Hazir Degil'));
     container.innerHTML=
       '<div class="studio-page">'+
         '<section class="studio-hero"><h1 class="studio-hero-title">ABR Profilleri ve Teslimat Merkezi</h1><div class="studio-hero-sub">Ham JSON duzenleme yerine secilebilir, kaydedilebilir ve tekrar kullanilabilir ABR profil studyosu. HLS, DASH ve audio-only teslimat davranisini burada modelleyebilir ve uygulayabilirsin.</div><div class="studio-pill-row" style="margin-top:14px"><span class="studio-pill active">'+escHtml((state.profileSet||'balanced'))+'</span><span class="studio-pill">'+escHtml((stream&&stream.name)||'Stream sec')+'</span><span class="studio-pill">'+escHtml(summary.audioOnly?'Audio-only':'Video + Audio')+'</span><span class="studio-pill">'+escHtml((diagnostics.delivery_summary&&diagnostics.delivery_summary.label)||'Teslimat ozeti')+'</span></div></section>'+
@@ -915,12 +931,65 @@
         '<div class="studio-grid studio-grid-2"><div class="studio-card"><div class="studio-section-title">Canli test ve cikti tahmini</div><div class="studio-section-sub">Secilen profil ile beklenen teslimat yapisi.</div><div class="studio-chip-row"><span class="studio-chip active">HLS varyant: '+fmtInt(summary.variants)+'</span><span class="studio-chip">'+escHtml(summary.audioOnly?'Audio-only MPD':'Video + Audio MPD')+'</span><span class="studio-chip">'+escHtml((stream&&stream.output_formats)||'Tum cikislar')+'</span></div><div class="studio-code-block">'+escHtml(JSON.stringify({profile_set:state.profileSet,layers:state.layers,hls_master_variants:summary.variants,dash_representations:summary.audioOnly?summary.variants:(summary.variants+1),audio_only:summary.audioOnly},null,2))+'</div></div><div class="studio-card"><div class="studio-section-title">Audio-only DASH sertlestirme</div><div class="studio-section-sub">Radyo ve podcast senaryolari icin ses odakli teslimat tanisi.</div><div class="studio-chip-row"><span class="studio-chip '+((summary.audioOnly||(diagnostics.output_formats||'').indexOf('mp3')>=0)?'active':'')+'">Audio preset</span><span class="studio-chip '+(((diagnostics.dash_enabled)?'active':''))+'">DASH cikisi</span><span class="studio-chip '+(((diagnostics.checks||[]).find(function(item){ return item.code==='dash' && item.status==='ready'; })?'active':''))+'">MPD hazir</span></div><div class="form-hint">Sadece ses yayini icin Audio-only veya Radyo presetlerini sec; ardindan Embed Studyosu icinden DASH Ses veya HLS Ses linklerini kullan.</div>'+(stream?('<div style="margin-top:12px">'+copyField('DASH Ses',location.origin+'/audio/dash/'+stream.stream_key)+copyField('HLS Ses',location.origin+'/audio/hls/'+stream.stream_key)+'</div>'):'')+'</div></div>'+
       '</div>';
 
+    const toolbarGroups=container.querySelectorAll('.studio-toolbar-group');
+    if(toolbarGroups[0]){
+      toolbarGroups[0].insertAdjacentHTML('beforeend',
+        '<select id="studio-abr-preset-select" class="input">'+studioSelectOptions(Object.keys(ABR_PRESETS).map(function(key){ return [key,ABR_PRESETS[key].title]; }),presetSelectValue)+'</select>'+
+        '<button class="btn btn-secondary" id="studio-abr-load-preset">Preseti Yukle</button>'
+      );
+    }
+    const firstGrid=container.querySelector('.studio-grid.studio-grid-2');
+    if(firstGrid){
+      firstGrid.insertAdjacentHTML('afterbegin',
+        '<div class="studio-card">'+
+          '<div><h2 class="studio-section-title">Genel adaptive teslimat</h2><div class="studio-section-sub">Bu alan tum sistemde adaptive acik/kapali davranisini ve varsayilan ABR profilini kontrol eder.</div></div>'+
+          '<div class="metric-list">'+
+            '<div class="metric-row"><span>Adaptive teslimat</span><strong><span class="tag '+(abrEnabled?'tag-green':'tag-blue')+'">'+(abrEnabled?'Acik':'Kapali')+'</span></strong></div>'+
+            '<div class="metric-row"><span>Master playlist</span><strong>'+(masterEnabled?'Acik':'Kapali')+'</strong></div>'+
+            '<div class="metric-row"><span>HLS cikisi</span><strong>'+(hlsEnabled?'Acik':'Kapali')+'</strong></div>'+
+            '<div class="metric-row"><span>DASH cikisi</span><strong>'+(dashEnabled?'Acik':'Kapali')+'</strong></div>'+
+          '</div>'+
+          '<div class="setting-row" style="margin-top:14px"><div><div class="setting-label">Adaptive teslimat genel acik</div><div class="setting-desc">Kapalidiginda sistem yeni yayinlarda coklu kalite merdiveni uretmez.</div></div><label class="toggle"><input type="checkbox" id="studio-abr-global-enabled" '+(abrEnabled?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+          '<div class="setting-row"><div><div class="setting-label">Master playlist uret</div><div class="setting-desc">Player once master.m3u8 arar, gerekirse medya playlistine duser.</div></div><label class="toggle"><input type="checkbox" id="studio-abr-master-enabled" '+(masterEnabled?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+          '<div class="setting-row"><div><div class="setting-label">HLS cikisi acik</div><div class="setting-desc">Adaptive teslimatin temel dagitim yolu. Kapatiyorsan ozel bir nedenin olmasi gerekir.</div></div><label class="toggle"><input type="checkbox" id="studio-abr-hls-enabled" '+(hlsEnabled?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+          '<div class="setting-row"><div><div class="setting-label">DASH cikisi acik</div><div class="setting-desc">Tarayici, dash.js ve harici istemciler icin MPEG-DASH teslimati.</div></div><label class="toggle"><input type="checkbox" id="studio-abr-dash-enabled" '+(dashEnabled?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+          '<div class="studio-grid studio-grid-2" style="margin-top:14px">'+
+            studioField('Varsayilan profil seti','<select id="studio-abr-global-profile" class="input">'+studioSelectOptions(Object.keys(ABR_PRESETS).map(function(key){ return [key,ABR_PRESETS[key].title]; }),s.abr_profile_set||state.profileSet||'balanced')+'</select>','Tum sistem icin varsayilan adaptive merdiveni.')+
+            studioField('Player kalite secici','<select id="studio-abr-quality-selector" class="input">'+studioSelectOptions([['true','Acik'],['false','Kapali']],(s.player_quality_selector!=='false'?'true':'false'))+'</select>','Izleyici kaliteyi elle secebilsin mi?')+
+          '</div>'+
+          '<div class="studio-chip-row"><button class="btn btn-primary" id="studio-abr-save-delivery">Teslimat Ayarlarini Kaydet</button><button class="btn btn-secondary" id="studio-abr-open-security">Guvenlik ve SSL Ac</button></div>'+
+        '</div>'+
+        '<div class="studio-card soft">'+
+          '<div><h2 class="studio-section-title">Guvenli teslimat ve secure stream</h2><div class="studio-section-sub">HTTPS player/embed linkleri ve RTMPS ingest portlari burada hizla gozden gecirilir. Sertifika dosyalari icin yine SSL/TLS merkezini kullanirsin.</div></div>'+
+          '<div class="metric-list">'+
+            '<div class="metric-row"><span>Web HTTPS listener</span><strong><span class="tag '+(webSSL.active?'tag-green':(webSSL.ready?'tag-yellow':'tag-red'))+'">'+escHtml(webSSLLabel)+'</span></strong></div>'+
+            '<div class="metric-row"><span>RTMPS listener</span><strong><span class="tag '+(streamSSL.active?'tag-green':(streamSSL.ready?'tag-yellow':'tag-red'))+'">'+escHtml(streamSSLLabel)+'</span></strong></div>'+
+            '<div class="metric-row"><span>Public domain</span><strong>'+escHtml(s.embed_domain||'Mevcut host')+'</strong></div>'+
+            '<div class="metric-row"><span>HTTPS link uret</span><strong>'+(embedHTTPS?'Acik':'Kapali')+'</strong></div>'+
+          '</div>'+
+          '<div class="setting-row" style="margin-top:14px"><div><div class="setting-label">HTTPS link uret</div><div class="setting-desc">Embed ve player linkleri public HTTPS tabaniyla uretilecek.</div></div><label class="toggle"><input type="checkbox" id="studio-abr-embed-https" '+(embedHTTPS?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+          '<div class="setting-row"><div><div class="setting-label">RTMPS ingest acik</div><div class="setting-desc">OBS ve encoderlar sifreli RTMPS ile baglanabilir.</div></div><label class="toggle"><input type="checkbox" id="studio-abr-rtmps-enabled" '+(isTruthy(s.rtmps_enabled)?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
+          '<div class="studio-grid studio-grid-2" style="margin-top:14px">'+
+            studioField('Web HTTPS portu','<input id="studio-abr-https-port" class="input" type="number" min="1" value="'+escHtml(String(s.https_port||'443'))+'">','Sunucunun HTTPS dinleyici portu.')+
+            studioField('Public HTTPS portu','<input id="studio-abr-embed-https-port" class="input" type="number" min="1" value="'+escHtml(String(s.embed_https_port||s.https_port||'443'))+'">','Player ve embed linklerinde kullanilan public port.')+
+            studioField('RTMPS portu','<input id="studio-abr-rtmps-port" class="input" type="number" min="1" value="'+escHtml(String(s.rtmps_port||'1936'))+'">','Sifreli RTMP ingest portu.')+
+            studioField('SSL/TLS yolu','<input class="input" readonly value="'+escHtml('/settings-ssl')+'">','Sertifika dosyasi veya Let\'s Encrypt icin SSL/TLS ekranina gec.')+
+          '</div>'+
+          '<div class="studio-alert info"><strong>Not</strong><div style="margin-top:8px" class="form-hint">Listener hazir ama aktif degilse once burada portlari kaydedip sonra SSL/TLS ekranindan sertifika profilini yeniden baslatabilirsin.</div></div>'+
+        '</div>'
+      );
+    }
+    const applyPresetLabel=document.getElementById('studio-abr-apply-preset');
+    if(applyPresetLabel) applyPresetLabel.textContent='Secili Preseti Katmanlara Uygula';
+
     document.querySelectorAll('.studio-option-card[data-studio-key]').forEach(function(btn){ if(btn.closest('#studio-embed-usecases')||btn.closest('#studio-embed-outputs')) return; });
     document.querySelectorAll('.studio-option-grid .studio-option-card').forEach(function(btn){ if(btn.closest('.studio-card.soft') && btn.closest('.studio-card.soft').querySelector('.studio-section-title') && btn.closest('.studio-card.soft').querySelector('.studio-section-title').textContent.indexOf('Hazir preset')>=0){ btn.onclick=function(){ const key=btn.dataset.studioKey||'balanced'; const preset=ABR_PRESETS[key]; if(!preset) return; state.profileSet=key; state.name=preset.title; state.description=preset.desc; state.layers=cloneJSON(preset.layers); state.mode=state.mode||'simple'; studioRerender('settings-abr'); }; } });
     document.querySelectorAll('[data-abr-mode]').forEach(function(btn){ btn.onclick=function(){ state.mode=btn.getAttribute('data-abr-mode')||'simple'; studioRerender('settings-abr'); }; });
     const streamSelect=document.getElementById('studio-abr-stream'); if(streamSelect) streamSelect.onchange=function(){ state.streamKey=streamSelect.value||''; studioRerender('settings-abr'); };
     const savedSelect=document.getElementById('studio-abr-saved'); if(savedSelect) savedSelect.onchange=function(){ state.profileId=toNumber(savedSelect.value,0); };
+    const presetSelect=document.getElementById('studio-abr-preset-select'); if(presetSelect) presetSelect.onchange=function(){ state.profileSet=presetSelect.value||'balanced'; };
     const loadBtn=document.getElementById('studio-abr-load'); if(loadBtn) loadBtn.onclick=async function(){ if(!state.profileId){ toast('Once kayitli profil secin','warning'); return; } const item=await api('/api/admin/abr-profiles/'+state.profileId); if(!item || item.error){ toast('Profil yuklenemedi','error'); return; } state.profileSet=item.profile_set||'custom-profile'; state.name=item.name||''; state.description=item.description||''; state.scope=item.scope||'global'; state.streamKey=item.stream_key||state.streamKey; state.layers=parseJSONSafeStudio(item.profiles_json,[]).map(normalizeABRLayer); studioRerender('settings-abr'); };
+    const loadPresetBtn=document.getElementById('studio-abr-load-preset'); if(loadPresetBtn) loadPresetBtn.onclick=function(){ const presetKey=(presetSelect&&presetSelect.value)||state.profileSet||'balanced'; const preset=ABR_PRESETS[presetKey] || ABR_PRESETS.balanced; state.profileSet=presetKey; state.name=preset.title; state.description=preset.desc; state.layers=cloneJSON(preset.layers); studioRerender('settings-abr'); };
     const duplicateBtn=document.getElementById('studio-abr-duplicate'); if(duplicateBtn) duplicateBtn.onclick=function(){ state.profileId=0; state.name=(state.name||'Profil')+' Kopya'; studioRerender('settings-abr'); };
     const addBtn=document.getElementById('studio-abr-add-layer'); if(addBtn) addBtn.onclick=function(){ var fresh=normalizeABRLayer({name:'Yeni katman',width:1280,height:720,bitrate:'2500k',max_bitrate:'3000k',buf_size:'5000k',fps:30,preset:'fast',audio_rate:'128k'},state.layers.length); fresh=applyABRResolutionChoice(fresh,'720p',state.layers.length); fresh=applyABRBitratePack(fresh,'balanced_720'); state.layers.push(fresh); studioRerender('settings-abr'); };
     const applyPreset=document.getElementById('studio-abr-apply-preset'); if(applyPreset) applyPreset.onclick=function(){ const preset=ABR_PRESETS[state.profileSet] || ABR_PRESETS.balanced; state.layers=cloneJSON(preset.layers); state.name=state.name||preset.title; state.description=state.description||preset.desc; studioRerender('settings-abr'); };
@@ -936,6 +1005,43 @@
     document.querySelectorAll('[data-layer-down]').forEach(function(btn){ btn.onclick=function(){ const index=toNumber(btn.getAttribute('data-layer-down'),0); if(index>=state.layers.length-1) return; const temp=state.layers[index+1]; state.layers[index+1]=state.layers[index]; state.layers[index]=temp; studioRerender('settings-abr'); }; });
     document.querySelectorAll('[data-layer-delete]').forEach(function(btn){ btn.onclick=function(){ const index=toNumber(btn.getAttribute('data-layer-delete'),0); state.layers.splice(index,1); if(!state.layers.length) state.layers=cloneJSON(ABR_PRESETS.balanced.layers); studioRerender('settings-abr'); }; });
     const applyCurrent=document.getElementById('studio-abr-apply-current'); if(applyCurrent) applyCurrent.onclick=async function(){ const payload={profile_set:state.profileSet||'custom-profile',profiles_json:abrLayersToJSON(state.layers),stream_key:state.streamKey||'',scope:state.scope||'global'}; const res=await api('/api/admin/abr-profiles/direct-apply',{method:'POST',body:payload}); if(!res || res.error){ toast('Profil uygulanamadi','error'); return; } toast('ABR profili uygulandi'); studioRerender('settings-abr'); };
+    const saveDeliveryBtn=document.getElementById('studio-abr-save-delivery');
+    if(saveDeliveryBtn) saveDeliveryBtn.onclick=async function(){
+      const outputs={
+        abr_enabled:document.getElementById('studio-abr-global-enabled')?.checked?'true':'false',
+        abr_master_enabled:document.getElementById('studio-abr-master-enabled')?.checked?'true':'false',
+        hls_enabled:document.getElementById('studio-abr-hls-enabled')?.checked?'true':'false',
+        dash_enabled:document.getElementById('studio-abr-dash-enabled')?.checked?'true':'false',
+        abr_profile_set:document.getElementById('studio-abr-global-profile')?.value||state.profileSet||'balanced',
+        player_quality_selector:document.getElementById('studio-abr-quality-selector')?.value||'true'
+      };
+      const embed={
+        embed_use_https:document.getElementById('studio-abr-embed-https')?.checked?'true':'false',
+        embed_https_port:document.getElementById('studio-abr-embed-https-port')?.value||String(s.embed_https_port||s.https_port||'443')
+      };
+      const general={
+        https_port:document.getElementById('studio-abr-https-port')?.value||String(s.https_port||'443')
+      };
+      const protocols={
+        rtmps_enabled:document.getElementById('studio-abr-rtmps-enabled')?.checked?'true':'false',
+        rtmps_port:document.getElementById('studio-abr-rtmps-port')?.value||String(s.rtmps_port||'1936')
+      };
+      const results=await Promise.all([
+        saveSettingsValues('outputs',outputs,true),
+        saveSettingsValues('embed',embed,true),
+        saveSettingsValues('general',general,true),
+        saveSettingsValues('protocols',protocols,true)
+      ]);
+      if(results.some(function(item){ return item&&item.error; })){
+        toast('Teslimat ayarlari kaydedilirken hata olustu','error');
+        return;
+      }
+      state.profileSet=outputs.abr_profile_set||state.profileSet;
+      toast('Adaptive ve guvenli teslimat ayarlari kaydedildi');
+      studioRerender('settings-abr');
+    };
+    const openSecurityBtn=document.getElementById('studio-abr-open-security');
+    if(openSecurityBtn) openSecurityBtn.onclick=function(){ navigate('settings-ssl'); };
     const saveBtn=document.getElementById('studio-abr-save'); if(saveBtn) saveBtn.onclick=async function(){ const payload={profile_set:state.profileSet||'custom-profile',name:state.name||state.profileSet||'Yeni profil',scope:state.scope||'global',stream_key:state.scope==='stream'?(state.streamKey||''):'',description:state.description||'',preset:state.profileSet||'',profiles_json:abrLayersToJSON(state.layers),summary_json:JSON.stringify(summarizeABRLayers(state.layers))}; const path=state.profileId?('/api/admin/abr-profiles/'+state.profileId):'/api/admin/abr-profiles'; const method=state.profileId?'PUT':'POST'; const res=await api(path,{method:method,body:payload}); if(!res || res.error){ toast('ABR profili kaydedilemedi','error'); return; } if(res.item && res.item.id) state.profileId=res.item.id; toast('ABR profili kaydedildi'); studioRerender('settings-abr'); };
     const deleteBtn=document.getElementById('studio-abr-delete'); if(deleteBtn) deleteBtn.onclick=async function(){ if(!state.profileId || !confirm('Secili kayitli ABR profili silinsin mi?')) return; const res=await api('/api/admin/abr-profiles/'+state.profileId,{method:'DELETE'}); if(!res || res.error){ toast('ABR profili silinemedi','error'); return; } state.profileId=0; toast('ABR profili silindi'); studioRerender('settings-abr'); };
   };
