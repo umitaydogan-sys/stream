@@ -157,7 +157,7 @@
   }
 
   function studioField(label,control,hint){
-    return '<div><label class="form-label">'+escHtml(label)+'</label>'+control+(hint?'<div class="form-hint">'+escHtml(hint)+'</div>':'')+'</div>';
+    return '<div class="studio-field"><label class="form-label">'+escHtml(label)+'</label>'+control+(hint?'<div class="form-hint">'+escHtml(hint)+'</div>':'')+'</div>';
   }
 
   function studioSelectOptions(items,selected,emptyLabel){
@@ -713,6 +713,38 @@
     low_band:{title:'Sadece dusuk bant', desc:'Dar bant ve saha baglantilari icin minimum merdiven.', scope:'global', layers:[{name:'480p',width:854,height:480,bitrate:'650k',max_bitrate:'800k',buf_size:'1300k',fps:25,preset:'veryfast',audio_rate:'96k'},{name:'360p',width:640,height:360,bitrate:'360k',max_bitrate:'450k',buf_size:'800k',fps:24,preset:'superfast',audio_rate:'64k'},{name:'240p',width:426,height:240,bitrate:'220k',max_bitrate:'280k',buf_size:'500k',fps:20,preset:'superfast',audio_rate:'48k'}]}
   };
 
+  const ABR_RESOLUTION_OPTIONS = [
+    {key:'1440p',label:'1440p / 2560x1440',width:2560,height:1440,default_name:'1440p',fps:30},
+    {key:'1080p',label:'1080p / 1920x1080',width:1920,height:1080,default_name:'1080p',fps:30},
+    {key:'720p',label:'720p / 1280x720',width:1280,height:720,default_name:'720p',fps:30},
+    {key:'540p',label:'540p / 960x540',width:960,height:540,default_name:'540p',fps:30},
+    {key:'480p',label:'480p / 854x480',width:854,height:480,default_name:'480p',fps:30},
+    {key:'360p',label:'360p / 640x360',width:640,height:360,default_name:'360p',fps:25},
+    {key:'240p',label:'240p / 426x240',width:426,height:240,default_name:'240p',fps:20},
+    {key:'audio',label:'Audio-only katman',width:0,height:0,default_name:'audio',fps:0}
+  ];
+
+  const ABR_BITRATE_PACKS = [
+    {key:'ultra_1440',label:'Ultra 1440p',bitrate:'9000k',max_bitrate:'9800k',buf_size:'18000k'},
+    {key:'strong_1080',label:'Guclu 1080p',bitrate:'5500k',max_bitrate:'6200k',buf_size:'11000k'},
+    {key:'balanced_1080',label:'Dengeli 1080p',bitrate:'4500k',max_bitrate:'5000k',buf_size:'9000k'},
+    {key:'balanced_720',label:'Dengeli 720p',bitrate:'2500k',max_bitrate:'3000k',buf_size:'5000k'},
+    {key:'mobile_720',label:'Mobil 720p',bitrate:'1800k',max_bitrate:'2200k',buf_size:'3600k'},
+    {key:'balanced_540',label:'Dengeli 540p',bitrate:'1800k',max_bitrate:'2100k',buf_size:'3600k'},
+    {key:'balanced_480',label:'Dengeli 480p',bitrate:'1100k',max_bitrate:'1200k',buf_size:'2000k'},
+    {key:'mobile_480',label:'Mobil 480p',bitrate:'900k',max_bitrate:'1100k',buf_size:'1800k'},
+    {key:'resilient_480',label:'Dayanikli 480p',bitrate:'700k',max_bitrate:'900k',buf_size:'1500k'},
+    {key:'balanced_360',label:'Dengeli 360p',bitrate:'600k',max_bitrate:'700k',buf_size:'1200k'},
+    {key:'mobile_360',label:'Mobil 360p',bitrate:'480k',max_bitrate:'600k',buf_size:'1000k'},
+    {key:'resilient_360',label:'Dayanikli 360p',bitrate:'420k',max_bitrate:'520k',buf_size:'900k'},
+    {key:'low_240',label:'Dusuk 240p',bitrate:'220k',max_bitrate:'280k',buf_size:'500k'},
+    {key:'audio_passthrough',label:'Audio-only',bitrate:'0',max_bitrate:'0',buf_size:'0'}
+  ];
+
+  const ABR_AUDIO_OPTIONS = [['192k','192 kbps'],['160k','160 kbps'],['128k','128 kbps'],['96k','96 kbps'],['64k','64 kbps'],['48k','48 kbps']];
+  const ABR_FPS_OPTIONS = [['0','0 / audio-only'],['20','20'],['24','24'],['25','25'],['30','30'],['50','50'],['60','60']];
+  const ABR_PRESET_OPTIONS = [['copy','copy'],['superfast','superfast'],['veryfast','veryfast'],['fast','fast'],['faster','faster']];
+
   function defaultABRState(){
     return {mode:'simple',profileId:0,profileSet:'balanced',name:'',description:'',scope:'global',streamKey:'',compareKey:'',layers:cloneJSON(ABR_PRESETS.balanced.layers),json:'',importJSON:''};
   }
@@ -779,19 +811,78 @@
     return {preset:'balanced',why:'Genel kullanim ve coklu ekran dagitimi icin dengeli profil uygun.'};
   }
 
-  function renderABRLayerRow(layer,index,total){
+  function abrResolutionKey(layer){
+    const item=ABR_RESOLUTION_OPTIONS.find(function(option){
+      return Number(option.width)===Number(layer.width||0) && Number(option.height)===Number(layer.height||0);
+    });
+    return item?item.key:(Number(layer.width||0)===0 && Number(layer.height||0)===0?'audio':'custom');
+  }
+
+  function abrBitratePackKey(layer){
+    const item=ABR_BITRATE_PACKS.find(function(pack){
+      return String(pack.bitrate)===String(layer.bitrate||'0')
+        && String(pack.max_bitrate)===String(layer.max_bitrate||layer.bitrate||'0')
+        && String(pack.buf_size)===String(layer.buf_size||'0');
+    });
+    if(item) return item.key;
+    return Number(layer.width||0)===0 && Number(layer.height||0)===0 ? 'audio_passthrough' : 'balanced_720';
+  }
+
+  function applyABRResolutionChoice(layer,key,index){
+    const picked=ABR_RESOLUTION_OPTIONS.find(function(option){ return option.key===key; }) || ABR_RESOLUTION_OPTIONS[2];
+    layer.width=picked.width;
+    layer.height=picked.height;
+    layer.fps=picked.fps;
+    if(!layer.name || /^Katman \d+$/i.test(layer.name) || /^audio/i.test(layer.name) || /\d+p/i.test(layer.name)) layer.name=picked.default_name;
+    if(picked.key==='audio'){
+      layer.bitrate='0';
+      layer.max_bitrate='0';
+      layer.buf_size='0';
+      layer.preset='copy';
+      layer.audio_rate=layer.audio_rate||'128k';
+    }else if(String(layer.bitrate||'0')==='0'){
+      const fallbackPack=ABR_BITRATE_PACKS.find(function(pack){ return pack.key.indexOf(picked.key)>=0; }) || ABR_BITRATE_PACKS.find(function(pack){ return pack.key==='balanced_720'; });
+      if(fallbackPack) applyABRBitratePack(layer,fallbackPack.key);
+    }
+    return normalizeABRLayer(layer,index);
+  }
+
+  function applyABRBitratePack(layer,key){
+    const picked=ABR_BITRATE_PACKS.find(function(pack){ return pack.key===key; }) || ABR_BITRATE_PACKS[0];
+    layer.bitrate=picked.bitrate;
+    layer.max_bitrate=picked.max_bitrate;
+    layer.buf_size=picked.buf_size;
+    if(key==='audio_passthrough'){
+      layer.width=0;
+      layer.height=0;
+      layer.fps=0;
+      layer.preset='copy';
+    }
+    return layer;
+  }
+
+  function renderABRLayerRow(layer,index,total,mode){
     layer=normalizeABRLayer(layer,index);
-    return '<div class="studio-layer" data-layer-index="'+index+'"><div class="studio-layer-head"><strong>'+escHtml(layer.name||('Katman '+(index+1)))+'</strong><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-secondary btn-sm" data-layer-up="'+index+'"'+(index===0?' disabled':'')+'>Yukari</button><button class="btn btn-secondary btn-sm" data-layer-down="'+index+'"'+(index===total-1?' disabled':'')+'>Asagi</button><button class="btn btn-danger btn-sm" data-layer-delete="'+index+'">Sil</button></div></div><div class="studio-grid studio-grid-3">'+
-      studioField('Ad','<input class="input" data-layer-field="name" data-layer-index="'+index+'" value="'+escHtml(layer.name||'')+'">','Katman etiketi.')+
-      studioField('Genislik','<input class="input" type="number" min="0" data-layer-field="width" data-layer-index="'+index+'" value="'+escHtml(String(layer.width||0))+'">','0 ise audio-only kabul edilir.')+
-      studioField('Yukseklik','<input class="input" type="number" min="0" data-layer-field="height" data-layer-index="'+index+'" value="'+escHtml(String(layer.height||0))+'">','0 ise audio-only kabul edilir.')+
-      studioField('Bitrate','<input class="input" data-layer-field="bitrate" data-layer-index="'+index+'" value="'+escHtml(layer.bitrate||'0')+'">','Ornek: 2500k')+
-      studioField('Max bitrate','<input class="input" data-layer-field="max_bitrate" data-layer-index="'+index+'" value="'+escHtml(layer.max_bitrate||layer.bitrate||'0')+'">','ABR ust siniri.')+
-      studioField('Buffer','<input class="input" data-layer-field="buf_size" data-layer-index="'+index+'" value="'+escHtml(layer.buf_size||'0')+'">','Encoder buffer boyutu.')+
-      studioField('FPS','<input class="input" type="number" min="0" data-layer-field="fps" data-layer-index="'+index+'" value="'+escHtml(String(layer.fps||0))+'">','Audio-only icin 0 olabilir.')+
-      studioField('Preset','<select class="input" data-layer-field="preset" data-layer-index="'+index+'">'+studioSelectOptions([['copy','Copy'],['superfast','superfast'],['veryfast','veryfast'],['fast','fast'],['faster','faster']],layer.preset||'fast')+'</select>','Encoder hiz profili.')+
-      studioField('Audio bitrate','<input class="input" data-layer-field="audio_rate" data-layer-index="'+index+'" value="'+escHtml(layer.audio_rate||'128k')+'">','Katmana eslik eden ses hizi.')+
-    '</div></div>';
+    const resolutionKey=abrResolutionKey(layer);
+    const bitrateKey=abrBitratePackKey(layer);
+    const simpleFields=
+      '<div class="studio-layer-simple">'+
+        studioField('Katman adi','<input class="input" data-layer-field="name" data-layer-index="'+index+'" value="'+escHtml(layer.name||'')+'">','Profil kutuphanesinde gorunecek ad.')+
+        studioField('Cozunurluk','<select class="input" data-layer-select="resolution" data-layer-index="'+index+'">'+studioSelectOptions(ABR_RESOLUTION_OPTIONS.map(function(item){ return [item.key,item.label]; }),resolutionKey)+'</select>','Hazir cozumlerden birini sec.')+
+        studioField('Bitrate paketi','<select class="input" data-layer-select="bitrate_pack" data-layer-index="'+index+'">'+studioSelectOptions(ABR_BITRATE_PACKS.map(function(item){ return [item.key,item.label]; }),bitrateKey)+'</select>','Video bitrate, max ve buffer birlikte secilir.')+
+        studioField('FPS','<select class="input" data-layer-field="fps" data-layer-index="'+index+'">'+studioSelectOptions(ABR_FPS_OPTIONS,String(layer.fps||0))+'</select>','Kare hizi secimi.')+
+        studioField('Encoder hizi','<select class="input" data-layer-field="preset" data-layer-index="'+index+'">'+studioSelectOptions(ABR_PRESET_OPTIONS,layer.preset||'fast')+'</select>','FFmpeg encoder profili.')+
+        studioField('Ses bitrate','<select class="input" data-layer-field="audio_rate" data-layer-index="'+index+'">'+studioSelectOptions(ABR_AUDIO_OPTIONS,layer.audio_rate||'128k')+'</select>','Katmana eslik eden ses hizi.')+
+      '</div>';
+    const advancedFields=
+      '<div class="studio-layer-manual">'+
+        studioField('Genislik','<input class="input" type="number" min="0" data-layer-field="width" data-layer-index="'+index+'" value="'+escHtml(String(layer.width||0))+'">','0 ise audio-only kabul edilir.')+
+        studioField('Yukseklik','<input class="input" type="number" min="0" data-layer-field="height" data-layer-index="'+index+'" value="'+escHtml(String(layer.height||0))+'">','0 ise audio-only kabul edilir.')+
+        studioField('Bitrate','<input class="input" data-layer-field="bitrate" data-layer-index="'+index+'" value="'+escHtml(layer.bitrate||'0')+'">','Ornek: 2500k')+
+        studioField('Max bitrate','<input class="input" data-layer-field="max_bitrate" data-layer-index="'+index+'" value="'+escHtml(layer.max_bitrate||layer.bitrate||'0')+'">','ABR ust siniri.')+
+        studioField('Buffer','<input class="input" data-layer-field="buf_size" data-layer-index="'+index+'" value="'+escHtml(layer.buf_size||'0')+'">','Encoder buffer boyutu.')+
+      '</div>';
+    return '<div class="studio-layer" data-layer-index="'+index+'"><div class="studio-layer-head"><strong>'+escHtml(layer.name||('Katman '+(index+1)))+'</strong><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-secondary btn-sm" data-layer-up="'+index+'"'+(index===0?' disabled':'')+'>Yukari</button><button class="btn btn-secondary btn-sm" data-layer-down="'+index+'"'+(index===total-1?' disabled':'')+'>Asagi</button><button class="btn btn-danger btn-sm" data-layer-delete="'+index+'">Sil</button></div></div><div class="studio-layer-meta"><span class="studio-chip active">'+escHtml(layer.width&&layer.height?(layer.width+'x'+layer.height):'Audio-only')+'</span><span class="studio-chip">'+escHtml((layer.bitrate||'0')+' / '+(layer.max_bitrate||layer.bitrate||'0'))+'</span><span class="studio-chip">'+escHtml((layer.audio_rate||'128k')+' ses')+'</span></div>'+simpleFields+(mode==='advanced'?advancedFields:'')+'</div>';
   }
 
   window.renderSettingsABR = async function(container){
@@ -816,7 +907,7 @@
         '<section class="studio-hero"><h1 class="studio-hero-title">ABR Profilleri ve Teslimat Merkezi</h1><div class="studio-hero-sub">Ham JSON duzenleme yerine secilebilir, kaydedilebilir ve tekrar kullanilabilir ABR profil studyosu. HLS, DASH ve audio-only teslimat davranisini burada modelleyebilir ve uygulayabilirsin.</div><div class="studio-pill-row" style="margin-top:14px"><span class="studio-pill active">'+escHtml((state.profileSet||'balanced'))+'</span><span class="studio-pill">'+escHtml((stream&&stream.name)||'Stream sec')+'</span><span class="studio-pill">'+escHtml(summary.audioOnly?'Audio-only':'Video + Audio')+'</span><span class="studio-pill">'+escHtml((diagnostics.delivery_summary&&diagnostics.delivery_summary.label)||'Teslimat ozeti')+'</span></div></section>'+
         '<section class="studio-toolbar"><div class="studio-toolbar-group"><select id="studio-abr-stream" class="input">'+streamList.map(function(item){ return '<option value="'+escHtml(item.stream_key)+'"'+(item.stream_key===state.streamKey?' selected':'')+'>'+escHtml(item.name)+'</option>'; }).join('')+'</select><select id="studio-abr-saved" class="input">'+studioProfileSelectOptions(savedProfiles,state.profileId)+'</select><button class="btn btn-secondary" id="studio-abr-load">Profili Yukle</button></div><div class="studio-toolbar-group"><div class="segmented"><button class="segment'+(state.mode==='simple'?' active':'')+'" data-abr-mode="simple" type="button">Basit Mod</button><button class="segment'+(state.mode==='advanced'?' active':'')+'" data-abr-mode="advanced" type="button">Gelismis Mod</button></div><button class="btn btn-secondary" id="studio-abr-duplicate">Cogalt</button><button class="btn btn-primary" id="studio-abr-save">Profili Kaydet</button></div></section>'+
         '<div class="studio-grid studio-grid-2"><div class="studio-card soft"><div><h2 class="studio-section-title">Hazir preset kutuphanesi</h2><div class="studio-section-sub">Kullanici JSON yazmak zorunda kalmadan secilebilir profil setleri.</div></div><div class="studio-option-grid">'+Object.keys(ABR_PRESETS).map(function(key){ const item=ABR_PRESETS[key]; return studioOptionCard({key:key,title:item.title,desc:item.desc,badge:key===recommendation.preset?'Oneri':'Preset'},key===state.profileSet); }).join('')+'</div><div class="studio-alert info"><strong>Yayin bazli onerim</strong><div style="margin-top:8px" class="form-hint">'+escHtml((ABR_PRESETS[recommendation.preset]&&ABR_PRESETS[recommendation.preset].title)||recommendation.preset)+' • '+escHtml(recommendation.why)+'</div></div></div><div class="studio-card"><div><h2 class="studio-section-title">Profil ozeti</h2><div class="studio-section-sub">Secili merdivenin tahmini kaynak kullanimi ve cikti yapisi.</div></div><div class="studio-kpi-grid" style="grid-template-columns:repeat(2,minmax(0,1fr))">'+renderAnalyticsKPI('Varyant',fmtInt(summary.variants),'Tahmini HLS / DASH katman sayisi')+renderAnalyticsKPI('Tahmini Upload',summary.uploadMbps.toFixed(2)+' Mbps','Bitrate toplami')+renderAnalyticsKPI('Tepe Upload',summary.peakMbps.toFixed(2)+' Mbps','Max bitrate toplami')+renderAnalyticsKPI('CPU Skoru',fmtInt(summary.cpuScore),'Yaklasik encoder maliyeti')+renderAnalyticsKPI('Dusuk Bant Uyumu',fmtInt(summary.lowBandScore)+'%','Daha dusuk katman yogunlugu')+renderAnalyticsKPI('Teslimat Sagligi',(diagnostics.delivery_summary&&diagnostics.delivery_summary.label)||'-',(diagnostics.delivery_summary&&diagnostics.delivery_summary.description)||'')+'</div><div class="studio-chip-row">'+(diagnostics.checks||[]).map(function(item){ return '<span class="studio-chip'+(item.tone==='green'?' active':'')+'">'+escHtml(item.description)+' • '+escHtml(item.label)+'</span>'; }).join('')+'</div><div class="studio-grid studio-grid-2">'+studioField('Profil anahtari','<input id="studio-abr-profile-set" class="input" value="'+escHtml(state.profileSet||'balanced')+'">','Kayitli profillerde benzersiz anahtar.')+studioField('Profil adi','<input id="studio-abr-name" class="input" value="'+escHtml(state.name||'')+'" placeholder="Ornek: Mobil Dayanikli">','Kutuphanede gosterilecek ad.')+studioField('Aciklama','<input id="studio-abr-description" class="input" value="'+escHtml(state.description||'')+'" placeholder="Dusuk bant saha yayini">','Profilin nerede kullanilacagi.')+studioField('Uygulama kapsami','<select id="studio-abr-scope" class="input">'+studioSelectOptions([['global','Global varsayilan'],['stream','Sadece secili stream']],state.scope)+'</select>','Global veya stream bazli uygula.')+'</div><div class="studio-chip-row"><button class="btn btn-secondary" id="studio-abr-import">JSON Icice Al</button><button class="btn btn-secondary" id="studio-abr-export">JSON Disari Aktar</button><button class="btn btn-secondary" id="studio-abr-apply-current">Mevcut Profili Uygula</button><button class="btn btn-secondary" id="studio-abr-delete">Secili Kayitli Profili Sil</button></div></div></div>'+
-        '<div class="studio-card"><div><h2 class="studio-section-title">Katman olusturucu</h2><div class="studio-section-sub">Katman ekle, sil, yukari/asagi tasi. Surukle birak yerine daha guvenli kontrol butonlari kullaniliyor.</div></div><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-primary" id="studio-abr-add-layer">Katman Ekle</button><button class="btn btn-secondary" id="studio-abr-apply-preset">Preseti Yukle</button><button class="btn btn-secondary" id="studio-abr-reset">Sifirla</button></div><div id="studio-abr-layer-list">'+(state.layers||[]).map(function(layer,index,arr){ return renderABRLayerRow(layer,index,arr.length); }).join('')+'</div>'+(state.mode==='advanced'?'<div class="studio-card soft" style="padding:14px"><div class="studio-section-title" style="font-size:16px">Gelistirilmis JSON gorunumu</div><textarea id="studio-abr-json" class="input" style="min-height:220px;font-family:Consolas,monospace">'+escHtml(state.json||'[]')+'</textarea><div class="studio-chip-row"><button class="btn btn-secondary" id="studio-abr-sync-json">JSON\'dan katmanlari guncelle</button></div></div>':'')+'</div>'+
+        '<div class="studio-card"><div><h2 class="studio-section-title">Katman olusturucu</h2><div class="studio-section-sub">Manuel sayi girmek yerine hazir cozum ve bitrate paketleri secilir. Istersen gelismis modda ayrintilari yine elle duzenleyebilirsin.</div></div><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-primary" id="studio-abr-add-layer">Katman Ekle</button><button class="btn btn-secondary" id="studio-abr-apply-preset">Preseti Yukle</button><button class="btn btn-secondary" id="studio-abr-reset">Sifirla</button></div><div id="studio-abr-layer-list">'+(state.layers||[]).map(function(layer,index,arr){ return renderABRLayerRow(layer,index,arr.length,state.mode); }).join('')+'</div>'+(state.mode==='advanced'?'<div class="studio-card soft" style="padding:14px"><div class="studio-section-title" style="font-size:16px">Gelistirilmis JSON gorunumu</div><textarea id="studio-abr-json" class="input" style="min-height:220px;font-family:Consolas,monospace">'+escHtml(state.json||'[]')+'</textarea><div class="studio-chip-row"><button class="btn btn-secondary" id="studio-abr-sync-json">JSON\'dan katmanlari guncelle</button></div></div>':'')+'</div>'+
         '<div class="studio-grid studio-grid-2"><div class="studio-card"><div class="studio-section-title">Canli test ve cikti tahmini</div><div class="studio-section-sub">Secilen profil ile beklenen teslimat yapisi.</div><div class="studio-chip-row"><span class="studio-chip active">HLS varyant: '+fmtInt(summary.variants)+'</span><span class="studio-chip">'+escHtml(summary.audioOnly?'Audio-only MPD':'Video + Audio MPD')+'</span><span class="studio-chip">'+escHtml((stream&&stream.output_formats)||'Tum cikislar')+'</span></div><div class="studio-code-block">'+escHtml(JSON.stringify({profile_set:state.profileSet,layers:state.layers,hls_master_variants:summary.variants,dash_representations:summary.audioOnly?summary.variants:(summary.variants+1),audio_only:summary.audioOnly},null,2))+'</div></div><div class="studio-card"><div class="studio-section-title">Audio-only DASH sertlestirme</div><div class="studio-section-sub">Radyo ve podcast senaryolari icin ses odakli teslimat tanisi.</div><div class="studio-chip-row"><span class="studio-chip '+((summary.audioOnly||(diagnostics.output_formats||'').indexOf('mp3')>=0)?'active':'')+'">Audio preset</span><span class="studio-chip '+(((diagnostics.dash_enabled)?'active':''))+'">DASH cikisi</span><span class="studio-chip '+(((diagnostics.checks||[]).find(function(item){ return item.code==='dash' && item.status==='ready'; })?'active':''))+'">MPD hazir</span></div><div class="form-hint">Sadece ses yayini icin Audio-only veya Radyo presetlerini sec; ardindan Embed Studyosu icinden DASH Ses veya HLS Ses linklerini kullan.</div>'+(stream?('<div style="margin-top:12px">'+copyField('DASH Ses',location.origin+'/audio/dash/'+stream.stream_key)+copyField('HLS Ses',location.origin+'/audio/hls/'+stream.stream_key)+'</div>'):'')+'</div></div>'+
       '</div>';
 
@@ -827,14 +918,16 @@
     const savedSelect=document.getElementById('studio-abr-saved'); if(savedSelect) savedSelect.onchange=function(){ state.profileId=toNumber(savedSelect.value,0); };
     const loadBtn=document.getElementById('studio-abr-load'); if(loadBtn) loadBtn.onclick=async function(){ if(!state.profileId){ toast('Once kayitli profil secin','warning'); return; } const item=await api('/api/admin/abr-profiles/'+state.profileId); if(!item || item.error){ toast('Profil yuklenemedi','error'); return; } state.profileSet=item.profile_set||'custom-profile'; state.name=item.name||''; state.description=item.description||''; state.scope=item.scope||'global'; state.streamKey=item.stream_key||state.streamKey; state.layers=parseJSONSafeStudio(item.profiles_json,[]).map(normalizeABRLayer); studioRerender('settings-abr'); };
     const duplicateBtn=document.getElementById('studio-abr-duplicate'); if(duplicateBtn) duplicateBtn.onclick=function(){ state.profileId=0; state.name=(state.name||'Profil')+' Kopya'; studioRerender('settings-abr'); };
-    const addBtn=document.getElementById('studio-abr-add-layer'); if(addBtn) addBtn.onclick=function(){ state.layers.push(normalizeABRLayer({name:'Yeni katman',width:640,height:360,bitrate:'600k',max_bitrate:'700k',buf_size:'1200k',fps:24,preset:'fast',audio_rate:'64k'},state.layers.length)); studioRerender('settings-abr'); };
+    const addBtn=document.getElementById('studio-abr-add-layer'); if(addBtn) addBtn.onclick=function(){ var fresh=normalizeABRLayer({name:'Yeni katman',width:1280,height:720,bitrate:'2500k',max_bitrate:'3000k',buf_size:'5000k',fps:30,preset:'fast',audio_rate:'128k'},state.layers.length); fresh=applyABRResolutionChoice(fresh,'720p',state.layers.length); fresh=applyABRBitratePack(fresh,'balanced_720'); state.layers.push(fresh); studioRerender('settings-abr'); };
     const applyPreset=document.getElementById('studio-abr-apply-preset'); if(applyPreset) applyPreset.onclick=function(){ const preset=ABR_PRESETS[state.profileSet] || ABR_PRESETS.balanced; state.layers=cloneJSON(preset.layers); state.name=state.name||preset.title; state.description=state.description||preset.desc; studioRerender('settings-abr'); };
     const resetBtn=document.getElementById('studio-abr-reset'); if(resetBtn) resetBtn.onclick=function(){ window.abrStudioState=defaultABRState(); if(streamSelect) window.abrStudioState.streamKey=streamSelect.value||''; studioRerender('settings-abr'); };
     const exportBtn=document.getElementById('studio-abr-export'); if(exportBtn) exportBtn.onclick=function(){ studioDownloadFile('fluxstream-abr-'+(state.profileSet||'profile')+'.json',abrLayersToJSON(state.layers),'application/json;charset=utf-8'); };
     const importBtn=document.getElementById('studio-abr-import'); if(importBtn) importBtn.onclick=function(){ const raw=prompt('ABR JSON yapistirin'); if(!raw) return; try{ state.layers=parseJSONSafeStudio(raw,[]).map(normalizeABRLayer); studioRerender('settings-abr'); }catch(e){ toast('JSON okunamadi','error'); } };
     const syncJSON=document.getElementById('studio-abr-sync-json'); if(syncJSON) syncJSON.onclick=function(){ const raw=(document.getElementById('studio-abr-json')||{}).value||'[]'; state.layers=parseJSONSafeStudio(raw,[]).map(normalizeABRLayer); studioRerender('settings-abr'); };
     ['studio-abr-profile-set','studio-abr-name','studio-abr-description','studio-abr-scope'].forEach(function(id){ const el=document.getElementById(id); if(!el) return; el.onchange=function(){ if(id==='studio-abr-profile-set') state.profileSet=el.value||'custom-profile'; else if(id==='studio-abr-name') state.name=el.value||''; else if(id==='studio-abr-description') state.description=el.value||''; else if(id==='studio-abr-scope') state.scope=el.value||'global'; }; });
-    document.querySelectorAll('[data-layer-field]').forEach(function(el){ el.onchange=function(){ const index=toNumber(el.getAttribute('data-layer-index'),0); const field=el.getAttribute('data-layer-field'); state.layers[index]=normalizeABRLayer(state.layers[index],index); state.layers[index][field]=el.value; state.json=abrLayersToJSON(state.layers); }; });
+    document.querySelectorAll('[data-layer-field]').forEach(function(el){ el.onchange=function(){ const index=toNumber(el.getAttribute('data-layer-index'),0); const field=el.getAttribute('data-layer-field'); state.layers[index]=normalizeABRLayer(state.layers[index],index); state.layers[index][field]=el.value; state.json=abrLayersToJSON(state.layers); if(state.mode==='advanced') return; studioRerender('settings-abr'); }; });
+    document.querySelectorAll('[data-layer-select="resolution"]').forEach(function(el){ el.onchange=function(){ const index=toNumber(el.getAttribute('data-layer-index'),0); state.layers[index]=normalizeABRLayer(state.layers[index],index); state.layers[index]=applyABRResolutionChoice(state.layers[index],el.value,index); state.json=abrLayersToJSON(state.layers); studioRerender('settings-abr'); }; });
+    document.querySelectorAll('[data-layer-select="bitrate_pack"]').forEach(function(el){ el.onchange=function(){ const index=toNumber(el.getAttribute('data-layer-index'),0); state.layers[index]=normalizeABRLayer(state.layers[index],index); state.layers[index]=applyABRBitratePack(state.layers[index],el.value); state.layers[index]=normalizeABRLayer(state.layers[index],index); state.json=abrLayersToJSON(state.layers); studioRerender('settings-abr'); }; });
     document.querySelectorAll('[data-layer-up]').forEach(function(btn){ btn.onclick=function(){ const index=toNumber(btn.getAttribute('data-layer-up'),0); if(index<=0) return; const temp=state.layers[index-1]; state.layers[index-1]=state.layers[index]; state.layers[index]=temp; studioRerender('settings-abr'); }; });
     document.querySelectorAll('[data-layer-down]').forEach(function(btn){ btn.onclick=function(){ const index=toNumber(btn.getAttribute('data-layer-down'),0); if(index>=state.layers.length-1) return; const temp=state.layers[index+1]; state.layers[index+1]=state.layers[index]; state.layers[index]=temp; studioRerender('settings-abr'); }; });
     document.querySelectorAll('[data-layer-delete]').forEach(function(btn){ btn.onclick=function(){ const index=toNumber(btn.getAttribute('data-layer-delete'),0); state.layers.splice(index,1); if(!state.layers.length) state.layers=cloneJSON(ABR_PRESETS.balanced.layers); studioRerender('settings-abr'); }; });
@@ -1282,6 +1375,265 @@
       };
     });
     studioAuditControls(container);
+  };
+
+  function defaultPlayerTemplateDraftStudioV2(){
+    return {name:'',theme:'dark',background_css:'',control_bar_css:'',play_button_css:'',logo_url:'',logo_position:'top-right',logo_opacity:1,watermark_text:'',show_title:true,show_live_badge:true,custom_css:''};
+  }
+
+  function playerTemplateRecordToDraftStudioV2(item){
+    return Object.assign(defaultPlayerTemplateDraftStudioV2(),cloneJSON(item||{}));
+  }
+
+  function ensurePlayerTemplateWorkbenchStudioV2(templates){
+    if(!window.playerTemplateWorkbenchStateV2) window.playerTemplateWorkbenchStateV2={selectedId:0,draft:defaultPlayerTemplateDraftStudioV2()};
+    const state=window.playerTemplateWorkbenchStateV2;
+    const list=Array.isArray(templates)?templates:[];
+    if(!state.draft) state.draft=defaultPlayerTemplateDraftStudioV2();
+    if(state.selectedId){
+      const selected=list.find(function(item){ return Number(item.id)===Number(state.selectedId); });
+      if(selected && !state.draft.name) state.draft=playerTemplateRecordToDraftStudioV2(selected);
+    }else if(list.length && !state.draft.name){
+      state.selectedId=Number(list[0].id)||0;
+      state.draft=playerTemplateRecordToDraftStudioV2(list[0]);
+    }
+    return state;
+  }
+
+  function loadPlayerTemplateWorkbenchStudioV2(id,templates){
+    const state=ensurePlayerTemplateWorkbenchStudioV2(templates);
+    const selected=(Array.isArray(templates)?templates:[]).find(function(item){ return Number(item.id)===Number(id); }) || null;
+    state.selectedId=selected?Number(selected.id):0;
+    state.draft=playerTemplateRecordToDraftStudioV2(selected);
+    return state;
+  }
+
+  function playerTemplateWorkbenchValuesStudioV2(){
+    return {
+      name:(document.getElementById('ptw-name')||{}).value||'',
+      theme:(document.getElementById('ptw-theme')||{}).value||'dark',
+      logo_url:(document.getElementById('ptw-logo-url')||{}).value||'',
+      logo_position:(document.getElementById('ptw-logo-pos')||{}).value||'top-right',
+      logo_opacity:parseFloat((document.getElementById('ptw-logo-opacity')||{}).value||'1')||1,
+      watermark_text:(document.getElementById('ptw-watermark')||{}).value||'',
+      show_title:!!((document.getElementById('ptw-show-title')||{}).checked),
+      show_live_badge:!!((document.getElementById('ptw-show-badge')||{}).checked),
+      background_css:(document.getElementById('ptw-bg-css')||{}).value||'',
+      control_bar_css:(document.getElementById('ptw-ctrl-css')||{}).value||'',
+      play_button_css:(document.getElementById('ptw-play-css')||{}).value||'',
+      custom_css:(document.getElementById('ptw-custom-css')||{}).value||''
+    };
+  }
+
+  function syncPlayerTemplateWorkbenchStudioV2(){
+    const state=window.playerTemplateWorkbenchStateV2||{selectedId:0,draft:defaultPlayerTemplateDraftStudioV2()};
+    state.draft=playerTemplateWorkbenchValuesStudioV2();
+    const streamSelect=document.getElementById('ptw-stream');
+    const formatSelect=document.getElementById('ptw-format');
+    if(streamSelect) playerTemplateStudioState.streamKey=streamSelect.value||'';
+    if(formatSelect) playerTemplateStudioState.format=formatSelect.value||'player';
+    ensureTemplateStudioState();
+    return state.draft;
+  }
+
+  async function refreshPlayerTemplateWorkbenchAssetShelfStudioV2(currentURL){
+    const host=document.getElementById('ptw-brand-assets');
+    if(!host) return;
+    const items=await studioListAssets('branding');
+    host.innerHTML=renderBrandAssetTiles(items,currentURL);
+    bindBrandAssetTiles(host,function(url){
+      const input=document.getElementById('ptw-logo-url');
+      if(input){
+        input.value=url||'';
+        syncPlayerTemplateWorkbenchStudioV2();
+        renderPlayerTemplateWorkbenchPreviewStudioV2();
+      }
+    });
+  }
+
+  async function uploadPlayerTemplateWorkbenchLogoStudioV2(){
+    const input=document.getElementById('ptw-logo-file');
+    if(!input || !input.files || !input.files[0]){
+      toast('Yuklenecek logo dosyasini secin','warning');
+      return;
+    }
+    const res=await studioUploadFile('branding',input.files[0]);
+    if(res && res.item && res.item.url){
+      const logo=document.getElementById('ptw-logo-url');
+      if(logo) logo.value=res.item.url;
+      input.value='';
+      syncPlayerTemplateWorkbenchStudioV2();
+      await refreshPlayerTemplateWorkbenchAssetShelfStudioV2(res.item.url);
+      await renderPlayerTemplateWorkbenchPreviewStudioV2();
+      toast('Logo yuklendi');
+    }else{
+      toast((res&&res.message)||'Logo yuklenemedi','error');
+    }
+  }
+
+  async function renderPlayerTemplateWorkbenchPreviewStudioV2(){
+    const preview=document.getElementById('ptw-live-preview');
+    const outputs=document.getElementById('ptw-live-output');
+    const streamHint=document.getElementById('ptw-stream-hint');
+    if(!preview || !outputs) return;
+    const draft=syncPlayerTemplateWorkbenchStudioV2();
+    const stream=ensureTemplateStudioState();
+    if(streamHint) streamHint.innerHTML=stream?('Kaynak: <strong>'+escHtml(stream.name)+'</strong> • '+escHtml(stream.stream_key)):'Kaynak stream secilmedi';
+    if(!stream){
+      preview.innerHTML='<div class="empty-state" style="padding:34px"><div class="icon"><i class="bi bi-broadcast"></i></div><h3>Kaynak stream yok</h3><p style="color:var(--text-muted)">Canli onizleme icin once bir stream secin.</p></div>';
+      outputs.innerHTML='';
+      return;
+    }
+    const settings=await api('/api/settings');
+    const access=await getPlaybackAccess(stream.stream_key,settings,stream.policy_json||'');
+    const previewRawURLs=getPreviewURLs(stream.stream_key,settings,stream.name,access);
+    const publicRawURLs=getAllURLs(stream.stream_key,settings,stream.name,access);
+    const previewURLs=templateAwareURLs(previewRawURLs,draft,stream.name);
+    const urls=templateAwareURLs(publicRawURLs,draft,stream.name);
+    const format=playerTemplateStudioState.format||'player';
+    const isAudio=format==='mp3'||format==='aac'||format==='ogg'||format==='wav'||format==='flac'||format==='icecast';
+    const previewSrc=buildTemplatePreviewSrc(previewURLs,format);
+    const bundle=buildEmbedBundle(format,stream.stream_key,urls,960,isAudio?140:540,true,true);
+    preview.innerHTML=previewSrc
+      ?'<div style="position:relative;'+(isAudio?'height:150px;':'padding-top:56.25%;')+'background:#05070b;border-radius:18px;overflow:hidden"><iframe src="'+previewSrc+'" style="position:absolute;inset:0;width:100%;height:100%;border:none;background:#000" allow="autoplay;fullscreen" allowfullscreen></iframe></div>'
+      :'<div class="empty-state" style="padding:34px"><div class="icon"><i class="bi bi-palette"></i></div><h3>Onizleme hazir degil</h3><p style="color:var(--text-muted)">Secili format icin gecerli bir cikti olusunca burada gorunecek.</p></div>';
+    outputs.innerHTML=
+      '<div class="studio-grid studio-grid-2">'+
+        studioField('Player URL','<input class="input" readonly value="'+escHtml(playerURLForFormat(urls.play||'',format))+'">','Template sorgusu eklenmis player baglantisi.')+
+        studioField('Embed URL','<input class="input" readonly value="'+escHtml(urls.embed||'')+'">','Iframe ve sitelere gomulu cikti.')+
+        studioField(bundle.primaryLabel||'Birincil cikti','<input class="input" readonly value="'+escHtml(bundle.primary||'')+'">','Secili formatin ana linki.')+
+        studioField(bundle.directLabel||'Direkt link','<input class="input" readonly value="'+escHtml(bundle.direct||'')+'">','Direkt manifest veya medya baglantisi.')+
+      '</div>'+
+      (bundle.note?'<div class="studio-alert info" style="margin-top:12px"><strong>Format notu</strong><div style="margin-top:8px" class="form-hint">'+escHtml(bundle.note)+'</div></div>':'');
+  }
+
+  let playerTemplateWorkbenchPreviewTimer=null;
+  function schedulePlayerTemplateWorkbenchPreviewStudioV2(){
+    if(playerTemplateWorkbenchPreviewTimer) clearTimeout(playerTemplateWorkbenchPreviewTimer);
+    playerTemplateWorkbenchPreviewTimer=setTimeout(function(){
+      renderPlayerTemplateWorkbenchPreviewStudioV2();
+    },180);
+  }
+
+  async function savePlayerTemplateWorkbenchStudioV2(){
+    const state=window.playerTemplateWorkbenchStateV2||{selectedId:0,draft:defaultPlayerTemplateDraftStudioV2()};
+    const body=syncPlayerTemplateWorkbenchStudioV2();
+    if(!body.name){
+      toast('Sablon adi gerekli','error');
+      return;
+    }
+    if(state.selectedId){
+      const res=await api('/api/players/'+state.selectedId,{method:'PUT',body:body});
+      if(!res || res.error){
+        toast((res&&res.message)||'Sablon guncellenemedi','error');
+        return;
+      }
+      toast('Sablon guncellendi');
+    }else{
+      const res=await api('/api/players',{method:'POST',body:body});
+      const newID=toNumber((res&&res.id)||(res&&res.item&&res.item.id),0);
+      if(!newID){
+        toast((res&&res.message)||'Sablon olusturulamadi','error');
+        return;
+      }
+      state.selectedId=newID;
+      toast('Sablon olusturuldu');
+    }
+    studioRerender('player-templates');
+  }
+
+  window.renderPlayerTemplates = async function(container){
+    const [templates,streams]=await Promise.all([api('/api/players'),api('/api/streams')]);
+    window._playerTemplateStreams=Array.isArray(streams)?streams:[];
+    ensureTemplateStudioState();
+    const library=Array.isArray(templates)?templates:[];
+    const state=ensurePlayerTemplateWorkbenchStudioV2(library);
+    const draft=playerTemplateRecordToDraftStudioV2(state.draft);
+    container.innerHTML=
+      '<div class="studio-page">'+
+        '<section class="studio-hero"><h1 class="studio-hero-title">Player Sablonlari Studyosu</h1><div class="studio-hero-sub">Modala bagimli duzen yerine sabit kutuphane, canli taslak alani ve gercek player onizlemesiyle daha kullanisli bir sablon merkezi.</div><div class="studio-pill-row" style="margin-top:14px"><span class="studio-pill active">Canli taslak</span><span class="studio-pill">Upload destekli logo</span><span class="studio-pill">Kapanmayan onizleme</span></div></section>'+
+        '<section class="studio-toolbar"><div class="studio-toolbar-group"><select id="ptw-stream" class="input">'+templateStudioStreamOptions()+'</select><select id="ptw-format" class="input">'+templateStudioFormatOptions()+'</select></div><div class="studio-toolbar-group"><button class="btn btn-secondary" id="ptw-new">Yeni Taslak</button><button class="btn btn-secondary" id="ptw-duplicate">Cogalt</button><button class="btn btn-primary" id="ptw-save">Kaydet</button><button class="btn btn-danger" id="ptw-delete"'+(state.selectedId?'':' disabled')+'>Sil</button></div></section>'+
+        '<section class="studio-template-workbench">'+
+          '<aside class="studio-card soft"><div><h2 class="studio-section-title">Sablon kutuphanesi</h2><div class="studio-section-sub">Hazir taslaklardan birini sec, cogalt veya sifirdan basla.</div></div><div class="studio-template-library">'+
+            '<button type="button" class="studio-template-tile'+(!state.selectedId?' active':'')+'" id="ptw-pick-new"><div class="title">Yeni taslak</div><div class="meta">Bos calisma alani acilir.</div></button>'+
+            (library.length?library.map(function(item){ return '<button type="button" class="studio-template-tile'+(Number(item.id)===Number(state.selectedId)?' active':'')+'" data-template-select="'+Number(item.id)+'"><div class="title">'+escHtml(item.name||'Sablon')+'</div><div class="meta">'+escHtml((item.theme||'dark').toUpperCase())+' • '+escHtml(item.logo_url?'Logo var':'Logo yok')+'</div><div style="margin-top:10px">'+renderPlayerTemplateThumbnail(item)+'</div></button>'; }).join(''):'<div class="empty-state" style="padding:24px"><div class="icon"><i class="bi bi-pc-display-horizontal"></i></div><h3>Kayitli sablon yok</h3><p style="color:var(--text-muted)">Ilk taslagi sag taraftan olusturup kaydedebilirsin.</p></div>')+
+          '</div></aside>'+
+          '<section class="studio-card"><div><h2 class="studio-section-title">Canli taslak duzenleyici</h2><div class="studio-section-sub">Alanlar degistikce sagdaki player gercek gorunume yakin sekilde yenilenir. Kaydet demeden once sonucu gorebilirsin.</div></div>'+
+            '<div class="studio-grid studio-grid-2">'+
+              studioField('Sablon adi *','<input class="input" id="ptw-name" value="'+escHtml(draft.name||'')+'" placeholder="Ornek: Haber Merkezi">','Kutuphane ve embed baglantilarinda gorunen ad.')+
+              studioField('Tema','<select class="input" id="ptw-theme">'+studioSelectOptions([['dark','Dark'],['light','Light'],['minimal','Minimal'],['custom','Custom']],draft.theme||'dark')+'</select>','Hazir tema ile baslayip sonradan ince ayar yapabilirsin.')+
+              studioField('Logo URL','<input class="input" id="ptw-logo-url" value="'+escHtml(draft.logo_url||'')+'" placeholder="/media-assets/branding/logo.png veya https://...">','Dis URL veya yukledigin marka dosyasi kullanilabilir.')+
+              studioField('Logo konumu','<select class="input" id="ptw-logo-pos">'+studioSelectOptions([['top-right','Sag ust'],['top-left','Sol ust'],['bottom-right','Sag alt'],['bottom-left','Sol alt']],draft.logo_position||'top-right')+'</select>','Player icinde logonun gorunecegi alan.')+
+              studioField('Logo seffaflik','<input class="input" id="ptw-logo-opacity" type="number" min="0" max="1" step="0.1" value="'+escHtml(String(draft.logo_opacity||1))+'">','0 ile 1 arasinda yumusaklik degeri.')+
+              studioField('Watermark yazi','<input class="input" id="ptw-watermark" value="'+escHtml(draft.watermark_text||'')+'" placeholder="CANLI • FluxStream">','Kucuk metin markalama.')+
+            '</div>'+
+            '<div class="studio-option-grid">'+
+              '<label class="card" style="padding:14px"><div style="display:flex;justify-content:space-between;gap:12px"><div><strong>Baslik goster</strong><div class="form-hint">Player basligini acik tutar.</div></div><input type="checkbox" id="ptw-show-title" '+(draft.show_title?'checked':'')+'></div></label>'+
+              '<label class="card" style="padding:14px"><div style="display:flex;justify-content:space-between;gap:12px"><div><strong>Canli rozeti</strong><div class="form-hint">Canli yayin etiketini gosterir.</div></div><input type="checkbox" id="ptw-show-badge" '+(draft.show_live_badge?'checked':'')+'></div></label>'+
+            '</div>'+
+            '<div class="studio-grid">'+
+              studioField('Arkaplan CSS','<textarea class="input" id="ptw-bg-css" rows="3" placeholder="background:linear-gradient(180deg,#0b1120 0%,#111827 100%);">'+escHtml(draft.background_css||'')+'</textarea>','Ana player yuzeyi.')+
+              studioField('Kontrol cubugu CSS','<textarea class="input" id="ptw-ctrl-css" rows="3" placeholder="background:rgba(8,15,32,.88);">'+escHtml(draft.control_bar_css||'')+'</textarea>','Alt kontrol alaninin tonu.')+
+              studioField('Play butonu CSS','<textarea class="input" id="ptw-play-css" rows="3" placeholder="background:#2563eb; color:#fff;">'+escHtml(draft.play_button_css||'')+'</textarea>','Ortadaki buyuk oynat butonu.')+
+              studioField('Ozel CSS','<textarea class="input" id="ptw-custom-css" rows="5" placeholder=".player-shell{backdrop-filter:blur(10px);}">'+escHtml(draft.custom_css||'')+'</textarea>','Tema disi kucuk dokunuslar.')+
+            '</div>'+
+            '<div class="studio-card soft" style="padding:14px"><div class="studio-section-title" style="font-size:16px">Logo kutuphanesi</div><div class="studio-section-sub">Dis URL mecburiyeti yok. Dilersen bu sayfadan dosya yukle, sec ve aninda onizlemede gor.</div><div class="studio-inline-actions" style="margin-top:10px"><input type="file" id="ptw-logo-file" accept="image/*"><button class="btn btn-secondary" id="ptw-logo-upload">Logo Yukle</button><button class="btn btn-secondary" id="ptw-logo-refresh">Kutuphane Yenile</button><button class="btn btn-secondary" onclick="navigate(\'logos\')">Marka Merkezi</button></div><div id="ptw-brand-assets" style="margin-top:14px"></div></div>'+
+          '</section>'+
+          '<aside class="studio-sticky-preview"><div class="studio-card"><div class="studio-section-title">Gercek player onizlemesi</div><div class="studio-section-sub">Guncellestir dugmesine gerek kalmadan secili stream ve format ile canli sonucu gor.</div><div class="form-hint" id="ptw-stream-hint" style="margin-top:6px"></div><div id="ptw-live-preview" class="studio-preview-shell player-frame" style="margin-top:14px"></div></div><div class="studio-card" style="margin-top:14px"><div class="studio-section-title">Sablonlu ciktilar</div><div class="studio-section-sub">Player URL, embed URL ve direkt cikti baglantilari burada tutulur.</div><div id="ptw-live-output" style="margin-top:12px"></div></div></aside>'+
+        '</section>'+
+      '</div>';
+
+    document.getElementById('ptw-stream').value=playerTemplateStudioState.streamKey||'';
+    document.getElementById('ptw-format').value=playerTemplateStudioState.format||'player';
+    ['ptw-name','ptw-theme','ptw-logo-url','ptw-logo-pos','ptw-logo-opacity','ptw-watermark','ptw-show-title','ptw-show-badge','ptw-bg-css','ptw-ctrl-css','ptw-play-css','ptw-custom-css','ptw-stream','ptw-format'].forEach(function(id){
+      const el=document.getElementById(id);
+      if(!el) return;
+      const handler=function(){ syncPlayerTemplateWorkbenchStudioV2(); schedulePlayerTemplateWorkbenchPreviewStudioV2(); };
+      el.onchange=handler;
+      el.oninput=handler;
+    });
+    document.getElementById('ptw-pick-new').onclick=function(){
+      window.playerTemplateWorkbenchStateV2={selectedId:0,draft:defaultPlayerTemplateDraftStudioV2()};
+      studioRerender('player-templates');
+    };
+    document.querySelectorAll('[data-template-select]').forEach(function(btn){
+      btn.onclick=function(){
+        loadPlayerTemplateWorkbenchStudioV2(toNumber(btn.getAttribute('data-template-select'),0),library);
+        studioRerender('player-templates');
+      };
+    });
+    const newBtn=document.getElementById('ptw-new'); if(newBtn) newBtn.onclick=function(){ window.playerTemplateWorkbenchStateV2={selectedId:0,draft:defaultPlayerTemplateDraftStudioV2()}; studioRerender('player-templates'); };
+    const duplicateBtn=document.getElementById('ptw-duplicate'); if(duplicateBtn) duplicateBtn.onclick=function(){ const draft=syncPlayerTemplateWorkbenchStudioV2(); window.playerTemplateWorkbenchStateV2={selectedId:0,draft:Object.assign({},draft,{name:(draft.name||'Yeni sablon')+' Kopya'})}; studioRerender('player-templates'); };
+    const saveBtn=document.getElementById('ptw-save'); if(saveBtn) saveBtn.onclick=savePlayerTemplateWorkbenchStudioV2;
+    const deleteBtn=document.getElementById('ptw-delete'); if(deleteBtn) deleteBtn.onclick=async function(){ const current=window.playerTemplateWorkbenchStateV2||{}; if(!current.selectedId || !confirm('Bu sablonu silmek istediginize emin misiniz?')) return; await api('/api/players/'+current.selectedId,{method:'DELETE'}); toast('Sablon silindi'); window.playerTemplateWorkbenchStateV2={selectedId:0,draft:defaultPlayerTemplateDraftStudioV2()}; studioRerender('player-templates'); };
+    const uploadBtn=document.getElementById('ptw-logo-upload'); if(uploadBtn) uploadBtn.onclick=uploadPlayerTemplateWorkbenchLogoStudioV2;
+    const refreshBtn=document.getElementById('ptw-logo-refresh'); if(refreshBtn) refreshBtn.onclick=function(){ refreshPlayerTemplateWorkbenchAssetShelfStudioV2((document.getElementById('ptw-logo-url')||{}).value||''); };
+    await refreshPlayerTemplateWorkbenchAssetShelfStudioV2(draft.logo_url||'');
+    await renderPlayerTemplateWorkbenchPreviewStudioV2();
+    studioAuditControls(container);
+  };
+
+  window.renderAdvancedEmbed = async function(container){
+    const rendered=await studioRenderLegacy(container,'advancedEmbed',{
+      title:'Gelismis Embed Studyosu',
+      subtitle:'Tum direkt linkler, output sekmeleri ve canli onizleme panelleri burada. HLS, DASH, MP4, ses cikislari ve protokol bazli teslimat linkleri eski guclu davranisiyla geri doner.',
+      pills:[{label:'Tum outputlar',active:true},{label:'Direkt linkler'},{label:'Sekmeli onizleme'}],
+      actionsHTML:'<button class="btn btn-secondary btn-sm" onclick="navigate(\'embed-codes\')"><i class="bi bi-grid"></i> Embed Studyosuna Don</button>'
+    });
+    if(rendered){
+      const page=container.querySelector('.studio-page');
+      const hero=page&&page.querySelector('.studio-hero');
+      if(hero){
+        studioInsertAfter(hero,
+          '<section class="studio-grid studio-grid-3">'+
+            '<div class="studio-summary"><span>Direkt linkler</span><strong>Hepsi geri geldi</strong><div class="form-hint">HLS, DASH, MP4, ses ve protokol tablariyla eski detayli davranis korunur.</div></div>'+
+            '<div class="studio-summary"><span>Gizli / tokenli test</span><strong>Gecici davranis</strong><div class="form-hint">Bu ekranda guvenli denemeler kalici stream policy kilidi olusturmaz; kalici uygulama icin ayri policy gerekir.</div></div>'+
+            '<div class="studio-summary"><span>Onizleme sekmeleri</span><strong>Player + manifest</strong><div class="form-hint">Tarayici, harici player ve teslimat linklerini ayni yerden test edebilirsin.</div></div>'+
+          '</section>'
+        );
+      }
+      studioAuditControls(container);
+    }
   };
 
   window.renderLogos = async function(container){
