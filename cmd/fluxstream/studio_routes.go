@@ -708,6 +708,7 @@ func registerStudioAdminRoutes(
 			format = "player"
 		}
 		base := studioPublicBaseURL(r, cfg)
+		previewBase := studioPreviewBaseURL(r)
 
 		secureEnabled := asBool(req.Security["signed_url"]) || asBool(req.Security["token_required"]) || asBool(req.Security["session_bound"])
 		expiryMinutes := asInt(req.Security["expiry_minutes"], cfg.GetInt("token_duration", 60))
@@ -815,6 +816,33 @@ func registerStudioAdminRoutes(
 			"manifest_url": manifestURL,
 			"audio_url":   audioURL,
 			"vlc_url":     studioManifestURL(base, streamKey, "hls"),
+			"preview_player_url": withQueryMap(fmt.Sprintf("%s/play/%s", previewBase, streamKey), query),
+			"preview_embed_url": withQueryMap(func() string {
+				if page == "player" {
+					return fmt.Sprintf("%s/play/%s", previewBase, streamKey)
+				}
+				return fmt.Sprintf("%s/embed/%s", previewBase, streamKey)
+			}(), query),
+			"preview_manifest_url": func() string {
+				url := studioManifestURL(previewBase, streamKey, format)
+				if url == "" {
+					return ""
+				}
+				return withQueryMap(url, map[string]string{
+					"token":     token,
+					"viewer_id": viewerID,
+				})
+			}(),
+			"preview_audio_url": func() string {
+				url := studioManifestURL(previewBase, streamKey, "dash_audio")
+				if url == "" {
+					return ""
+				}
+				return withQueryMap(url, map[string]string{
+					"token":     token,
+					"viewer_id": viewerID,
+				})
+			}(),
 			"iframe_code": iframeCode,
 			"script_code": scriptCode,
 			"applied":     req.ApplyStreamPolicy,
@@ -959,6 +987,42 @@ func studioPublicBaseURL(r *http.Request, cfg *config.Manager) string {
 		defaultPort = 443
 	}
 	if port == defaultPort || port <= 0 {
+		return fmt.Sprintf("%s://%s", scheme, host)
+	}
+	return fmt.Sprintf("%s://%s:%d", scheme, host, port)
+}
+
+func studioPreviewBaseURL(r *http.Request) string {
+	if r == nil {
+		return "http://localhost:8844"
+	}
+	scheme := "http"
+	if xf := strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")); xf != "" {
+		scheme = strings.ToLower(xf)
+	} else if r.TLS != nil {
+		scheme = "https"
+	}
+	host := studioRequestHostName(r.Host)
+	if host == "" {
+		host = "localhost"
+	}
+	port := 80
+	if scheme == "https" {
+		port = 443
+	}
+	if h, p, err := net.SplitHostPort(r.Host); err == nil {
+		host = strings.Trim(h, "[]")
+		if parsed, convErr := strconv.Atoi(p); convErr == nil && parsed > 0 {
+			port = parsed
+		}
+	} else if strings.Count(r.Host, ":") == 1 {
+		if idx := strings.LastIndex(r.Host, ":"); idx > 0 {
+			if parsed, convErr := strconv.Atoi(r.Host[idx+1:]); convErr == nil && parsed > 0 {
+				port = parsed
+			}
+		}
+	}
+	if (scheme == "http" && port == 80) || (scheme == "https" && port == 443) {
 		return fmt.Sprintf("%s://%s", scheme, host)
 	}
 	return fmt.Sprintf("%s://%s:%d", scheme, host, port)

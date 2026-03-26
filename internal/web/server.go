@@ -1401,6 +1401,7 @@ func (s *Server) handleSSLStatus(w http.ResponseWriter, r *http.Request) {
 			"has_cert":         fileExists(webSource.CertPath),
 			"has_key":          fileExists(webSource.KeyPath),
 			"ready":            webSource.Ready,
+			"active":           localTCPPortListening(s.cfg.GetInt("https_port", 443)),
 			"https_port":       s.cfg.GetInt("https_port", 443),
 			"requires_restart": true,
 		},
@@ -1414,6 +1415,7 @@ func (s *Server) handleSSLStatus(w http.ResponseWriter, r *http.Request) {
 			"has_cert":         fileExists(streamSource.CertPath),
 			"has_key":          fileExists(streamSource.KeyPath),
 			"ready":            streamSource.Ready,
+			"active":           localTCPPortListening(s.cfg.GetInt("rtmps_port", 1936)),
 			"rtmps_port":       s.cfg.GetInt("rtmps_port", 1936),
 			"requires_restart": true,
 		},
@@ -1506,6 +1508,18 @@ func fileExists(path string) bool {
 	}
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+func localTCPPortListening(port int) bool {
+	if port <= 0 {
+		return false
+	}
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", port), 700*time.Millisecond)
+	if err != nil {
+		return false
+	}
+	_ = conn.Close()
+	return true
 }
 
 func slugifyFileName(name string) string {

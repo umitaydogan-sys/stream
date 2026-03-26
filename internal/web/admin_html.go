@@ -2510,20 +2510,45 @@ async function renderSettingsSSL(c){
     '<div style="margin-top:16px"><button class="btn btn-primary" onclick="saveSSLSettings()">SSL Ayarlarini Kaydet</button></div>';
 }
 function renderSSLProfileCard(target,title,status,s,enableKey,portKey,modeKey,certKey,keyKey,domainKey,emailKey,desc){
-  const mode=String((s&&s[modeKey])||'file').toLowerCase();
+  const mode=String(((status&&status.mode)||(s&&s[modeKey])||'file')).toLowerCase();
   const ready=!!(status&&status.ready);
+  const active=!!(status&&status.active);
   const enabled=isTruthy(s&&s[enableKey]);
+  let stateTone='tag-red';
+  let stateLabel='Hazir Degil';
+  let stateHelp='Bu profil icin sertifika bilgileri eksik veya listener henuz kullanima acilamadi.';
+  if(!enabled){
+    stateTone='tag-blue';
+    stateLabel='Kapali';
+    stateHelp='Bu profil kapali oldugu icin ilgili portta SSL listener baslatilmaz.';
+  }else if(active){
+    stateTone='tag-green';
+    stateLabel='Aktif';
+    stateHelp=mode==='letsencrypt'
+      ?'Listener aktif. Let\\'s Encrypt challenge ve sertifika yenileme akisina hazir.'
+      :'Listener aktif. Yuklenen sertifika su an canli olarak kullaniliyor.';
+  }else if(ready){
+    stateTone='tag-yellow';
+    stateLabel='Yeniden Baslat';
+    stateHelp='Ayarlar kaydedildi ancak listener henuz yeniden baslatilmadi. Kaydetten sonra servisi yeniden baslatin.';
+  }else if(mode==='letsencrypt'){
+    stateTone='tag-red';
+    stateLabel='Bekliyor';
+    stateHelp='Let\\'s Encrypt icin domainin bu VPS\\'e yonlenmesi ve 80/443 portlarinin ulasilabilir olmasi gerekir.';
+  }
   return '<div class="card">'+
     '<div class="card-title" style="margin-bottom:10px">'+title+'</div>'+
     '<div class="form-hint" style="line-height:1.7;margin-bottom:14px">'+desc+'</div>'+
     '<div class="setting-row"><div><div class="setting-label">Ozellik Acik</div><div class="setting-desc">Kapaliysa bu profil hic kullanilmaz.</div></div>'+
       '<label class="toggle"><input type="checkbox" class="setting-input" data-key="'+enableKey+'" '+(enabled?'checked':'')+'><span class="toggle-slider"></span></label></div>'+
     '<div style="padding:14px;background:var(--bg-primary);border-radius:var(--radius-sm);margin-bottom:14px">'+
-      '<div style="display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:8px"><strong>Durum</strong><span class="tag '+(ready?'tag-green':'tag-red')+'">'+(ready?'Hazir':'Hazir Degil')+'</span></div>'+
+      '<div style="display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:8px"><strong>Durum</strong><span class="tag '+stateTone+'">'+stateLabel+'</span></div>'+
       '<div class="form-hint">Port: <b>'+escHtml(String((s&&s[portKey])||(status&&status[portKey])||''))+'</b></div>'+
+      '<div class="form-hint" style="margin-top:6px">'+stateHelp+'</div>'+
       (mode==='letsencrypt'
         ?'<div class="form-hint" style="margin-top:6px">Domain: <b>'+escHtml(String((s&&s[domainKey])||(status&&status.domain)||'-'))+'</b></div>'
         :'<div class="form-hint" style="margin-top:6px">CRT: <code>'+escHtml(String((status&&status.cert_path)||(s&&s[certKey])||'-'))+'</code></div><div class="form-hint">KEY: <code>'+escHtml(String((status&&status.key_path)||(s&&s[keyKey])||'-'))+'</code></div>')+
+      ((enabled&&ready&&!active)?'<div style="margin-top:12px"><button class="btn btn-secondary btn-sm" onclick="restartServer()">Yeniden Baslat ve Uygula</button></div>':'')+
     '</div>'+
     '<div class="form-group"><label class="form-label">Sertifika Modu</label><select class="form-select setting-input" data-key="'+modeKey+'"><option value="file" '+(mode==='file'?'selected':'')+'>Manuel CRT/KEY</option><option value="letsencrypt" '+(mode==='letsencrypt'?'selected':'')+'>Let\' Encrypt</option></select><div class="form-hint">Manuel modda dosya yuklersiniz. Let\' Encrypt modunda domain ve e-posta yeterlidir.</div></div>'+
     '<div class="form-group"><label class="form-label">CRT / PEM Yukle</label><input type="file" id="ssl-cert-file-'+target+'" accept=".crt,.pem,.cert" class="form-input" style="padding:8px"></div>'+

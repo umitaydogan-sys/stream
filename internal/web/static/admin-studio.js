@@ -422,6 +422,10 @@
     const manifestURL=result.manifest_url||'';
     const audioURL=result.audio_url||'';
     const vlcURL=result.vlc_url||manifestURL;
+    const previewPlayerURL=result.preview_player_url||playerURL;
+    const previewEmbedURL=result.preview_embed_url||embedURL||previewPlayerURL;
+    const previewManifestURL=result.preview_manifest_url||manifestURL;
+    const previewAudioURL=result.preview_audio_url||audioURL||previewPlayerURL;
     let code='', label='Embed Kodu', primaryURL=embedURL;
     if(output==='iframe'){
       code='<iframe src="'+embedURL+'" width="'+width+'" height="'+height+'" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>';
@@ -449,7 +453,7 @@
       code=vlcURL;
       primaryURL=vlcURL;
     }
-    return {label:label,code:code,primaryURL:primaryURL,playerURL:playerURL,embedURL:embedURL,manifestURL:manifestURL,audioURL:audioURL,vlcURL:vlcURL};
+    return {label:label,code:code,primaryURL:primaryURL,playerURL:playerURL,embedURL:embedURL,manifestURL:manifestURL,audioURL:audioURL,vlcURL:vlcURL,previewPlayerURL:previewPlayerURL,previewEmbedURL:previewEmbedURL,previewManifestURL:previewManifestURL,previewAudioURL:previewAudioURL};
   }
 
   function studioRenderWarnings(state,bundle){
@@ -479,7 +483,7 @@
     const playbackResult=stream?await studioFetchPlaybackBundle(state,stream,template):null;
     const codeBundle=studioBuildCodeBundle(playbackResult||{},state);
     const selectedUseCase=EMBED_USE_CASES.find(function(item){return item.key===state.useCase;}) || EMBED_USE_CASES[0];
-    const previewURL=(state.outputType==='player'||state.outputType==='audio'?codeBundle.playerURL:codeBundle.embedURL) || '';
+    const previewURL=(state.outputType==='player'||state.outputType==='audio'?codeBundle.previewPlayerURL:codeBundle.previewEmbedURL) || '';
     const profileItems=Array.isArray(profiles)?profiles:[];
 
     container.innerHTML=
