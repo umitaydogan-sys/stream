@@ -10,7 +10,7 @@ func normalizePlayerFormat(format string) string {
 	switch format {
 	case "", "iframe", "player", "jsapi":
 		return "auto"
-	case "auto", "hls", "ll_hls", "dash", "flv", "mp4", "webm", "mp3", "aac", "ogg", "wav", "flac", "icecast":
+	case "auto", "hls", "ll_hls", "dash", "flv", "mp4", "webm", "mp3", "aac", "ogg", "wav", "flac", "icecast", "hls_audio", "dash_audio":
 		return format
 	default:
 		return "auto"
@@ -19,7 +19,7 @@ func normalizePlayerFormat(format string) string {
 
 func isAudioFormat(format string) bool {
 	switch normalizePlayerFormat(format) {
-	case "mp3", "aac", "ogg", "wav", "flac", "icecast":
+	case "mp3", "aac", "ogg", "wav", "flac", "icecast", "hls_audio", "dash_audio":
 		return true
 	default:
 		return false
@@ -438,7 +438,7 @@ function setLastError(message, sourceKind) {
 
 function passthroughURL(url) {
   const next = new URL(url, location.origin);
-  ['token','password'].forEach(function(key) {
+  ['token','password','viewer_id','player_watermark'].forEach(function(key) {
     const val = queryParams.get(key);
     if (val && !next.searchParams.has(key)) next.searchParams.set(key, val);
   });
@@ -1217,7 +1217,7 @@ audio.muted = muted;
 
 function passthroughURL(url) {
   const next = new URL(url, location.origin);
-  ['token','password'].forEach(function(key) {
+  ['token','password','viewer_id','player_watermark'].forEach(function(key) {
     const val = queryParams.get(key);
     if (val && !next.searchParams.has(key)) next.searchParams.set(key, val);
   });
@@ -1309,6 +1309,10 @@ function applySkin() {
 
 function primaryURLForFormat(fmt) {
   switch (fmt) {
+    case 'dash_audio':
+      return passthroughURL(location.origin + '/audio/dash/' + streamKey);
+    case 'hls_audio':
+      return passthroughURL(location.origin + '/audio/hls/' + streamKey);
     case 'mp3':
       return passthroughURL(location.origin + '/audio/mp3/' + streamKey + '/' + streamKey + '.mp3');
     case 'aac':
@@ -1387,20 +1391,25 @@ function startHLS(url) {
   startDASHFallback();
 }
 
-function startDASHFallback() {
+function startDASH(url, waitingNote, readyNote) {
   if (!window.dashjs || !window.dashjs.MediaPlayer) {
     setNote('Ses akisi simdilik hazir degil.');
     return;
   }
   cleanupPlayers();
   dashPlayer = window.dashjs.MediaPlayer().create();
-  dashPlayer.initialize(audio, dashFallbackUrl, autoplay);
+  if (waitingNote) setNote(waitingNote);
+  dashPlayer.initialize(audio, url || dashFallbackUrl, autoplay);
   dashPlayer.on(window.dashjs.MediaPlayer.events.STREAM_INITIALIZED, function() {
-    markReady('Canli DASH ses baglandi.');
+    markReady(readyNote || 'Canli DASH ses baglandi.');
   });
   dashPlayer.on(window.dashjs.MediaPlayer.events.ERROR, function() {
     setNote('Ses akisi simdilik hazir degil.');
   });
+}
+
+function startDASHFallback() {
+  startDASH(dashFallbackUrl, 'Canli DASH ses fallback deneniyor.', 'Canli DASH ses baglandi.');
 }
 
 function startFallback() {
@@ -1427,10 +1436,17 @@ audio.addEventListener('error', function() {
 
 fallbackTimer = setTimeout(function() {
   if (!primaryReady) startFallback();
-}, 2200);
+}, preferredFormat === 'dash_audio' ? 3200 : 2200);
 
 applySkin();
-startNative(primaryUrl, preferredFormat.toUpperCase() + ' ses akisi bekleniyor...');
+if (preferredFormat === 'dash_audio') {
+  startDASH(dashFallbackUrl, 'DASH ses akisi bekleniyor...', 'DASH ses akisi baglandi.');
+} else if (preferredFormat === 'hls_audio') {
+  setNote('HLS ses akisi bekleniyor...');
+  startHLS(hlsFallbackUrl);
+} else {
+  startNative(primaryUrl, preferredFormat.toUpperCase() + ' ses akisi bekleniyor...');
+}
 </script>
 </body>
 </html>`,

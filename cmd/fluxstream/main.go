@@ -892,6 +892,8 @@ func main() {
 		jsonResp(w, map[string]interface{}{"token": token, "expires_at": expiry})
 	})
 
+	registerStudioAdminRoutes(webServer, db, cfg, analyticsTracker, tcManager, playerTelemetry, tokenMgr)
+
 	// Security API - IP Ban
 	webServer.RegisterHandler("/api/security/bans", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {

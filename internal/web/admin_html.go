@@ -11,6 +11,7 @@ const adminHTML = `<!DOCTYPE html>
 <title>FluxStream</title>
 <!-- Bootstrap Icons -->
 <link rel="stylesheet" href="/static/vendor/bootstrap-icons.css">
+<link rel="stylesheet" href="/static/admin-studio.css">
 <style>
 /* Light theme variables */
 :root {
@@ -5031,6 +5032,9 @@ function settingSelect(key,label,value,options,hint){
     '</select>'+(hint?'<div class="form-hint">'+hint+'</div>':'')+'</div>';
 }
 
+</script>
+<script src="/static/admin-studio.js"></script>
+<script>
 init();
 </script>
 </body>

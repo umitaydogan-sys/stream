@@ -14,7 +14,7 @@ func passthroughPlaybackQuery(r *http.Request) url.Values {
 	if r == nil {
 		return values
 	}
-	for _, key := range []string{"token", "password"} {
+	for _, key := range []string{"token", "password", "viewer_id", "player_watermark"} {
 		if value := strings.TrimSpace(r.URL.Query().Get(key)); value != "" {
 			values.Set(key, value)
 		}

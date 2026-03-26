@@ -13,10 +13,22 @@ flowchart LR
     B --> C[OBS Multitrack ve ABR]
     C --> D[QoE ve Operasyon Merkezi]
     D --> E[Kayit Arsiv ve Yedek Merkezi]
-    E --> F[Playback Guvenligi]
-    F --> G[DRM]
-    G --> H[Origin-Edge ve Enterprise Faz]
-    H --> I[Konferans Chat Sanal Sinif]
+    E --> F[Embed ve Analitik Studyo Fazı]
+    F --> G[Playback Guvenligi]
+    G --> H[DRM]
+    H --> I[Origin-Edge ve Enterprise Faz]
+    I --> J[Konferans Chat Sanal Sinif]
+```
+
+## 1.1 Son Fazda Nereye Geldik
+
+```mermaid
+flowchart TD
+    S1[Embed Kodlari] --> S2[Embed Studyosu]
+    S3[Basit Analitik] --> S4[Analitik Merkezi]
+    S5[Ham ABR JSON] --> S6[ABR Profil Studyosu]
+    S7[Temel Token Uretimi] --> S8[Playback Guvenligi V1]
+    S9[Audio-only DASH Cekirdegi] --> S10[Audio teslimat gorunurlugu]
 ```
 
 ## 2. Nereden Nereye Geldik
@@ -43,6 +55,9 @@ journey
       Depolama ve Arsiv Merkezi: 5
       MinIO ve SFTP saha testi: 4
     section Siradaki Faz
+      Embed ve Analitik Studyo: 3
+      ABR Profil Merkezi: 3
+      Audio-only DASH sertlestirme: 3
       Playback guvenligi: 2
       DRM: 1
       Origin-edge: 1
@@ -57,8 +72,9 @@ journey
 | OBS multitrack ve ABR | Tamamlandi | HLS/DASH varyant zinciri ve chunk timestamp kok nedeni kapandi |
 | QoE ve Operasyon Merkezi | Tamamlandi | telemetry, track analytics, Prometheus ve teshis ekrani var |
 | Depolama ve Arsiv Merkezi | Buyuk oranda tamamlandi | kayit, arsiv, yedek ve bulut hedefleri tek merkezde |
+| Embed + Analitik + ABR Studyo | Tamamlandi | embed, analitik ve ABR ekranlari urun seviyesine tasindi |
 | Harici storage saha testi | Kismen tamamlandi | ayni VPS uzerinde MinIO + SFTP test edildi, gercek S3 sirada |
-| Playback guvenligi | Baslamadi | signed URL, token, hotlink, watermark fazi acik |
+| Playback guvenligi | Buyuk oranda tamamlandi | signed URL, token, domain/IP kisiti ve watermark omurgasi panel tarafina baglandi |
 | DRM | Baslamadi | AES-128, DRM abstraction ve lisans servisleri acik |
 | Origin-edge / cluster | Baslamadi | dusuk butceye uygun lite model tasarlanacak |
 | Konferans / chat / sanal sinif | Baslamadi | cekirdek streaming tarafi tamamen oturduktan sonra |
@@ -79,6 +95,8 @@ quadrantChart
     QoE ve Operasyon Merkezi: [0.76, 0.86]
     Recording ve Remux: [0.70, 0.84]
     Depolama ve Arsiv Merkezi: [0.68, 0.82]
+    Embed ve Analitik Studyo: [0.28, 0.88]
+    ABR Profil Merkezi: [0.24, 0.86]
     Playback Guvenligi: [0.20, 0.86]
     DRM: [0.10, 0.80]
     Origin-edge: [0.12, 0.88]
@@ -99,6 +117,7 @@ quadrantChart
 
 - harici AWS S3 saha testi
 - rclone tabanli populer bulut hedeflerinin gercek hesaplarla dogrulanmasi
+- `Embed Stüdyosu`, `Analitik Merkezi` ve `ABR Profilleri` ekranlarinin urun seviyesine tasinmasi
 - `audio-only DASH` istemci saha testleri
 - playback guvenligi
 - DRM
@@ -112,31 +131,36 @@ gantt
     title FluxStream Sonraki Fazlar
     dateFormat  YYYY-MM-DD
     axisFormat  %d %b
-    section Kisa Vade
-    Depolama UX sadeleştirme         :active, ux1, 2026-03-26, 10d
-    Harici AWS S3 saha testi         :s3, 2026-03-28, 7d
-    Drive / OneDrive / Dropbox test  :drv, 2026-03-31, 10d
-    Audio-only DASH sertlestirme     :dasha, 2026-04-02, 8d
-    Recording soak ve restart testi  :rec, 2026-04-05, 10d
+    section Urunlestirme
+    Embed Studyosu                   :active, emb1, 2026-03-26, 10d
+    Analitik Merkezi                 :ana1, 2026-03-29, 10d
+    ABR Profil Merkezi               :abr1, 2026-04-01, 10d
+    Audio-only DASH sertlestirme     :dasha, 2026-04-05, 8d
     section Guvenlik
     Signed URL ve token policy       :sec1, 2026-04-10, 12d
-    Hotlink / watermark / rate limit :sec2, 2026-04-15, 10d
-    AES-128 ve key service           :drm1, 2026-04-24, 12d
+    Hotlink / watermark / rate limit :sec2, 2026-04-14, 10d
+    section Depolama Sertlestirme
+    Harici AWS S3 saha testi         :s3, 2026-04-18, 7d
+    Drive / OneDrive / Dropbox test  :drv, 2026-04-21, 10d
+    Recording soak ve restart testi  :rec, 2026-04-24, 10d
+    section DRM
+    AES-128 ve key service           :drm1, 2026-05-02, 12d
     section Mimari
-    Origin-edge lite tasarimi        :oe1, 2026-05-02, 12d
-    RBAC / audit / SSO               :auth1, 2026-05-08, 14d
+    Origin-edge lite tasarimi        :oe1, 2026-05-12, 12d
+    RBAC / audit / SSO               :auth1, 2026-05-18, 14d
     section Sonrasi
-    Konferans / chat / sanal sinif   :future, 2026-05-20, 20d
+    Konferans / chat / sanal sinif   :future, 2026-06-01, 20d
 ```
 
 ## 6. Once Neyi Bitirecegiz
 
-1. `Depolama ve Arsiv Merkezi`ni daha da sade hale getirecegiz.
-2. Harici AWS S3 bucket ile gercek dis ortam dogrulamasi yapacagiz.
-3. Drive / OneDrive / Dropbox gibi hedefleri gercek hesaplarla test edecegiz.
-4. `audio-only DASH` ve recording finalize davranisini sertlestirecegiz.
-5. Ardindan signed playback security fazina girecegiz.
-6. Sonra DRM ve origin-edge mimarisine gececegiz.
+1. `Embed Stüdyosu` ekranini urun seviyesine tasiyacagiz.
+2. `Analitik Merkezi` ekranini daha guclu KPI ve grafiklerle yeniden kuracagiz.
+3. `ABR Profilleri ve Teslimat Merkezi`ni form tabanli profil mantigina gecirecegiz.
+4. Ayni faz icinde `audio-only DASH` istemci sertlestirmesini kapatacagiz.
+5. Ayni faz icinde playback guvenligi v1 katmanini ekleyecegiz.
+6. Sonra harici AWS S3 ve populer bulut hedeflerinin gercek saha testlerine donecegiz.
+7. Daha sonra DRM ve origin-edge mimarisine gececegiz.
 
 ## 7. Bu Cekirdegin Uzerine Neler Insa Edilebilir
 

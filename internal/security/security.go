@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"encoding/hex"
 	"fmt"
 	"net"
@@ -19,6 +20,17 @@ import (
 type TokenManager struct {
 	secret      []byte
 	duration    time.Duration
+}
+
+// PlaybackTokenClaims stores optional restrictions for signed playback links.
+type PlaybackTokenClaims struct {
+	StreamKey     string `json:"stream_key"`
+	ExpiresAtUnix int64  `json:"exp"`
+	AllowedIP     string `json:"allowed_ip,omitempty"`
+	AllowedDomain string `json:"allowed_domain,omitempty"`
+	ViewerID      string `json:"viewer_id,omitempty"`
+	Watermark     string `json:"watermark,omitempty"`
+	AllowedFormat string `json:"allowed_format,omitempty"`
 }
 
 // NewTokenManager creates a new token manager
@@ -47,6 +59,9 @@ func (tm *TokenManager) GenerateToken(streamKey string) (string, time.Time) {
 
 // ValidateToken verifies a token
 func (tm *TokenManager) ValidateToken(token, streamKey string) bool {
+	if strings.HasPrefix(strings.TrimSpace(token), "v2.") {
+		return tm.ValidatePlaybackToken(token, streamKey, "", nil)
+	}
 	decoded, err := base64.URLEncoding.DecodeString(token)
 	if err != nil {
 		return false
@@ -81,6 +96,125 @@ func (tm *TokenManager) ValidateToken(token, streamKey string) bool {
 	expectedSig := hex.EncodeToString(mac.Sum(nil))
 
 	return hmac.Equal([]byte(providedSig), []byte(expectedSig))
+}
+
+// GeneratePlaybackToken creates a scoped signed playback token.
+func (tm *TokenManager) GeneratePlaybackToken(streamKey string, claims PlaybackTokenClaims) (string, time.Time, error) {
+	streamKey = strings.TrimSpace(streamKey)
+	if streamKey == "" {
+		return "", time.Time{}, fmt.Errorf("stream key gerekli")
+	}
+	expiry := time.Now().Add(tm.duration)
+	if claims.ExpiresAtUnix > 0 {
+		expiry = time.Unix(claims.ExpiresAtUnix, 0)
+	}
+	claims.StreamKey = streamKey
+	claims.ExpiresAtUnix = expiry.Unix()
+	payload, err := json.Marshal(claims)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	payloadEnc := base64.RawURLEncoding.EncodeToString(payload)
+	sig := tm.sign(payloadEnc)
+	return "v2." + payloadEnc + "." + sig, expiry, nil
+}
+
+// ValidatePlaybackToken verifies both legacy and scoped playback tokens.
+func (tm *TokenManager) ValidatePlaybackToken(token, streamKey, format string, r *http.Request) bool {
+	token = strings.TrimSpace(token)
+	streamKey = strings.TrimSpace(streamKey)
+	if token == "" || streamKey == "" {
+		return false
+	}
+	if !strings.HasPrefix(token, "v2.") {
+		return tm.ValidateToken(token, streamKey)
+	}
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return false
+	}
+	payloadEnc := parts[1]
+	if !hmac.Equal([]byte(parts[2]), []byte(tm.sign(payloadEnc))) {
+		return false
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(payloadEnc)
+	if err != nil {
+		return false
+	}
+	var claims PlaybackTokenClaims
+	if err := json.Unmarshal(raw, &claims); err != nil {
+		return false
+	}
+	if strings.TrimSpace(claims.StreamKey) != streamKey {
+		return false
+	}
+	if claims.ExpiresAtUnix > 0 && time.Now().Unix() > claims.ExpiresAtUnix {
+		return false
+	}
+	if claims.AllowedIP != "" && r != nil {
+		if extractIP(r) != strings.TrimSpace(claims.AllowedIP) {
+			return false
+		}
+	}
+	if claims.AllowedDomain != "" && r != nil {
+		if !requestMatchesDomain(r, claims.AllowedDomain) {
+			return false
+		}
+	}
+	if claims.ViewerID != "" && r != nil {
+		if strings.TrimSpace(r.URL.Query().Get("viewer_id")) != strings.TrimSpace(claims.ViewerID) {
+			return false
+		}
+	}
+	if claims.AllowedFormat != "" && format != "" {
+		if normalizePlaybackFormat(claims.AllowedFormat) != normalizePlaybackFormat(format) {
+			return false
+		}
+	}
+	return true
+}
+
+func (tm *TokenManager) sign(payloadEnc string) string {
+	mac := hmac.New(sha256.New, tm.secret)
+	mac.Write([]byte(payloadEnc))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+func requestMatchesDomain(r *http.Request, domain string) bool {
+	domain = strings.ToLower(strings.TrimSpace(domain))
+	if domain == "" || r == nil {
+		return true
+	}
+	candidates := []string{
+		strings.ToLower(strings.TrimSpace(r.Header.Get("Origin"))),
+		strings.ToLower(strings.TrimSpace(r.Referer())),
+		strings.ToLower(strings.TrimSpace(r.Host)),
+	}
+	for _, candidate := range candidates {
+		if candidate == "" {
+			continue
+		}
+		if strings.Contains(candidate, domain) {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizePlaybackFormat(format string) string {
+	format = strings.ToLower(strings.TrimSpace(format))
+	switch format {
+	case "", "auto", "player", "embed", "iframe", "jsapi", "hls_master", "ll_hls", "hls_audio":
+		return "hls"
+	case "dash_audio":
+		return "dash"
+	case "http_flv":
+		return "flv"
+	case "fmp4":
+		return "mp4"
+	default:
+		return format
+	}
 }
 
 // RateLimiter implements IP-based rate limiting

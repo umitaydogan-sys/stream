@@ -229,6 +229,36 @@ func (s *SQLiteDB) migrate() error {
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			UNIQUE(name)
 		)`,
+		`CREATE TABLE IF NOT EXISTS embed_profiles (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			stream_key TEXT NOT NULL DEFAULT '',
+			name TEXT NOT NULL,
+			use_case TEXT NOT NULL DEFAULT 'website',
+			mode TEXT NOT NULL DEFAULT 'simple',
+			primary_format TEXT NOT NULL DEFAULT 'player',
+			width INTEGER NOT NULL DEFAULT 1280,
+			height INTEGER NOT NULL DEFAULT 720,
+			theme TEXT NOT NULL DEFAULT 'clean',
+			options_json TEXT NOT NULL DEFAULT '{}',
+			branding_json TEXT NOT NULL DEFAULT '{}',
+			security_json TEXT NOT NULL DEFAULT '{}',
+			notes TEXT NOT NULL DEFAULT '',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE TABLE IF NOT EXISTS abr_profiles (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			profile_set TEXT NOT NULL,
+			name TEXT NOT NULL,
+			scope TEXT NOT NULL DEFAULT 'global',
+			stream_key TEXT NOT NULL DEFAULT '',
+			description TEXT NOT NULL DEFAULT '',
+			preset TEXT NOT NULL DEFAULT '',
+			profiles_json TEXT NOT NULL DEFAULT '{}',
+			summary_json TEXT NOT NULL DEFAULT '{}',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
 		`CREATE INDEX IF NOT EXISTS idx_logs_created ON logs(created_at DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_logs_level ON logs(level)`,
 		`CREATE INDEX IF NOT EXISTS idx_streams_key ON streams(stream_key)`,
@@ -239,6 +269,8 @@ func (s *SQLiteDB) migrate() error {
 		`CREATE INDEX IF NOT EXISTS idx_track_telemetry_stream_created ON track_telemetry_samples(stream_key, created_at DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_recording_archives_stream ON recording_archives(stream_key, archived_at DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_backup_archives_archived ON backup_archives(archived_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_embed_profiles_stream_updated ON embed_profiles(stream_key, updated_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_abr_profiles_scope_updated ON abr_profiles(scope, stream_key, updated_at DESC)`,
 	}
 
 	for _, m := range migrations {

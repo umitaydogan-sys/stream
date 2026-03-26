@@ -2,6 +2,47 @@
 
 Tarih: 26 Mart 2026
 
+## 0. Bugun Kapanan Yeni Faz
+
+Bu turda urun hissini buyuten ikinci buyuk admin panel fazi kapatildi.
+Ana paket:
+
+- `Embed Studyosu`
+- `Analitik Merkezi`
+- `ABR Profilleri ve Teslimat Merkezi`
+- `audio-only DASH` gorunurlugu ve istemci hazirlik katmani
+- `Playback Guvenligi V1`
+
+Bu faz ile birlikte:
+
+- embed kodlari tek textarea ekranindan cikti studyosuna donustu
+- analitik ekrani KPI, grafik ve sorunlu yayin merkezi haline geldi
+- ABR ayarlari ham JSON alani olmaktan cikti, preset ve katman studyosuna donustu
+- signed playback URL ve token temelli guvenlik ayarlari embed akisina baglandi
+- audio-only teslimat linkleri daha gorunur ve daha uygulanabilir hale geldi
+
+## 0.1 Fazin Canli Durumu
+
+Yerelde:
+
+- `node --check internal/web/static/admin-studio.js`
+- `go build ./cmd/fluxstream/`
+- `go test ./...`
+
+temiz gecti.
+
+VPS:
+
+- servis: `active`
+- health: `http://127.0.0.1:8844/api/health`
+- Linux binary SHA256:
+  `5E8E09B68B632CF427CDB6068A62AFEEF19C5266FF848C16EC853308D95D6686`
+
+Yeni statik dosyalar:
+
+- `internal/web/static/admin-studio.js`
+- `internal/web/static/admin-studio.css`
+
 ## 1. Urun Vizyonu
 
 FluxStream, tek binary ile calisan, yerelde ve Linux sunucuda kolay
@@ -149,45 +190,162 @@ Hala enterprise seviyeye cikarmak icin gerekli ana farklar:
 - gercek dis ortam storage ve failover testleri
 - yuk testi ve soak testi
 
-## 6. Acik Kalan Kisa Vade Fazlar
+## 6. Siradaki Buyuk Faz
 
-### 6.1 Depolama ve Arsiv Merkezi
+### 6.1 Embed + Analitik + ABR Stüdyosu + Playback Guvenligi Fazı
 
-- teknik terimleri daha da azalt
+Bu faz, birbirinden kopuk duran ama ayni urun hissi eksigini tasiyan
+uc ekrani ayni paket icinde urun seviyesine tasir:
+
+- `Embed Kodlari` menusu
+- `Analitik` sayfasi
+- `Teslimat / ABR` sayfasi
+
+Ayni faz icinde iki teknik sertlestirme hatti da kapatilir:
+
+- `audio-only DASH` istemci sertlestirmesi
+- `playback guvenligi v1`
+
+### 6.2 Embed Stüdyosu
+
+Hedef:
+
+- mevcut embed ekranini `Embed Stüdyosu` seviyesine tasimak
+- kod uretimini tek textarea yerine secilebilir, profilli ve canli onizlemeli bir merkez haline getirmek
+
+Planlanan alt basliklar:
+
+- `Basit Mod` ve `Gelismis Mod`
+- hazir kullanim tipleri:
+  `Web sitesi`, `Haber portalı`, `Kurumsal sayfa`, `Mobil uyumlu`,
+  `Sadece ses`, `Gizli yayın`, `Token korumalı`, `Düşük gecikme`,
+  `DASH`, `HLS`, `MP4 fallback`
+- kartli cikislar:
+  `Iframe`, `Script embed`, `Player URL`, `Audio player`,
+  `Popup player`, `Direct manifest`, `VLC linki`
+- canli onizleme, kullanim aciklamasi ve `nerede kullanilir` kutusu
+- secilebilir opsiyonlar:
+  `responsive`, `autoplay`, `muted`, `poster`, `branding`,
+  `watermark`, `audio-only`, `start quality`, `token`,
+  `signed URL`, `referrer policy`
+- stream bazli kaydedilebilir `Embed Profili`
+- `Kopyala`, `Paylaş`, `Test Et`, `Yeni sekmede aç`, `Debug ile aç`
+- eksik veya gecersiz parametrelerde korumali uyari akisi
+
+### 6.3 Analitik Merkezi
+
+Hedef:
+
+- mevcut basit analitik ekranini tek merkezli bir `Analitik Merkezi` haline getirmek
+
+Planlanan alt basliklar:
+
+- ust sabit filtre blogu:
+  `tarih aralığı`, `stream seçimi`, `canlı görünüm`, `geçmiş rapor`
+- KPI kartlari:
+  `aktif izleyici`, `tepe izleyici`, `ortalama buffer`, `stall`,
+  `kalite geçişi`, `audio switch`, `hata oranı`, `en çok izlenen stream`
+- tum streamler ve tek stream gorunumu ayni sayfada
+- gelismis grafikler:
+  `izleyici zaman serisi`, `buffer trendi`, `stall trendi`,
+  `kalite dağılımı`, `cihaz/oynatıcı kaynağı`,
+  `audio track kullanımı`, `ABR katman dağılımı`
+- `Sorunlu yayınlar` bolumu
+- ayri kartlar:
+  `Kalite geçiş raporu`, `Audio track değişim raporu`
+- `CSV` ve `JSON` disa aktarma
+- ilgili streamin `Operasyon Merkezi` sayfasina gecis
+- `Analitik alarm merkezi` ve esik asimi kartlari
+
+### 6.4 ABR Profilleri ve Teslimat Merkezi
+
+Hedef:
+
+- mevcut JSON odakli ekranı `ABR Profilleri ve Teslimat Merkezi` seviyesine tasimak
+
+Planlanan alt basliklar:
+
+- hazir profil secimi korunacak ama yanina form tabanli profil olusturucu gelecek
+- kullanici JSON yazmak zorunda kalmayacak
+- `katman ekle`, `katman sil`, `surukle sirala`
+- alanlar:
+  `çözünürlük`, `bitrate`, `max bitrate`, `buffer`, `fps`,
+  `preset`, `audio bitrate`
+- hazir kartli presetler:
+  `Mobil`, `Dengeli`, `Dayanıklı`, `TV`, `Yüksek kalite`,
+  `Audio-only`, `Radyo`, `Sadece düşük bant`
+- `Profili kaydet`, `çoğalt`, `içe al`, `dışa aktar`
+- `JSON görünümü` sadece gelismis modda
+- her profil icin:
+  `tahmini CPU yükü`, `tahmini upload`, `düşük bant uyumu`,
+  `önerilen kullanım`
+- secilen profil icin beklenen HLS / DASH cikisini gosteren canli test kutusu
+- `varsayılan profil`, `stream bazlı özel profil`, `global profil kütüphanesi`
+- `Yayin bazli öneri motoru`
+
+### 6.5 Audio-only DASH Sertlestirme
+
+Planlanan alt basliklar:
+
+- tarayici, dash.js ve VLC tarafinda `audio-only DASH` dogrulamasi
+- `audio.mpd`, `manifest.mpd`, `init segment`, codec ve MIME basliklarini gercek istemcilerle test
+- `Sadece ses oynatici` icin daha net UI
+- `audio-only embed` ve `audio-only direct link` gorunurlugu
+- DASH ses cikisi icin `hazır / bekliyor / sorunlu` tanisini daha netlestirme
+- radyo ve podcast presetleri
+
+### 6.6 Playback Guvenligi V1
+
+Planlanan alt basliklar:
+
+- `signed playback URL`
+- `signed manifest ve segment erişimi`
+- `süreli token`
+- `tek domain / referrer kısıtı`
+- `iframe domain pinning`
+- `IP kısıtı`
+- `tek kullanımlık token` veya `oturum bağlı token`
+- `görünür watermark`
+- `oturuma özel izleme izi`
+- `embed güvenlik profilleri`
+
+### 6.7 Bu Fazda Ayni Anda Eklenebilecek Guzel Parcalar
+
+- `Embed Şablon Kütüphanesi`
+- `Paylaşım Paketleri`
+- `A/B kalite testi`
+- `Teslimat sağlık özeti`
+- `Yayın bazlı öneri motoru`
+- `Analitik alarm merkezi`
+- `Preset import/export`
+- `Stream’e profil bağla / profili miras al`
+- `Gömme kodları için marka profili`
+- `Kısa link ve paylaşım linki üretimi`
+
+## 7. Sonraki Kisa Vade Sertlestirme Basliklari
+
+- `Depolama ve Arsiv Merkezi` teknik terimlerini daha da azalt
 - kullaniciya secim yardimi ve hazir preset sihirbazi ekle
 - rclone tabanli Drive / OneDrive / Dropbox akisini gercek saha testleriyle dogrula
 - harici AWS S3 bucket ile gercek saha testi al
 - ayni VPS uzerindeki MinIO + SFTP laboratuvar hedeflerini uzun sureli testlerle sertlestir
-
-### 6.2 Audio-only DASH ve Recording Sertlestirme
-
-- farkli tarayicilar, VLC ve dash.js tabanli istemcilerde `audio-only DASH` testleri
 - buyuk dosya, uzun sureli kayit, servis restart ve gec finalize senaryolari
 - eski bozuk `TS` kayitlar icin kurtarma / uyari akisi
 
-### 6.3 Playback Guvenligi
-
-- signed URL
-- signed manifest / segment
-- oturum bagli playback tokeni
-- hotlink korumasi
-- watermark
-- IP / CIDR / geo policy
-
-### 6.4 Tam DRM
+## 8. Tam DRM Hazirligi
 
 - AES-128 HLS key servisi
 - DRM abstraction
 - Widevine / FairPlay / PlayReady hazirligi
 
-## 7. Orta Vade Buyuk Fazlar
+## 9. Orta Vade Buyuk Fazlar
 
 - multi-node origin-edge mimarisi
 - RBAC, audit log, SSO
 - SSAI ve monetizasyon
 - uzun sureli soak test / yuk testi
 
-## 8. Cekirdek Sonrasi Fazlar
+## 10. Cekirdek Sonrasi Fazlar
 
 - konferans odalari
 - canli chat
@@ -196,11 +354,12 @@ Hala enterprise seviyeye cikarmak icin gerekli ana farklar:
 - yoklama ve breakout room
 - takim ici mesajlasma
 
-## 9. Sonraki En Dogru Sira
+## 11. Sonraki En Dogru Sira
 
-1. `Depolama ve Arsiv Merkezi` UX sadeleştirmesini ikinci turda tamamla
-2. harici bir bucket ile gercek AWS S3 saha testi yap
-3. rclone tabanli populer bulut hedeflerini gercek hesaplarla dogrula
-4. `audio-only DASH` davranisini canli istemcilerde sertlestir
-5. playback guvenligi fazina gir
-6. sonra DRM ve origin-edge mimarisi tasarimina gec
+1. `Embed Stüdyosu` ekranini kur
+2. `Analitik Merkezi` ekranini urun seviyesine tası
+3. `ABR Profilleri ve Teslimat Merkezi` profil mantigini devreye al
+4. ayni faz icinde `audio-only DASH` istemci sertlestirmesini kapat
+5. ayni faz icinde `Playback Guvenligi V1` katmanini ekle
+6. sonra depolama sertlestirmesi ve harici AWS S3 saha testine don
+7. sonra DRM ve origin-edge mimarisi tasarimina gec

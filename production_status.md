@@ -2,6 +2,28 @@
 
 Tarih: 26 Mart 2026
 
+## 0. Son Faz Sonrasi Hizli Karar
+
+FluxStream artik yalnizca iyi bir tek-node medya sunucusu degil;
+ayni zamanda:
+
+- embed ureten
+- playback guvenligini yoneten
+- analitik okuyan
+- ABR profili tasarlayan
+- operasyon ve depolama akislarini tek panelden veren
+
+bir yayin urunu iskeletine donusmus durumda.
+
+En yeni kazanım:
+
+- `Embed Studyosu`
+- `Analitik Merkezi`
+- `ABR Profilleri ve Teslimat Merkezi`
+- `Playback Guvenligi V1`
+
+aynı urun diliyle panel icine oturdu.
+
 ## 1. Genel Karar
 
 FluxStream artik prototip seviyesini asti.
@@ -89,6 +111,23 @@ Karar:
 - kayit tarafi sadece ham dosya toplamaktan cikti, gercek kutuphane / arsiv mantigina yaklasti
 
 ## 3. Bu Turda Kapanan Onemli Fazlar
+
+### 3.0 Embed + Analitik + ABR + Playback Guvenligi Fazı
+
+Kapananlar:
+
+- `Embed Studyosu` ile kullanim tipine gore embed kodu ve guvenli baglanti uretimi
+- kaydedilebilir embed profilleri
+- signed URL / token / domain / IP / watermark tabanli playback guvenligi omurgasi
+- `Analitik Merkezi` ile KPI kartlari, trend grafikler ve sorunlu yayinlar gorunumu
+- `ABR Profilleri ve Teslimat Merkezi` ile form tabanli katman studyosu
+- preset kutuphanesi, profil kaydetme, cogaltma, uygulama ve oneri akisi
+- `audio-only DASH` link ve teslimat gorunurlugu
+
+Karar:
+
+- panel artik yalnizca yonetim ekrani degil, urun seviyesi operator araci
+- teknik derinlik ile kullanilabilirlik arasinda onceki turlara gore belirgin sicrama var
 
 ### 3.1 Storage UI ve Crash Hatti
 
@@ -214,10 +253,10 @@ Bunu demek icin kapanmasi gereken fark yaratan alanlar:
 
 ## 8. Siradaki En Dogru Hedefler
 
-1. `Depolama ve Arsiv Merkezi` ekraninin kullanici dilini daha da sadeleştir
-2. harici bir AWS S3 bucket ile gercek saha testi al
-3. rclone tabanli populer bulut hedeflerini gercek hesaplarla dogrula
-4. `audio-only DASH` ve uzun recording/finalize davranisini sertlestir
-5. playback guvenligi fazina gir
-6. sonra tam DRM mimarisini tasarla
-7. daha sonra origin-edge ve enterprise guvenlik fazina gec
+1. `Embed Stüdyosu` ekranini urun seviyesine tası
+2. `Analitik Merkezi` ekranini yeniden kur
+3. `ABR Profilleri ve Teslimat Merkezi`ni form tabanli profil mantigina gecir
+4. ayni faz icinde `audio-only DASH` istemci sertlestirmesini kapat
+5. ayni faz icinde `Playback Guvenligi V1` katmanini ekle
+6. sonra harici AWS S3 bucket ve populer bulut hedefleri icin gercek saha testlerine don
+7. daha sonra tam DRM ve origin-edge fazina gec

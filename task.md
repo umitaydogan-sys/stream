@@ -2,6 +2,36 @@
 
 Tarih: 26 Mart 2026
 
+## 0. Yeni Fazda Kapanan Buyuk Paket
+
+- [x] `Embed Kodlari` ekranini `Embed Studyosu` seviyesine tasi
+- [x] `Basit Mod` ve `Gelismis Mod` ayrimini ekle
+- [x] hazir kullanim tipleri ekle:
+  `Web sitesi`, `Haber portali`, `Kurumsal sayfa`, `Mobil uyumlu`,
+  `Sadece ses`, `Gizli yayin`, `Token korumali`, `Dusuk gecikme`,
+  `DASH`, `HLS`, `MP4 fallback`
+- [x] kartli cikis tipleri ekle:
+  `Iframe`, `Script embed`, `Player URL`, `Audio player`,
+  `Popup player`, `Direct manifest`, `VLC linki`
+- [x] canli onizleme, kullanim ozeti, kopyala/test/debug aksiyonlari ekle
+- [x] stream bazli kaydedilebilir `Embed Profili` mantigini ekle
+- [x] signed playback URL, sureli token, domain/IP kisiti ve watermark tabanli
+  `Playback Guvenligi V1` omurgasini Embed Studyosu ile birlestir
+- [x] `Analitik` ekranini `Analitik Merkezi` seviyesine tasi
+- [x] KPI kartlari, zaman serileri, kalite/audio dagilimlari ve sorunlu yayinlar bolumunu ekle
+- [x] JSON/CSV disa aktarma ve Operasyon Merkezi'ne hizli gecis ekle
+- [x] `Teslimat / ABR` ekranini `ABR Profilleri ve Teslimat Merkezi` seviyesine tasi
+- [x] form tabanli profil olusturucu, preset kutuphanesi, kaydet/cogalt/sil akisini ekle
+- [x] tahmini CPU, upload, dusuk bant uyumu, teslimat saglik ozeti ve yayin bazli oneri motoru ekle
+- [x] `audio-only DASH` icin player/embed/ABR UI gorunurlugunu guclendir
+- [x] `DASH Ses` ve `HLS Ses` linklerini teslimat merkezi icinde gorunur hale getir
+
+## 0.1 Bu Fazdan Sonra Acik Kalan Saha Dogrulamalari
+
+- [ ] `audio-only DASH` akisini gercek audio-only kaynakla tarayici, dash.js ve VLC tarafinda saha testinden gecir
+- [ ] yeni `Embed Studyosu` ve `Analitik Merkezi` ekranlarini canli veriyle uzun sureli operatör kullanim testine sok
+- [ ] playback guvenligi V1 akisini domain/IP/token zorlamasi ile canli stream policy senaryolarinda dogrula
+
 ## 1. Bu Turda Kapanan Ana Basliklar
 
 - [x] tum kayit baslatma akislarinda varsayilan formati `mp4` yap
@@ -73,9 +103,100 @@ Tarih: 26 Mart 2026
 - [ ] buyuk dosya, uzun sureli kayit ve servis restart senaryolarinda finalize/remux akisinin dayanikliligini arttir
 - [ ] eski bozuk `TS` kayitlar icin kullaniciyi uyaran ve kurtarma yolunu gosteren akis ekle
 
-## 6. Playback Guvenligi ve DRM Fazlari
+## 6. Yeni Buyuk Faz: Embed + Analitik + ABR Stüdyosu + Playback Guvenligi
 
-### 6.1 Kisa Vade Playback Guvenligi
+### 6.1 Embed Stüdyosu
+
+- [ ] `Embed Kodlari` ekranini `Embed Stüdyosu` seviyesine tası
+- [ ] `Basit Mod` ve `Gelismis Mod` ayrimini ekle
+- [ ] hazir kullanim tipleri ekle:
+  `Web sitesi`, `Haber portalı`, `Kurumsal sayfa`, `Mobil uyumlu`,
+  `Sadece ses`, `Gizli yayın`, `Token korumalı`, `Düşük gecikme`,
+  `DASH`, `HLS`, `MP4 fallback`
+- [ ] kartli cikis tipleri ekle:
+  `Iframe`, `Script embed`, `Player URL`, `Audio player`,
+  `Popup player`, `Direct manifest`, `VLC linki`
+- [ ] her embed tipi icin canli onizleme ve `nerede kullanilir` kutusu ekle
+- [ ] secilebilir opsiyonlari checkbox/select yapisina tasi:
+  `responsive`, `autoplay`, `muted`, `poster`, `branding`,
+  `watermark`, `audio-only`, `start quality`, `token`,
+  `signed URL`, `referrer policy`
+- [ ] stream bazli kaydedilebilir `Embed Profili` mantigi ekle
+- [ ] `Kopyala`, `Paylaş`, `Test Et`, `Yeni sekmede aç`, `Debug ile aç` aksiyonlarini belirginlestir
+- [ ] eksik veya gecersiz parametrelerde korumali uyari akislarini ekle
+- [ ] `Embed Şablon Kütüphanesi` ekle
+- [ ] `Paylaşım Paketleri` ekle
+- [ ] `Gömme kodları için marka profili` ekle
+- [ ] `Kısa link ve paylaşım linki üretimi` ekle
+
+### 6.2 Analitik Merkezi
+
+- [ ] `Analitik` ekranini `Analitik Merkezi` seviyesine tası
+- [ ] ustte sabit `tarih araligi` ve `stream secimi` filtresini ekle
+- [ ] KPI kartlari ekle:
+  `aktif izleyici`, `tepe izleyici`, `ortalama buffer`, `stall`,
+  `kalite geçişi`, `audio switch`, `hata oranı`, `en çok izlenen stream`
+- [ ] tum streamler ve tek stream gorunumunu ayni sayfada destekle
+- [ ] gelismis grafikler ekle:
+  `izleyici zaman serisi`, `buffer trendi`, `stall trendi`,
+  `kalite dağılımı`, `cihaz/oynatıcı kaynağı`,
+  `audio track kullanımı`, `ABR katman dağılımı`
+- [ ] `Sorunlu yayınlar` bolumu ekle
+- [ ] `Kalite geçiş raporu` ve `Audio track değişim raporu` kartlari ekle
+- [ ] `Canlı görünüm` ve `geçmiş rapor` modlarini ayir
+- [ ] `CSV` ve `JSON` disa aktarma ekle
+- [ ] ilgili streamin `Operasyon Merkezi` sayfasina hizli gecis ekle
+- [ ] `Analitik alarm merkezi` ekle
+
+### 6.3 ABR Profilleri ve Teslimat Merkezi
+
+- [ ] `Teslimat / ABR` ekranini `ABR Profilleri ve Teslimat Merkezi` seviyesine tası
+- [ ] JSON odakli kullanim yerine form tabanli profil olusturucu ekle
+- [ ] `katman ekle`, `katman sil`, `surukle sirala` akisini ekle
+- [ ] katman alanlarini form tabanli ver:
+  `çözünürlük`, `bitrate`, `max bitrate`, `buffer`, `fps`,
+  `preset`, `audio bitrate`
+- [ ] hazir preset kartlari ekle:
+  `Mobil`, `Dengeli`, `Dayanıklı`, `TV`, `Yüksek kalite`,
+  `Audio-only`, `Radyo`, `Sadece düşük bant`
+- [ ] `Profili kaydet` ve `profil olarak çoğalt` akislarini ekle
+- [ ] `JSON görünümü`nü sadece gelismis moda tasi
+- [ ] profil bazli `tahmini CPU yükü`, `tahmini upload`, `düşük bant uyumu`, `önerilen kullanım` kartlarini ekle
+- [ ] secilen profil icin beklenen HLS / DASH cikisini gosteren canli test kutusu ekle
+- [ ] `varsayılan profil`, `stream bazlı özel profil`, `global profil kütüphanesi` mantigini ekle
+- [ ] `Preset import/export` ekle
+- [ ] `Stream’e profil bağla / profili miras al` mantigini ekle
+- [ ] `Teslimat sağlık özeti` ekle
+- [ ] `Yayın bazlı öneri motoru` ekle
+- [ ] `A/B kalite testi` icin temel karsilastirma altyapisini ekle
+
+### 6.4 Audio-only DASH Sertlestirme
+
+- [ ] tarayici tarafinda `audio-only DASH` oynatimini dogrula
+- [ ] dash.js istemcisi ile `audio-only DASH` oynatimini dogrula
+- [ ] VLC ile `audio-only DASH` oynatimini dogrula
+- [ ] `audio.mpd`, `manifest.mpd`, `init segment`, codec ve MIME basliklarini sertlestir
+- [ ] `Sadece ses oynatici` UI'ini daha net hale getir
+- [ ] `audio-only embed` ve `audio-only direct link` gorunurlugunu artir
+- [ ] DASH ses cikisi icin `hazır / bekliyor / sorunlu` tanisini daha netlestir
+- [ ] radyo ve podcast presetleri ekle
+
+### 6.5 Playback Guvenligi V1
+
+- [ ] signed playback URL destegi ekle
+- [ ] signed manifest ve segment erisimi ekle
+- [ ] sureli token mantigi ekle
+- [ ] tek domain / referrer kisiti ekle
+- [ ] iframe domain pinning ekle
+- [ ] IP kisiti ekle
+- [ ] tek kullanımlık token veya oturum bagli token mantigi ekle
+- [ ] gorunur watermark ekle
+- [ ] oturuma ozel izleme izi ekle
+- [ ] embed guvenlik profilleri ekle
+
+## 7. Playback Guvenligi ve DRM Fazlari
+
+### 7.1 Kisa Vade Playback Guvenligi
 
 - [ ] kisa omurlu signed playback URL destegi ekle
 - [ ] manifest ve segment istekleri icin imzali token dogrulamasi ekle
@@ -86,21 +207,21 @@ Tarih: 26 Mart 2026
 - [ ] gorunur watermark / dynamic overlay / oturum izi ekle
 - [ ] playback auth olaylarini audit log tarafina bagla
 
-### 6.2 Orta Vade Gelismis Playback Guvenligi
+### 7.2 Orta Vade Gelismis Playback Guvenligi
 
 - [ ] AES-128 HLS sifreleme ve anahtar servis akisini ekle
 - [ ] anahtar erisimini token / oturum / IP ile koru
 - [ ] lisansli playback policy seti olustur
 - [ ] embed domain pinning ve signed iframe mantigi ekle
 
-### 6.3 Uzun Vade Tam DRM
+### 7.3 Uzun Vade Tam DRM
 
 - [ ] DRM abstraction layer tasarla
 - [ ] Widevine / FairPlay / PlayReady entegrasyon noktalarini tasarla
 - [ ] CENC / CMAF ve DRM lisans sunucusu baglantisi icin enterprise faz plani cikar
 - [ ] tam DRM ozelliklerini lisans modeliyle eslestir
 
-## 7. Buyuk Urun Eksikleri
+## 8. Buyuk Urun Eksikleri
 
 - [ ] multi-node origin-edge mimarisi
 - [ ] RBAC, audit log ve SSO
@@ -108,7 +229,7 @@ Tarih: 26 Mart 2026
 - [ ] uzun sureli soak test ve yuk testi kapsamini artir
 - [ ] playback guvenligi ile lisans katmanini ortak policy modeline bagla
 
-## 8. Cekirdek Tamamlandiktan Sonra
+## 9. Cekirdek Tamamlandiktan Sonra
 
 - [ ] konferans odalari
 - [ ] canli chat

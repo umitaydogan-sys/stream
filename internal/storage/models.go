@@ -222,3 +222,37 @@ type BackupArchive struct {
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 }
+
+// EmbedProfile stores reusable embed/link generation presets per stream.
+type EmbedProfile struct {
+	ID            int64     `json:"id"`
+	StreamKey     string    `json:"stream_key"`
+	Name          string    `json:"name"`
+	UseCase       string    `json:"use_case"`
+	Mode          string    `json:"mode"`
+	PrimaryFormat string    `json:"primary_format"`
+	Width         int       `json:"width"`
+	Height        int       `json:"height"`
+	Theme         string    `json:"theme"`
+	OptionsJSON   string    `json:"options_json"`
+	BrandingJSON  string    `json:"branding_json"`
+	SecurityJSON  string    `json:"security_json"`
+	Notes         string    `json:"notes,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+// ABRProfile stores saved adaptive bitrate profile libraries.
+type ABRProfile struct {
+	ID          int64     `json:"id"`
+	ProfileSet  string    `json:"profile_set"`
+	Name        string    `json:"name"`
+	Scope       string    `json:"scope"` // global or stream
+	StreamKey   string    `json:"stream_key,omitempty"`
+	Description string    `json:"description,omitempty"`
+	Preset      string    `json:"preset,omitempty"`
+	ProfilesJSON string   `json:"profiles_json"`
+	SummaryJSON string    `json:"summary_json,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}

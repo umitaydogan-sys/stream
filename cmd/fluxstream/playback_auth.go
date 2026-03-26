@@ -47,14 +47,16 @@ func makePlaybackAuthorizer(cfg *config.Manager, db *storage.SQLiteDB, tokenMgr 
 			}
 		}
 		needsToken := cfg.GetBool("token_enabled", false) || policy.RequirePlaybackToken || policy.RequireSignedURL
-		if needsToken {
-			token := strings.TrimSpace(r.URL.Query().Get("token"))
-			if token == "" {
-				token = strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
-			}
-			if token == "" || !tokenMgr.ValidateToken(token, streamKey) {
+		token := strings.TrimSpace(r.URL.Query().Get("token"))
+		if token == "" {
+			token = strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+		}
+		if token != "" {
+			if !tokenMgr.ValidatePlaybackToken(token, streamKey, format, r) {
 				return false, http.StatusUnauthorized, "Gecerli playback token gerekli."
 			}
+		} else if needsToken {
+			return false, http.StatusUnauthorized, "Gecerli playback token gerekli."
 		}
 		return true, 0, ""
 	}
