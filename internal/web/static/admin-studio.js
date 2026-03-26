@@ -1,6 +1,26 @@
 (function(){
   if(!window.api || !window.escHtml) return;
 
+  const legacyStudioRenders = {
+    dashboard: typeof window.renderDashboard === 'function' ? window.renderDashboard : null,
+    streams: typeof window.renderStreams === 'function' ? window.renderStreams : null,
+    guidedSettings: typeof window.renderGuidedSettings === 'function' ? window.renderGuidedSettings : null,
+    settingsGeneral: typeof window.renderSettingsGeneral === 'function' ? window.renderSettingsGeneral : null,
+    settingsEmbed: typeof window.renderSettingsEmbed === 'function' ? window.renderSettingsEmbed : null,
+    settingsProtocols: typeof window.renderSettingsProtocols === 'function' ? window.renderSettingsProtocols : null,
+    settingsOutputs: typeof window.renderSettingsOutputs === 'function' ? window.renderSettingsOutputs : null,
+    settingsSecurity: typeof window.renderSettingsSecurity === 'function' ? window.renderSettingsSecurity : null,
+    diagnostics: typeof window.renderDiagnostics === 'function' ? window.renderDiagnostics : null,
+    maintenanceCenter: typeof window.renderMaintenanceCenter === 'function' ? window.renderMaintenanceCenter : null,
+    securityTokens: typeof window.renderSecurityTokens === 'function' ? window.renderSecurityTokens : null,
+    playerTemplates: typeof window.renderPlayerTemplates === 'function' ? window.renderPlayerTemplates : null,
+    advancedEmbed: typeof window.renderAdvancedEmbed === 'function' ? window.renderAdvancedEmbed : null,
+    analytics: typeof window.renderAnalytics === 'function' ? window.renderAnalytics : null,
+    settingsTranscode: typeof window.renderSettingsTranscode === 'function' ? window.renderSettingsTranscode : null,
+    viewers: typeof window.renderViewers === 'function' ? window.renderViewers : null,
+    transcodeJobs: typeof window.renderTranscodeJobs === 'function' ? window.renderTranscodeJobs : null
+  };
+
   const EMBED_USE_CASES = [
     {key:'website', title:'Web Sitesi', desc:'Genel web yayini ve kurumsal sayfa icin dengeli secim.', output:'iframe', format:'player', badge:'Genel'},
     {key:'newsroom', title:'Haber Portali', desc:'Haber siteleri ve hizli gomulu player kullanimlari.', output:'script', format:'player', badge:'Editoryal'},
@@ -47,6 +67,30 @@
     return JSON.parse(JSON.stringify(value==null?{}:value));
   }
 
+  async function studioUploadFile(category,file){
+    if(!file) return {error:true,message:'Dosya secilmedi'};
+    const form=new FormData();
+    form.append('category',category||'branding');
+    form.append('file',file,file.name||'asset');
+    const headers={};
+    if(typeof authToken!=='undefined' && authToken) headers.Authorization='Bearer '+authToken;
+    try{
+      const res=await fetch(API+'/api/admin/assets',{method:'POST',headers:headers,body:form,cache:'no-store'});
+      return await res.json();
+    }catch(err){
+      return {error:true,message:(err&&err.message)||'Yukleme hatasi'};
+    }
+  }
+
+  async function studioListAssets(category){
+    const result=await api('/api/admin/assets?category='+encodeURIComponent(category||'branding'));
+    return Array.isArray(result&&result.items)?result.items:[];
+  }
+
+  async function studioDeleteAsset(path){
+    return api('/api/admin/assets',{method:'DELETE',body:{path:path}});
+  }
+
   function toNumber(value,fallback){
     const n=Number(value);
     return Number.isFinite(n)?n:fallback;
@@ -60,6 +104,56 @@
 
   function studioRerender(page){
     if(typeof loadPage==='function') return loadPage(page);
+  }
+
+  function studioAuditControls(root){
+    const scope=root||document;
+    scope.querySelectorAll('textarea, .form-textarea').forEach(function(el){
+      el.classList.add('studio-textarea');
+      if(!el.style.minHeight) el.style.minHeight=el.rows && Number(el.rows)>=4 ? '160px' : '120px';
+    });
+    scope.querySelectorAll('input.form-input, select.form-select, input.input, select.input, textarea.input').forEach(function(el){
+      el.classList.add('studio-control');
+    });
+    scope.querySelectorAll('.page-header').forEach(function(header){
+      if(header.classList.contains('studio-headerized')) return;
+      header.classList.add('studio-headerized');
+    });
+    scope.querySelectorAll('.copy-input, .mono-wrap, code').forEach(function(el){
+      el.classList.add('studio-mono');
+    });
+  }
+
+  function studioWrapLegacyPage(container,title,subtitle,pills,actionsHTML){
+    if(!container) return;
+    const temp=document.createElement('div');
+    temp.innerHTML=container.innerHTML;
+    temp.querySelectorAll(':scope > .page-header').forEach(function(node){ node.remove(); });
+    const body=temp.innerHTML;
+    container.innerHTML=
+      '<div class="studio-page">'+
+        '<section class="studio-hero">'+
+          '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap">'+
+            '<div><h1 class="studio-hero-title">'+escHtml(title||'Studio')+'</h1><div class="studio-hero-sub">'+escHtml(subtitle||'')+'</div></div>'+
+            (actionsHTML?'<div class="studio-toolbar-group">'+actionsHTML+'</div>':'')+
+          '</div>'+
+          (Array.isArray(pills)&&pills.length?'<div class="studio-pill-row" style="margin-top:14px">'+pills.map(function(item){ return '<span class="studio-pill'+(item&&item.active?' active':'')+'">'+escHtml(String((item&&item.label)||item||''))+'</span>'; }).join('')+'</div>':'')+
+        '</section>'+
+        body+
+      '</div>';
+    studioAuditControls(container);
+  }
+
+  async function studioRenderLegacy(container,key,hero){
+    const fn=legacyStudioRenders[key];
+    if(typeof fn!=='function') return false;
+    await fn(container);
+    if(hero){
+      studioWrapLegacyPage(container,hero.title,hero.subtitle,hero.pills,hero.actionsHTML);
+    }else{
+      studioAuditControls(container);
+    }
+    return true;
   }
 
   function studioField(label,control,hint){
@@ -923,5 +1017,443 @@
     const refresh=document.getElementById('studio-jobs-refresh');
     if(refresh) refresh.onclick=function(){ studioRerender('transcode-jobs'); };
     if(typeof schedulePageRefresh==='function') schedulePageRefresh('transcode-jobs',10000);
+  };
+
+  function studioInsertAfter(referenceNode, html){
+    if(!referenceNode || !referenceNode.parentNode || !html) return null;
+    const wrap=document.createElement('div');
+    wrap.innerHTML=html;
+    const node=wrap.firstElementChild;
+    if(!node) return null;
+    referenceNode.parentNode.insertBefore(node, referenceNode.nextSibling);
+    return node;
+  }
+
+  function renderBrandAssetTiles(items,currentURL){
+    const list=Array.isArray(items)?items:[];
+    if(!list.length) return '<div class="empty-state" style="padding:24px"><div class="icon"><i class="bi bi-images"></i></div><h3>Henüz asset yok</h3><p style="color:var(--text-muted)">Logo, poster veya marka görseli yüklediğinde burada görünecek.</p></div>';
+    return '<div class="studio-asset-grid">'+list.map(function(item){
+      const active=String(item.url||'')===String(currentURL||'');
+      return '<div class="studio-asset-card'+(active?' active':'')+'">'+
+        '<div class="studio-asset-thumb">'+(item.url?'<img src="'+escHtml(item.url)+'" alt="'+escHtml(item.name||'asset')+'">':'<span class="studio-chip">Asset</span>')+'</div>'+
+        '<div><div style="font-weight:700;font-size:13px;word-break:break-word">'+escHtml(item.name||'asset')+'</div><div class="form-hint">'+escHtml((item.category||'branding').toUpperCase())+' • '+escHtml(fmtBytes(item.size||0))+'</div></div>'+
+        '<div class="studio-inline-actions"><button class="btn btn-secondary btn-sm" data-asset-use="'+escHtml(item.url||'')+'">Kullan</button><button class="btn btn-secondary btn-sm" data-asset-copy="'+escHtml(item.url||'')+'">Kopyala</button><button class="btn btn-danger btn-sm" data-asset-delete="'+escHtml(item.path||'')+'">Sil</button></div>'+
+      '</div>';
+    }).join('')+'</div>';
+  }
+
+  async function bindBrandAssetTiles(root,onUse){
+    if(!root) return;
+    root.querySelectorAll('[data-asset-copy]').forEach(function(btn){
+      btn.onclick=function(){ copyText(btn.getAttribute('data-asset-copy')||''); };
+    });
+    root.querySelectorAll('[data-asset-use]').forEach(function(btn){
+      btn.onclick=function(){ if(typeof onUse==='function') onUse(btn.getAttribute('data-asset-use')||''); };
+    });
+    root.querySelectorAll('[data-asset-delete]').forEach(function(btn){
+      btn.onclick=async function(){
+        const path=btn.getAttribute('data-asset-delete')||'';
+        if(!path || !confirm('Bu asset silinsin mi?')) return;
+        const res=await studioDeleteAsset(path);
+        if(res && !res.error){
+          toast('Asset silindi');
+          studioRerender(currentPage);
+        }else{
+          toast((res&&res.message)||'Asset silinemedi','error');
+        }
+      };
+    });
+  }
+
+  function playerTemplateModalValues(){
+    return {
+      name:(document.getElementById('pt-name')||{}).value||'',
+      theme:(document.getElementById('pt-theme')||{}).value||'dark',
+      logo_url:(document.getElementById('pt-logo-url')||{}).value||'',
+      logo_position:(document.getElementById('pt-logo-pos')||{}).value||'top-right',
+      logo_opacity:parseFloat((document.getElementById('pt-logo-opacity')||{}).value||'1')||1,
+      watermark_text:(document.getElementById('pt-watermark')||{}).value||'',
+      show_title:!!((document.getElementById('pt-show-title')||{}).checked),
+      show_live_badge:!!((document.getElementById('pt-show-badge')||{}).checked),
+      background_css:(document.getElementById('pt-bg-css')||{}).value||'',
+      control_bar_css:(document.getElementById('pt-ctrl-css')||{}).value||'',
+      play_button_css:(document.getElementById('pt-play-css')||{}).value||'',
+      custom_css:(document.getElementById('pt-custom-css')||{}).value||''
+    };
+  }
+
+  async function refreshPlayerTemplateAssetShelf(currentURL){
+    const host=document.getElementById('pt-brand-assets');
+    if(!host) return;
+    const items=await studioListAssets('branding');
+    host.innerHTML=renderBrandAssetTiles(items,currentURL);
+    bindBrandAssetTiles(host,function(url){
+      const input=document.getElementById('pt-logo-url');
+      if(input){
+        input.value=url||'';
+        updatePlayerTemplateModalPreview();
+      }
+    });
+  }
+
+  async function uploadPlayerTemplateLogo(){
+    const input=document.getElementById('pt-logo-file');
+    if(!input || !input.files || !input.files[0]){
+      toast('Yüklenecek logo dosyasını seçin','warning');
+      return;
+    }
+    const res=await studioUploadFile('branding',input.files[0]);
+    if(res && res.item && res.item.url){
+      const logo=document.getElementById('pt-logo-url');
+      if(logo) logo.value=res.item.url;
+      toast('Logo yüklendi');
+      input.value='';
+      await refreshPlayerTemplateAssetShelf(res.item.url);
+      updatePlayerTemplateModalPreview();
+    }else{
+      toast((res&&res.message)||'Logo yüklenemedi','error');
+    }
+  }
+
+  window.showPlayerModal = async function(id){
+    let pt={name:'',theme:'dark',background_css:'',control_bar_css:'',play_button_css:'',logo_url:'',logo_position:'top-right',logo_opacity:1,watermark_text:'',show_title:true,show_live_badge:true,custom_css:''};
+    if(id){
+      const data=await api('/api/players/'+id);
+      if(data && !data.error) pt=data;
+    }
+    const streams=await api('/api/streams');
+    window._playerTemplateStreams=Array.isArray(streams)?streams:[];
+    ensureTemplateStudioState();
+    const modalRoot=document.getElementById('player-modal');
+    if(!modalRoot) return;
+    modalRoot.innerHTML=
+      '<div class="modal-overlay" onclick="if(event.target===this)this.remove()">'+
+        '<div class="modal" style="max-width:1280px">'+
+          '<div class="modal-title">'+(id?'Player Şablonu Stüdyosu':'Yeni Player Şablonu')+'</div>'+
+          '<div class="studio-grid studio-grid-2" style="align-items:start">'+
+            '<div class="studio-card soft">'+
+              '<div><h2 class="studio-section-title">Şablon Ayarları</h2><div class="studio-section-sub">Gerçek player görünümüne yakın önizleme ile renk, logo, watermark ve tema ayarlarını aynı pencerede yönet.</div></div>'+
+              '<div class="studio-form-grid">'+
+                studioField('Şablon Adı *','<input class="input" id="pt-name" value="'+escHtml(pt.name||'')+'" placeholder="Örn: Haber Merkezi">','Kaydedilecek şablonun görünen adı.')+
+                studioField('Tema','<select class="input" id="pt-theme">'+studioSelectOptions([['dark','Dark'],['light','Light'],['minimal','Minimal'],['custom','Custom']],pt.theme||'dark')+'</select>','Hazır temadan başla veya custom kullan.')+
+                studioField('Logo URL','<input class="input" id="pt-logo-url" value="'+escHtml(pt.logo_url||'')+'" placeholder="/media-assets/branding/logo.png veya https://...">','Harici URL ya da yüklediğin marka dosyası kullanılabilir.')+
+                studioField('Logo Konumu','<select class="input" id="pt-logo-pos">'+studioSelectOptions([['top-right','Sağ Üst'],['top-left','Sol Üst'],['bottom-right','Sağ Alt'],['bottom-left','Sol Alt']],pt.logo_position||'top-right')+'</select>','Player içinde markanın görüleceği alan.')+
+                studioField('Logo Şeffaflık','<input class="input" id="pt-logo-opacity" type="number" min="0" max="1" step="0.1" value="'+escHtml(String(pt.logo_opacity||1))+'">','0 ile 1 arasında şeffaflık değeri.')+
+                studioField('Watermark Yazı','<input class="input" id="pt-watermark" value="'+escHtml(pt.watermark_text||'')+'" placeholder="CANLI • FluxStream">','Küçük metin watermarkı.')+
+              '</div>'+
+              '<div class="studio-option-grid">'+
+                '<label class="card" style="padding:14px"><div style="display:flex;justify-content:space-between;gap:12px"><div><strong>Başlık Göster</strong><div class="form-hint">Player başlığını görünür tutar.</div></div><input type="checkbox" id="pt-show-title" '+(pt.show_title?'checked':'')+'></div></label>'+
+                '<label class="card" style="padding:14px"><div style="display:flex;justify-content:space-between;gap:12px"><div><strong>CANLI Rozeti</strong><div class="form-hint">Canlı durum etiketini gösterir.</div></div><input type="checkbox" id="pt-show-badge" '+(pt.show_live_badge?'checked':'')+'></div></label>'+
+              '</div>'+
+              '<div class="studio-grid">'+
+                studioField('Arkaplan CSS','<textarea class="input" id="pt-bg-css" rows="3" placeholder="background:linear-gradient(180deg,#0b1120 0%,#111827 100%);">'+escHtml(pt.background_css||'')+'</textarea>','Ana player yüzeyi.')+
+                studioField('Kontrol Çubuğu CSS','<textarea class="input" id="pt-ctrl-css" rows="3" placeholder="background:rgba(8,15,32,.88);">'+escHtml(pt.control_bar_css||'')+'</textarea>','Alt kontrol alanı.')+
+                studioField('Play Butonu CSS','<textarea class="input" id="pt-play-css" rows="3" placeholder="background:#2563eb; color:#fff;">'+escHtml(pt.play_button_css||'')+'</textarea>','Ortadaki büyük play butonu.')+
+                studioField('Özel CSS','<textarea class="input" id="pt-custom-css" rows="5" placeholder=".player-shell{backdrop-filter:blur(10px);}">'+escHtml(pt.custom_css||'')+'</textarea>','Tema dışında kalan küçük dokunuşlar.')+
+              '</div>'+
+              '<div class="studio-card soft" style="padding:14px">'+
+                '<div class="studio-section-title" style="font-size:16px">Logo yükleme ve kütüphane</div>'+
+                '<div class="studio-section-sub">Dış URL zorunluluğunu kaldırır. Yüklenen logo ve poster dosyaları tüm panelde tekrar kullanılabilir.</div>'+
+                '<div class="studio-inline-actions" style="margin-top:10px"><input type="file" id="pt-logo-file" accept="image/*"><button class="btn btn-secondary" id="pt-logo-upload">Logo Yükle</button><button class="btn btn-secondary" id="pt-logo-refresh">Kütüphaneyi Yenile</button></div>'+
+                '<div id="pt-brand-assets" style="margin-top:14px"></div>'+
+              '</div>'+
+              '<div class="studio-inline-actions"><button class="btn btn-secondary" onclick="document.getElementById(\'player-modal\').innerHTML=\'\'">Kapat</button><button class="btn btn-secondary" id="pt-apply-preview">Güncelleştir</button><button class="btn btn-primary" id="pt-save-btn">'+(id?'Kaydet ve Açık Kal':'Oluştur ve Açık Kal')+'</button></div>'+
+            '</div>'+
+            '<div class="studio-sticky-preview">'+
+              '<div class="studio-card">'+
+                '<div class="studio-section-title">Gerçek player önizlemesi</div>'+
+                '<div class="studio-section-sub">Kaydet dediğinde modal kapanmaz; önizleme ve kodlar aynı pencerede güncellenir.</div>'+
+                '<div class="studio-grid studio-grid-2">'+
+                  studioField('Kaynak stream','<select class="input" id="pt-modal-stream">'+templateStudioStreamOptions()+'</select>','Önizleme kaynağı.')+
+                  studioField('Format','<select class="input" id="pt-modal-format">'+templateStudioFormatOptions()+'</select>','Şablonun test formatı.')+
+                '</div>'+
+                '<input type="hidden" id="pt-current-template-id" value="'+(id||0)+'">'+
+                '<div id="pt-live-preview" class="studio-preview-shell player-frame" style="margin-top:14px"></div>'+
+              '</div>'+
+              '<div class="studio-card" style="margin-top:14px"><div class="studio-section-title">Şablonlu çıkışlar</div><div class="studio-section-sub">Player URL, embed URL ve ana çıktı burada güncellenir.</div><div id="pt-live-embed-code"></div></div>'+
+            '</div>'+
+          '</div>'+
+        '</div>'+
+      '</div>';
+    applyTranslations(modalRoot);
+    ['pt-name','pt-theme','pt-logo-url','pt-logo-pos','pt-logo-opacity','pt-watermark','pt-bg-css','pt-ctrl-css','pt-play-css','pt-custom-css','pt-show-title','pt-show-badge','pt-modal-stream','pt-modal-format'].forEach(function(idValue){
+      const el=document.getElementById(idValue);
+      if(!el) return;
+      el.onchange=function(){ updatePlayerTemplateModalPreview(); };
+      el.oninput=function(){ updatePlayerTemplateModalPreview(); };
+    });
+    const upload=document.getElementById('pt-logo-upload');
+    if(upload) upload.onclick=uploadPlayerTemplateLogo;
+    const refresh=document.getElementById('pt-logo-refresh');
+    if(refresh) refresh.onclick=function(){ refreshPlayerTemplateAssetShelf((document.getElementById('pt-logo-url')||{}).value||''); };
+    const applyPreview=document.getElementById('pt-apply-preview');
+    if(applyPreview) applyPreview.onclick=function(){ savePlayerTemplate(toNumber((document.getElementById('pt-current-template-id')||{}).value,0)||null); };
+    const saveBtn=document.getElementById('pt-save-btn');
+    if(saveBtn) saveBtn.onclick=function(){ savePlayerTemplate(toNumber((document.getElementById('pt-current-template-id')||{}).value,0)||null); };
+    await refreshPlayerTemplateAssetShelf(pt.logo_url||'');
+    updatePlayerTemplateModalPreview();
+  };
+
+  window.savePlayerTemplate = async function(id){
+    const body=playerTemplateModalValues();
+    if(!body.name){
+      toast('Şablon adı gerekli','error');
+      return;
+    }
+    let newID=id;
+    if(id){
+      const res=await api('/api/players/'+id,{method:'PUT',body:body});
+      if(!res || res.error){
+        toast((res&&res.message)||'Şablon güncellenemedi','error');
+        return;
+      }
+      toast('Şablon güncellendi');
+    }else{
+      const res=await api('/api/players',{method:'POST',body:body});
+      newID=toNumber((res&&res.id)||(res&&res.item&&res.item.id),0);
+      if(!newID){
+        toast((res&&res.message)||'Şablon oluşturulamadı','error');
+        return;
+      }
+      const current=document.getElementById('pt-current-template-id');
+      if(current) current.value=String(newID);
+      toast('Şablon oluşturuldu');
+    }
+    await refreshPlayerTemplateAssetShelf(body.logo_url||'');
+    updatePlayerTemplatePreview(newID);
+  };
+
+  window.renderPlayerTemplates = async function(container){
+    const rendered=await studioRenderLegacy(container,'playerTemplates',{
+      title:'Player Şablonları Stüdyosu',
+      subtitle:'Gerçek player görünümüne yakın canlı önizleme, marka kütüphanesi, yüklenebilir logo dosyaları ve kapanmayan düzenleme akışı tek merkezde.',
+      pills:[{label:'Gerçek önizleme',active:true},{label:'Upload destekli logo akışı'},{label:'Kaydet ve açık kal'}],
+      actionsHTML:'<button class="btn btn-secondary btn-sm" onclick="navigate(\'logos\')"><i class="bi bi-images"></i> Marka Kütüphanesi</button><button class="btn btn-primary btn-sm" onclick="showPlayerModal()"><i class="bi bi-plus-circle"></i> Yeni Şablon</button>'
+    });
+    if(rendered){
+      const host=container.querySelector('.studio-page');
+      if(host){
+        const summary=document.createElement('section');
+        summary.className='studio-grid studio-grid-3';
+        summary.innerHTML=
+          '<div class="studio-summary"><span>Canlı önizleme</span><strong>Gerçek player</strong><div class="form-hint">Önizleme artık gerçek player tasarımını daha net gösterir.</div></div>'+
+          '<div class="studio-summary"><span>Güncelleştir davranışı</span><strong>Kapanmadan</strong><div class="form-hint">Kaydet dediğinde modal kapanmaz; sonucu aynı ekranda görürsün.</div></div>'+
+          '<div class="studio-summary"><span>Marka varlıkları</span><strong>Upload + URL</strong><div class="form-hint">Dış URL yanında doğrudan yüklenen logo ve posterleri de kullanabilirsin.</div></div>';
+        host.insertBefore(summary, host.children[1] || null);
+      }
+      studioAuditControls(container);
+    }
+  };
+
+  window.renderAdvancedEmbed = async function(container){
+    const state=ensureEmbedState();
+    state.mode='advanced';
+    await renderEmbedStudio(container);
+    const title=container.querySelector('.studio-hero-title');
+    if(title) title.textContent='Gelişmiş Embed Stüdyosu';
+    const sub=container.querySelector('.studio-hero-sub');
+    if(sub) sub.textContent='Hazır paylaşım paketleri, güvenli link laboratuvarı, manifest testleri ve gerçek önizleme ile gelişmiş embed üretimi.';
+    const studioPage=container.querySelector('.studio-page');
+    const streamList=await api('/api/streams');
+    const templates=await api('/api/players');
+    const streams=Array.isArray(streamList)?streamList:[];
+    const stream=streams.find(function(item){ return item.stream_key===state.streamKey; }) || streams[0] || null;
+    const template=studioSelectedTemplate(Array.isArray(templates)?templates:[],state.templateId);
+    const playback=stream?await studioFetchPlaybackBundle(state,stream,template):null;
+    const extra=document.createElement('section');
+    extra.className='studio-grid studio-grid-2';
+    extra.innerHTML=
+      '<div class="studio-card soft"><div><h2 class="studio-section-title">Embed preset laboratuvarı</h2><div class="studio-section-sub">Gizli yayın, token, audio-only, popup ve manifest dağıtımını ayrı ayrı test etmek için hızlı kısayollar.</div></div><div class="studio-chip-row">'+
+      '<button class="btn btn-secondary" data-advanced-open="player">Player Aç</button><button class="btn btn-secondary" data-advanced-open="embed">Embed Aç</button><button class="btn btn-secondary" data-advanced-open="manifest">Manifest Aç</button><button class="btn btn-secondary" data-advanced-open="audio">Ses Çıkışını Aç</button><button class="btn btn-secondary" data-advanced-open="vlc">VLC Linki</button></div><div class="studio-alert info" style="margin-top:12px"><strong>Gizli preset davranışı</strong><div style="margin-top:8px" class="form-hint">Gizli veya tokenli paket seçmek artık varsayılan olarak stream policy’yi kalıcı kilitlemez. Bu ekranda geçici güvenli link üretir; kalıcı uygulama için ayrıca stream policy açmalısın.</div></div></div>'+
+      '<div class="studio-card"><div><h2 class="studio-section-title">Doğrudan çıktı kutusu</h2><div class="studio-section-sub">Manifest, player, iframe ve ses URL’lerini burada tek tıkla test et.</div></div>'+
+      copyField('Player URL',(playback&&playback.player_url)||'')+
+      copyField('Embed URL',(playback&&playback.embed_url)||'')+
+      copyField('Manifest URL',(playback&&playback.manifest_url)||'')+
+      copyField('Ses URL',(playback&&playback.audio_url)||'')+
+      '</div>';
+    studioPage.appendChild(extra);
+    extra.querySelectorAll('[data-advanced-open]').forEach(function(btn){
+      btn.onclick=function(){
+        if(!playback){ toast('Önce bir stream seçin','warning'); return; }
+        const kind=btn.getAttribute('data-advanced-open');
+        const map={player:playback.player_url,embed:playback.embed_url,manifest:playback.manifest_url,audio:playback.audio_url,vlc:playback.vlc_url};
+        if(!map[kind]){ toast('Bu çıkış hazır değil','warning'); return; }
+        window.open(map[kind],'_blank','noopener');
+      };
+    });
+    studioAuditControls(container);
+  };
+
+  window.renderLogos = async function(container){
+    const items=await studioListAssets('branding');
+    container.innerHTML=
+      '<div class="studio-page">'+
+        '<section class="studio-hero"><h1 class="studio-hero-title">Logo ve Marka Merkezi</h1><div class="studio-hero-sub">Player şablonları, embed profilleri ve ileride gelecek marka presetleri için tekrar kullanılabilir logo, poster ve görsel varlık kütüphanesi.</div><div class="studio-pill-row" style="margin-top:14px"><span class="studio-pill active">'+fmtInt(items.length)+' asset</span><span class="studio-pill">Upload + Kopyala + Sil</span><span class="studio-pill">Player ve Embed ile ortak</span></div></section>'+
+        '<section class="studio-grid studio-grid-2">'+
+          '<div class="studio-card soft"><div><h2 class="studio-section-title">Yeni asset yükle</h2><div class="studio-section-sub">Logo, poster veya küçük marka görseli yükleyebilirsin. Yüklenen URL tüm panelde kullanılabilir.</div></div>'+
+            studioField('Kategori','<select id="studio-brand-category" class="input">'+studioSelectOptions([['branding','Genel Marka'],['logos','Logo'],['posters','Poster'],['players','Player Asset']], 'branding')+'</select>','Yüklenecek varlığın sınıfı.')+
+            '<div class="studio-inline-actions"><input type="file" id="studio-brand-file" accept="image/*"><button class="btn btn-primary" id="studio-brand-upload">Yükle</button><button class="btn btn-secondary" id="studio-brand-refresh">Listeyi Yenile</button></div>'+
+            '<div class="studio-alert info" style="margin-top:14px"><strong>Nerede kullanılır?</strong><div style="margin-top:8px" class="form-hint">Player Şablonları içindeki logo alanında, Embed Stüdyosu içindeki poster alanında ve ileride marka presetlerinde doğrudan kullanılabilir.</div></div>'+
+          '</div>'+
+          '<div class="studio-card"><div><h2 class="studio-section-title">Marka kullanım rehberi</h2><div class="studio-section-sub">Teknik URL’ler yerine bu kütüphaneden seçerek daha hızlı ilerleyebilirsin.</div></div><div class="metric-list">'+
+            '<div class="metric-row"><span>Player şablonu</span><strong>Logo + watermark</strong></div>'+
+            '<div class="metric-row"><span>Embed stüdyosu</span><strong>Poster + paylaşım paketi</strong></div>'+
+            '<div class="metric-row"><span>Kısa kullanım</span><strong>Kopyala ve kullan</strong></div>'+
+            '<div class="metric-row"><span>Öneri</span><strong>Şeffaf PNG veya SVG</strong></div>'+
+          '</div><div class="studio-chip-row" style="margin-top:12px"><button class="btn btn-secondary" onclick="navigate(\'player-templates\')">Player Şablonlarına Git</button><button class="btn btn-secondary" onclick="navigate(\'embed-codes\')">Embed Stüdyosuna Git</button></div></div>'+
+        '</section>'+
+        '<section class="studio-card"><div><h2 class="studio-section-title">Asset kütüphanesi</h2><div class="studio-section-sub">Kullan, kopyala veya sil. En güncel dosyalar üstte görünür.</div></div><div id="studio-brand-assets">'+renderBrandAssetTiles(items,'')+'</div></section>'+
+      '</div>';
+    studioAuditControls(container);
+    const upload=document.getElementById('studio-brand-upload');
+    if(upload) upload.onclick=async function(){
+      const file=(document.getElementById('studio-brand-file')||{}).files;
+      const category=(document.getElementById('studio-brand-category')||{}).value||'branding';
+      if(!file || !file[0]){
+        toast('Önce yüklemek için bir dosya seçin','warning');
+        return;
+      }
+      const res=await studioUploadFile(category,file[0]);
+      if(res && res.item){
+        toast('Asset yüklendi');
+        studioRerender('logos');
+      }else{
+        toast((res&&res.message)||'Asset yüklenemedi','error');
+      }
+    };
+    const refresh=document.getElementById('studio-brand-refresh');
+    if(refresh) refresh.onclick=function(){ studioRerender('logos'); };
+    await bindBrandAssetTiles(document.getElementById('studio-brand-assets'),function(url){ copyText(url); toast('Asset URL kopyalandi'); });
+  };
+
+  window.renderDashboard = async function(container){
+    await studioRenderLegacy(container,'dashboard');
+  };
+
+  window.renderStreams = async function(container){
+    await studioRenderLegacy(container,'streams');
+  };
+
+  window.renderGuidedSettings = async function(container){
+    await studioRenderLegacy(container,'guidedSettings',{
+      title:'Hızlı Ayarlar Stüdyosu',
+      subtitle:'Günlük kullanım için risk seviyesi düşük, preset odaklı kısa yol ekranı.',
+      pills:[{label:'Preset kartları',active:true},{label:'Hızlı güvenlik'},{label:'Yayın tipi senaryoları'}]
+    });
+  };
+
+  window.renderSettingsGeneral = async function(container){
+    await studioRenderLegacy(container,'settingsGeneral');
+    const page=container.querySelector('.studio-page');
+    if(page){
+      const extra=document.createElement('section');
+      extra.className='studio-grid studio-grid-3';
+      extra.innerHTML=
+        '<div class="studio-card soft"><div class="studio-section-title">Global varsayılanlar</div><div class="form-hint">Ürünün genel davranışını belirleyen ayarlar burada kalır. Marka, güvenlik ve teslimat varsayımlarını bu merkezden yönetebilirsin.</div></div>'+
+        '<div class="studio-card"><div class="studio-section-title">Hızlı geçişler</div><div class="studio-chip-row"><button class="btn btn-secondary" onclick="navigate(\'logos\')">Logo ve Marka</button><button class="btn btn-secondary" onclick="navigate(\'settings-embed\')">Alan Adı / Embed</button><button class="btn btn-secondary" onclick="navigate(\'settings-security\')">Güvenlik</button></div></div>'+
+        '<div class="studio-card"><div class="studio-section-title">Yönlendirme</div><div class="form-hint">Detaylı yayın davranışları için Protokoller, Çıkış Formatları, ABR ve Depolama merkezleriyle birlikte kullan.</div></div>';
+      page.appendChild(extra);
+    }
+    studioAuditControls(container);
+  };
+
+  window.renderSettingsEmbed = async function(container){
+    await studioRenderLegacy(container,'settingsEmbed');
+    studioAuditControls(container);
+  };
+
+  window.renderSettingsProtocols = async function(container){
+    await studioRenderLegacy(container,'settingsProtocols');
+    const page=container.querySelector('.studio-page');
+    if(page){
+      const hero=page.querySelector('.studio-hero');
+      studioInsertAfter(hero,'<section class="studio-grid studio-grid-3"><div class="studio-summary"><span>OBS / yayın encoder</span><strong>RTMP</strong><div class="form-hint">En kolay ve en yaygın giriş protokolü.</div></div><div class="studio-summary"><span>Kararsız ağlar</span><strong>SRT</strong><div class="form-hint">Düşük gecikme ve daha güvenli iletim.</div></div><div class="studio-summary"><span>Tarayıcı publish</span><strong>WHIP / WebRTC</strong><div class="form-hint">Doğrudan browser tabanlı gönderim için.</div></div></section>');
+    }
+    studioAuditControls(container);
+  };
+
+  window.renderSettingsOutputs = async function(container){
+    await studioRenderLegacy(container,'settingsOutputs');
+    const page=container.querySelector('.studio-page');
+    if(page){
+      const hero=page.querySelector('.studio-hero');
+      studioInsertAfter(hero,'<section class="studio-grid studio-grid-3"><div class="studio-summary"><span>Genel web dağıtımı</span><strong>HLS + DASH</strong><div class="form-hint">En dengeli başlangıç kombinasyonu.</div></div><div class="studio-summary"><span>Düşük gecikme</span><strong>HTTP-FLV / WHEP</strong><div class="form-hint">Canlı etkileşim için hızlı teslimat.</div></div><div class="studio-summary"><span>Radyo / podcast</span><strong>HLS Ses / DASH Ses</strong><div class="form-hint">Audio-only yayınlar için en temiz yol.</div></div></section>');
+    }
+    studioAuditControls(container);
+  };
+
+  window.renderSettingsSecurity = async function(container){
+    await studioRenderLegacy(container,'settingsSecurity');
+    studioAuditControls(container);
+  };
+
+  window.renderSecurityTokens = async function(container){
+    await studioRenderLegacy(container,'securityTokens',{
+      title:'Token ve Signed URL Merkezi',
+      subtitle:'Süreli playback linkleri, test akışı ve güvenlik profilleri için tek merkez.',
+      pills:[{label:'Playback güvenliği',active:true},{label:'Kopyala + test et'},{label:'Embed ile uyumlu'}]
+    });
+  };
+
+  window.renderMaintenanceCenter = async function(container){
+    await studioRenderLegacy(container,'maintenanceCenter',{
+      title:'Bakım ve Yedek Merkezi',
+      subtitle:'Servis aksiyonları, upgrade planı ve offline restore komutları. Kayıt ve arşiv senkronu için Depolama ve Arşiv Merkezi ile rol ayrımı korunur.',
+      pills:[{label:'Servis yönetimi',active:true},{label:'Offline restore'},{label:'Upgrade planı'}]
+    });
+  };
+
+  window.renderDiagnostics = async function(container){
+    const streams=await api('/api/streams')||[];
+    const selectedID=(window.diagnosticsStudioState&&window.diagnosticsStudioState.streamID)||((streams[0]&&streams[0].id)||0);
+    window.diagnosticsStudioState={streamID:selectedID};
+    const selected=streams.find(function(item){ return Number(item.id)===Number(selectedID); }) || streams[0] || null;
+    const diag=selected?await api('/api/diagnostics/stream/'+selected.id):null;
+    const checks=Array.isArray(diag&&diag.checks)?diag.checks:[];
+    const readyCount=checks.filter(function(item){ return item.status==='ready'; }).length;
+    container.innerHTML=
+      '<div class="studio-page">'+
+        '<section class="studio-hero"><h1 class="studio-hero-title">Teşhis ve Tedavi Merkezi</h1><div class="studio-hero-sub">HLS, DASH, audio-only, güvenlik policy ve kayıt/arsiv zincirini denetle; gerektiğinde aynı ekrandan müdahale et.</div><div class="studio-pill-row" style="margin-top:14px"><span class="studio-pill active">'+(selected?escHtml(selected.name):'Yayın seç')+'</span><span class="studio-pill">'+fmtInt(readyCount)+' hazır kontrol</span><span class="studio-pill">'+fmtInt(checks.length-readyCount)+' dikkat</span></div></section>'+
+        '<section class="studio-toolbar"><div class="studio-toolbar-group"><select id="studio-diag-stream" class="input">'+(streams.map(function(st){ return '<option value="'+Number(st.id)+'"'+(Number(st.id)===Number(selectedID)?' selected':'')+'>'+escHtml(st.name)+' • '+escHtml(st.stream_key)+'</option>'; }).join(''))+'</select></div><div class="studio-toolbar-group"><button class="btn btn-secondary" id="studio-diag-refresh">Yenile</button><button class="btn btn-secondary" id="studio-diag-open-ops">Operasyon Merkezi</button><button class="btn btn-primary" id="studio-diag-run-maint">Bakımı Çalıştır</button></div></section>'+
+        '<div class="studio-kpi-grid">'+
+          renderAnalyticsKPI('HLS Varyant',fmtInt((diag&&diag.hls_variant_count)||0),'Master playlist katmanı')+
+          renderAnalyticsKPI('DASH Rep.',fmtInt((diag&&diag.dash_representation_count)||0),'MPD representation toplamı')+
+          renderAnalyticsKPI('DASH Ses',fmtInt((diag&&diag.dash_audio_representation_count)||0),'Audio-only veya ses adaptation seti')+
+          renderAnalyticsKPI('Aktif Player',fmtInt((diag&&diag.telemetry&&diag.telemetry.active_sessions)||0),'Anlık oturum')+
+          renderAnalyticsKPI('Toplam Stall',fmtInt((diag&&diag.telemetry&&diag.telemetry.total_stalls)||0),'QoE takılma olayı')+
+          renderAnalyticsKPI('Teslimat Özeti',escHtml((diag&&diag.delivery_summary&&diag.delivery_summary.label)||'-'),(diag&&diag.delivery_summary&&diag.delivery_summary.description)||'')+
+        '</div>'+
+        '<div class="studio-grid studio-grid-2"><div class="studio-card"><div class="studio-section-title">Kontrol matrisi</div><div class="studio-section-sub">Hazır, bekliyor, sorunlu veya kapalı durumlarını aynı tabloda gör.</div>'+(checks.length?'<div style="overflow:auto"><table class="studio-table"><thead><tr><th>Kontrol</th><th>Durum</th><th>Açıklama</th></tr></thead><tbody>'+checks.map(function(item){ return '<tr><td><strong>'+escHtml(item.description||item.code||'-')+'</strong></td><td><span class="studio-chip'+(item.status==='ready'?' active':'')+'">'+escHtml(item.label||item.status||'-')+'</span></td><td>'+escHtml(item.detail||item.message||'-')+'</td></tr>'; }).join('')+'</tbody></table></div>':'<div class="empty-state" style="padding:24px"><div class="icon"><i class="bi bi-heart-pulse"></i></div><h3>Henüz teşhis verisi yok</h3></div>')+'</div><div class="studio-card"><div class="studio-section-title">Tedavi aksiyonları</div><div class="studio-section-sub">Sorun çözmek için ilgili merkeze veya onarım akışına tek tık geçiş.</div><div class="studio-inline-actions"><button class="btn btn-secondary" id="studio-diag-open-security">Güvenlik</button><button class="btn btn-secondary" id="studio-diag-open-storage">Depolama</button><button class="btn btn-secondary" id="studio-diag-open-transcode">Transkod</button><button class="btn btn-secondary" id="studio-diag-open-text">Manifesti Aç</button>'+(selected?'<button class="btn btn-danger" id="studio-diag-reset-policy">Playback policy sıfırla</button>':'')+'</div><div class="studio-alert info" style="margin-top:14px"><strong>Tedavi mantığı</strong><div style="margin-top:8px" class="form-hint">Tanı ekranı, en sık kullanılan onarım akışlarını ilgili merkeze bağlar. Kayıt ve arşiv konuları için Depolama Merkezi; token ve signed URL sorunları için Güvenlik; varyant/FFmpeg sorunları için Transkod sayfasına geç.</div></div></div></div>'+
+      '</div>';
+    const streamSel=document.getElementById('studio-diag-stream');
+    if(streamSel) streamSel.onchange=function(){ window.diagnosticsStudioState.streamID=toNumber(streamSel.value,0); studioRerender('diagnostics'); };
+    const refresh=document.getElementById('studio-diag-refresh');
+    if(refresh) refresh.onclick=function(){ studioRerender('diagnostics'); };
+    const openOps=document.getElementById('studio-diag-open-ops');
+    if(openOps) openOps.onclick=function(){ if(selected && typeof selectOperationsStream==='function') selectOperationsStream(selected.id||0); navigate('operations-center'); };
+    const runMaint=document.getElementById('studio-diag-run-maint');
+    if(runMaint) runMaint.onclick=function(){ runMaintenance(); };
+    const openSec=document.getElementById('studio-diag-open-security');
+    if(openSec) openSec.onclick=function(){ navigate('settings-security'); };
+    const openStorage=document.getElementById('studio-diag-open-storage');
+    if(openStorage) openStorage.onclick=function(){ navigate('settings-storage'); };
+    const openTranscode=document.getElementById('studio-diag-open-transcode');
+    if(openTranscode) openTranscode.onclick=function(){ navigate('settings-transcode'); };
+    const openText=document.getElementById('studio-diag-open-text');
+    if(openText) openText.onclick=function(){
+      if(!selected){ toast('Önce bir yayın seçin','warning'); return; }
+      openTextInspectModal('HLS Master',location.origin+'/hls/'+selected.stream_key+'/master.m3u8');
+    };
+    const reset=document.getElementById('studio-diag-reset-policy');
+    if(reset) reset.onclick=async function(){
+      if(!selected || !confirm('Bu yayın için kalıcı playback koruması sıfırlansın mı?')) return;
+      const res=await api('/api/admin/security/stream-policy/reset',{method:'POST',body:{stream_key:selected.stream_key,clear_domain_lock:true,clear_ip_whitelist:false}});
+      if(res && !res.error){
+        toast('Playback policy sıfırlandı');
+        studioRerender('diagnostics');
+      }else{
+        toast((res&&res.message)||'Policy sıfırlanamadı','error');
+      }
+    };
   };
 })();

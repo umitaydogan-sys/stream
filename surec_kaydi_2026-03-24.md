@@ -78,6 +78,61 @@ Bu asamanin o gun sonundaki siniri:
 - cok protokollu ingest kabul eden
 - HLS, LL-HLS, DASH, HTTP-FLV, MP4, WebM ve audio output verebilen
 - recording ve analytics katmani olan
+
+## 5. 26 Mart 2026 Sonrasi Buyuk Panel Fazlari
+
+24 Mart sonrasinda urun iki buyuk siframa daha yasadi.
+
+### 5.1 Embed + Analitik + ABR + Playback Guvenligi Fazı
+
+Bu fazda:
+
+- `Embed Studyosu` eklendi
+- `Analitik Merkezi` urunlesti
+- `ABR Profilleri ve Teslimat Merkezi` form tabanli hale geldi
+- signed playback URL ve guvenlik profili mantigi panel akisina baglandi
+- `audio-only DASH` link ve teslimat gorunurlugu guclendi
+
+### 5.2 Admin Studio V2
+
+Bu fazda panelin geri kalan kritik ekranlari da ayni urun diline tasindi:
+
+- `Dashboard`
+- `Streams`
+- `Quick Settings`
+- `Genel Ayarlar`
+- `Gelişmis Embed`
+- `Player Sablonlari`
+- `Domain ve Embed`
+- `Giris Protokolleri`
+- `Cikis Formatlari`
+- `Security`
+- `Health & Alerts`
+- `Transkod / FFmpeg`
+- `Izleyiciler`
+- `Transcode Isleri`
+- `Teshis ve Tedavi Merkezi`
+- `Bakim ve Yedek`
+- `Tokens`
+- `Logo ve Marka Merkezi`
+
+Ayrica:
+
+- player sablonlarina logo upload geldi
+- admin panelde ortak studio stili kuruldu
+- marka varliklari `/media-assets/` uzerinden servis edilir hale geldi
+- `Bakim ve Yedek` ile `Depolama ve Arsiv Merkezi` rol ayrimi netlestirildi
+
+## 6. Bu Surecin Ogrendigimiz En Onemli Dersi
+
+Bu repo icin en verimli ilerleme modeli su oldu:
+
+- once cekirdek davranisi ve saha hatalari kapatildi
+- sonra ayni alan urun olarak yeniden tasarlandi
+- her buyuk siframada mutlaka canli VPS testleri yapildi
+
+Bu sayede FluxStream, ham teknik prototipten urunlesmis tek-node yayin
+cekirdegi seviyesine gelmis oldu.
 - beyaz etiket player / embed / template mantigi bulunan
 - Linux servis olarak calisabilen
 

@@ -430,6 +430,9 @@ func main() {
 	webServer.SetPlayerTemplateMutator(licenseRuntime.normalizePlayerTemplate)
 	webServer.SetHLSOverrideDir(tcManager.GetLiveOutputDir())
 	webServer.SetDashOverrideDir(tcManager.GetLiveDashOutputDir())
+	assetsDir := filepath.Join(dataDir, "assets")
+	_ = os.MkdirAll(assetsDir, 0755)
+	webServer.RegisterOutputDir("/media-assets/", assetsDir)
 	// Register output routes on web server
 	if flvServer != nil {
 		webServer.RegisterHandler("/flv/", wrapStreamingPlaybackHandler(analyticsTracker, playbackAuth, "http_flv", flvPlaybackKey, flvServer.HandleFLV))
@@ -892,7 +895,7 @@ func main() {
 		jsonResp(w, map[string]interface{}{"token": token, "expires_at": expiry})
 	})
 
-	registerStudioAdminRoutes(webServer, db, cfg, analyticsTracker, tcManager, playerTelemetry, tokenMgr)
+	registerStudioAdminRoutes(webServer, db, cfg, analyticsTracker, tcManager, playerTelemetry, tokenMgr, dataDir)
 
 	// Security API - IP Ban
 	webServer.RegisterHandler("/api/security/bans", func(w http.ResponseWriter, r *http.Request) {

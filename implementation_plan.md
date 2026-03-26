@@ -2,77 +2,90 @@
 
 Tarih: 26 Mart 2026
 
-## 0. Bugun Kapanan Yeni Faz
+## 0. Bugun Kapanan Faz
 
-Bu turda urun hissini buyuten ikinci buyuk admin panel fazi kapatildi.
-Ana paket:
+Bu turda `Admin Studio V2` fazi kapatildi.
+Bu faz, daha once urunlesen `Embed Studyosu`, `Analitik Merkezi`,
+`ABR Profilleri ve Teslimat Merkezi` ve `Playback Guvenligi V1`
+omurgasinin ustune panelin geri kalan kritik ekranlarini de ayni urun
+diline tasidi.
 
-- `Embed Studyosu`
-- `Analitik Merkezi`
-- `ABR Profilleri ve Teslimat Merkezi`
-- `audio-only DASH` gorunurlugu ve istemci hazirlik katmani
-- `Playback Guvenligi V1`
+Kapanan ana paket:
+
+- `Dashboard V2`
+- `Streams V2`
+- `Quick Settings V2`
+- `Genel Ayarlar Merkezi`
+- `Gelişmis Embed` laboratuvari
+- `Player Sablonlari Studyosu`
+- `Domain ve Embed Merkezi`
+- `Giris Protokolleri Studyosu`
+- `Cikis Formatlari Studyosu`
+- `Security Studio`
+- `Health & Alerts` studio katmani
+- `Transkod / FFmpeg Merkezi`
+- `Izleyici Merkezi`
+- `Transcode Isleri Merkezi`
+- `Teshis ve Tedavi Merkezi`
+- `Bakim ve Yedek Merkezi`
+- `Token Merkezi`
+- `Logo ve Marka Merkezi`
 
 Bu faz ile birlikte:
 
-- embed kodlari tek textarea ekranindan cikti studyosuna donustu
-- analitik ekrani KPI, grafik ve sorunlu yayin merkezi haline geldi
-- ABR ayarlari ham JSON alani olmaktan cikti, preset ve katman studyosuna donustu
-- signed playback URL ve token temelli guvenlik ayarlari embed akisina baglandi
-- audio-only teslimat linkleri daha gorunur ve daha uygulanabilir hale geldi
+- admin panelin buyuk kismi ortak `studio` gorunumu etrafinda toplandi
+- textarea, input, select ve teknik metin bloklari ortak stile kavustu
+- `Gelişmis Embed` ekrani urun hissi verecek sekilde yenilendi
+- `Player Sablonlari` modal akisi kapanmadan calisacak hale geldi
+- logo yukleme ve medya varlik kutuphanesi eklendi
+- teshis ekrani tani koyan degil, yonlendiren ve tedavi aksiyonu veren merkez haline geldi
+- `Bakim ve Yedek` ile `Depolama ve Arsiv Merkezi` arasindaki rol farki netlestirildi
 
-## 0.1 Fazin Canli Durumu
+## 0.1 Canli Durum
 
 Yerelde:
 
 - `node --check internal/web/static/admin-studio.js`
 - `go build ./cmd/fluxstream/`
+- `go build ./cmd/fluxstream-license/`
 - `go test ./...`
 
-temiz gecti.
-
-VPS:
+Canli host:
 
 - servis: `active`
 - health: `http://127.0.0.1:8844/api/health`
 - Linux binary SHA256:
-  `44E5A33FD771B67934CF0187F2A0F9ABCE5A6DE544F77F3F7B00A97321DA9E70`
+  `5907711E9FBCD31345A46A890C66277EDD8EBD6D7066B77BEB9F77515C6EC60A`
 
-## 0.2 Son Cekirdek Sertlestirme Paketi
+## 0.2 Bu Fazdaki Cekirdek Sertlestirme
 
-Bu faz kapandiktan sonra cekirdek tarafta cakismaz bir sertlestirme turu daha uygulandi.
+Bu fazla birlikte cekirdek tarafta da cakismaz sertlestirmeler yapildi:
 
-Bu turda:
-
-- `Analitik Merkezi` acilisini kiran eksik istemci yardimcisi kapatildi
-- `require_signed_url` aktif streamlerde sadece sorgu parametreli `v2` signed URL kabul edilir hale getirildi
-- domain / referrer eslesmesi alt dizi mantigindan cikarilip gercek host ve subdomain siniri ile guvenli hale getirildi
-- tokenli HLS / DASH teslimatta cache davranisi `private, no-store` seviyesine cekildi
-- `audio.mpd`, `audio_init.mp4` ve `audio_*.m4s` icin daha net audio MIME ve baslik davranisi eklendi
-- teshis tarafina `Audio-only DASH manifest` ve `DASH ses representation` gorunurlugu eklendi
-- `Bakim ve Yedek` ile `Depolama ve Arsiv Merkezi` arasindaki rol ayrimi sayfa icinden netlestirildi
-
-Yeni statik dosyalar:
-
-- `internal/web/static/admin-studio.js`
-- `internal/web/static/admin-studio.css`
+- `Analitik Merkezi` acilisini kiran istemci yardimci eksigi kapatildi
+- `require_signed_url` aktif streamlerde sadece sorgu parametreli `v2` signed URL kabul eder hale getirildi
+- domain / referrer / host eslesmesi gercek host ve subdomain siniri mantigina cekildi
+- tokenli HLS / DASH teslimatta daha guvenli `private, no-store` cache davranisi eklendi
+- `audio.mpd`, `audio_init.mp4` ve `audio_*.m4s` icin audio odakli MIME davranisi sertlestirildi
+- teshis ekranina `Audio-only DASH manifest` ve `DASH ses representation` gorunurlugu eklendi
+- admin asset yukleme / listeleme / silme API'leri eklendi
+- `/media-assets/` uzerinden logo ve marka varliklari servis edilir hale geldi
 
 ## 1. Urun Vizyonu
 
-FluxStream, tek binary ile calisan, yerelde ve Linux sunucuda kolay
-kurulabilen, cok protokollu ingest alip HLS/DASH merkezli dagitim
-yapabilen, urunlesmeye uygun bir canli yayin sunucusudur.
+FluxStream, tek binary ile kurulan, cok protokollu ingest alip HLS/DASH
+merkezli dagitim yapan, oynatici/embed, operasyon, kayit, arsiv ve panel
+katmani tek urunde toplanmis bir canli yayin omurgasidir.
 
 Ana hedefler:
 
-- yayini guvenli ve kararlı sekilde almak
-- dusuk bant genisliginde dahi akici izleme saglamak
-- adaptif bitrate ile kaliteyi baglanti kosullarina gore evirmek
-- kayit, arsiv, yedek ve operasyon akislarini urun seviyesine tasimak
-- playback guvenligi, lisans ve Linux urunlestirmesini cekirdege entegre etmek
+- yayini kararlı ve guvenli almak
+- dusuk bantta akici izleme saglamak
+- ABR ile kaliteyi baglanti kosullarina gore evirmek
+- kayit, arsiv, yedek ve operasyon akisini urun seviyesine tasimak
+- playback guvenligi ve Linux urunlestirmesini cekirdege gommek
 
-Konferans, chat, sanal sinif ve mesajlasma katmanlari cekirdek
-streaming omurgasi yeterince olgunlastiktan sonra eklenecek.
+Konferans, chat, sanal sinif ve mesajlasma katmanlari cekirdek streaming
+omurgasi yeterince olgunlastiktan sonra eklenecek.
 
 ## 2. Bugun Itibariyla Cekirdekte Olanlar
 
@@ -81,34 +94,37 @@ streaming omurgasi yeterince olgunlastiktan sonra eklenecek.
 - RTMP, RTMPS, SRT, RTP, RTSP, WebRTC/WHIP, MPEG-TS ve HTTP Push ingest
 - HLS, LL-HLS, DASH, HTTP-FLV, MP4, WebM ve ses cikislari
 - FFmpeg tabanli live transcode ve ABR merdiveni
-- recording, analytics, subscriber fanout ve stream yasam dongusu
+- stream lifecycle, analytics, subscriber fanout ve recording akisi
 - OBS Enhanced RTMP / multitrack ingest
 
 ### 2.2 Player, Embed ve Operasyon
 
 - player, embed, iframe ve direct link akisi kararlilasti
 - template preview gercek gomulu player akisi ile hizalandi
+- `Embed Studyosu` ve `Gelişmis Embed` urunlesti
+- `Player Sablonlari Studyosu` canli preview + acik modal modeli ile yenilendi
 - QoE debug overlay, heartbeat telemetrisi ve kalici SQLite telemetry
-- `Operasyon Merkezi` ve sekmeli `Canli Izleme ve Tanilama Merkezi`
-- ham HLS / MPD manifest inceleme ve kullanim rehberi kartlari
+- `Operasyon Merkezi` ve sekmeli canli tanilama merkezi
+- ham HLS / MPD inceleme, kullanim rehberi ve debug akislari
 
 ### 2.3 Multitrack Video ve Audio
 
 - OBS multitrack video katmanlari HLS varyantlarina baglanabiliyor
 - DASH repack HLS varyantlarini representation olarak mapleyebiliyor
-- audio alternate group ve player tarafinda ses izi secimi var
+- alternate audio group ve player tarafinda ses izi secimi var
 - kalite gecisi ve audio switch verisi telemetry / rapora yaziliyor
 - `audio-only DASH` icin ayri `audio.mpd` ve init segment uretilebiliyor
 
 ### 2.4 Gozlemlenebilirlik ve Tanilama
 
 - Prometheus `/metrics`
-- OTel-benzeri `/api/observability/otel`
-- QoE riskli yayinlar, uyarilar ve retention temelli housekeeping
+- OTel benzeri `/api/observability/otel`
+- QoE riskli yayinlar, esik tabanli uyarilar ve housekeeping
 - track bazli bitrate / runtime analytics
-- `Hazir / Bekliyor / Kapali / Opsiyonel / Sorunlu` mantigina sahip teshis ekrani
+- `Teshis ve Tedavi Merkezi`
+- `Hazir / Bekliyor / Kapali / Opsiyonel / Sorunlu` mantigi
 
-### 2.5 Kayıt, Arsiv ve Yedek
+### 2.5 Kayit, Arsiv ve Yedek
 
 - `Depolama ve Arsiv Merkezi`
 - kayit, arsiv ve sistem yedeklerini tek merkezden yonetme
@@ -117,42 +133,47 @@ streaming omurgasi yeterince olgunlastiktan sonra eklenecek.
 - `MP4 Hazirla` arka plan isi
 - lokal, S3/MinIO, SFTP ve rclone tabanli bulut hedefleri
 - ayri kayit hedefi ve ayri sistem yedegi hedefi
-- zamanlama, hedef seviyesi, soguk katman hazirligi
+- zamanlama, hedef seviyesi ve soguk katman hazirligi
 - ayni VPS uzerinde MinIO + SFTP saha testi
 
-### 2.6 Urunlestirme
+### 2.6 Urunlestirme ve Admin Katmani
 
-- runtime lisans modeli
-- Linux servis yonetimi
-- backup / restore / deploy omurgasi
-- saglik endpoint ve tekrar edilebilir deploy akisi
+- `Dashboard V2`
+- `Streams V2`
+- `Quick Settings V2`
+- `Genel Ayarlar Merkezi`
+- `Domain ve Embed Merkezi`
+- `Giris Protokolleri Studyosu`
+- `Cikis Formatlari Studyosu`
+- `Security Studio`
+- `Health & Alerts` studio katmani
+- `Transkod / FFmpeg Merkezi`
+- `Izleyici Merkezi`
+- `Transcode Isleri Merkezi`
+- `Token Merkezi`
+- `Logo ve Marka Merkezi`
 
 ## 3. Bu Fazda Kapanan Teknik Paket
 
-Bu son fazda depolama ve bulut tarafi genisletildi.
+Bu son fazda admin panel geneline urun dili tasindi.
 
 Kapananlar:
 
-- basit ve gelismis modlu yeni depolama akisi
-- kayitlar ve yedekler icin ayri hedef tanimlama
-- `Yerel Disk`, `AWS S3`, `MinIO`, `Cloudflare R2`, `Backblaze B2`, `Wasabi`,
-  `DigitalOcean Spaces`, `Linode Object Storage`, `Scaleway Object Storage`,
-  `IDrive e2`, `SFTP` kartlari
-- rclone profili uzerinden `Google Drive`, `OneDrive`, `Dropbox`,
-  `Google Cloud Storage`, `Azure Blob`, `Box`, `pCloud`, `MEGA`,
-  `Nextcloud`, `WebDAV` gibi hedefleri kullanma altyapisi
-- hedef bazli `Baglantiyi Test Et`
-- ayri kayit senkronu ve ayri yedek senkronu
-- senkron / donusum isleri icin ust ozet kartlari
-- storage ekraninda tam sayfa yeniden cizim yerine parcali yenileme
-- storage ekraninda renderer crash zincirinin kapatilmasi
+- ortak `studio` CSS ve kontrol stili
+- global textarea / input / select / monospace audit'i
+- legacy sayfalarin studio wrapper ile birlestirilmesi
+- `Logo ve Marka Merkezi` ile upload tabanli varlik kutuphanesi
+- `Player Sablonlari` icin logo upload ve acik modal kaydetme akisi
+- `Gelişmis Embed` icin daha guclu laboratuvar ve hizli test aksiyonlari
+- `Teshis ve Tedavi Merkezi` ile tani + aksiyon birlesimi
+- `Bakim ve Yedek` ile `Depolama ve Arsiv Merkezi` rol ayriminin netlestirilmesi
 
 ## 4. Canli Saha Ogrenimleri
 
 ### 4.1 Multitrack Mikro Segment Sorunu
 
-OBS multitrack yayininda gorulen mikro segment sorununun kok nedeni
-RTMP chunk reader tarafindaki timestamp delta birikimiydi.
+OBS multitrack yayininda gorulen mikro segment sorununun kok nedeni RTMP
+chunk reader tarafindaki timestamp delta birikimiydi.
 
 Kalici duzeltmeler:
 
@@ -165,18 +186,18 @@ Sonuc:
 
 - mikro `EXTINF` segmentleri ortadan kalkti
 - DASH `SegmentTimeline` tutarli hale geldi
-- `360p + 1080p` ABR katmanlari yeniden saglikli sekilde ilan edildi
+- `360p + 1080p` ABR katmanlari saglikli sekilde ilan edildi
 
 ### 4.2 Recording ve Storage Sorunlari
 
-Saha testinde storage ekranindaki tam sayfa donma / renderer crash
-zinciri ve kayittan MP4 hazirlama sorunu goruldu.
+Saha testinde storage ekranindaki tam sayfa donma / renderer crash zinciri
+ve kayittan MP4 hazirlama sorunu goruldu.
 
 Kalici duzeltmeler:
 
-- storage aksiyonlari icin tam rerender kaldirildi
+- storage aksiyonlarinda tam rerender kaldirildi
 - preview teardown ve parcali yenileme akisi sertlestirildi
-- `MP4 Hazirla` arka plan job haline getirildi
+- `MP4 Hazirla` arka plan isi haline getirildi
 - recording TS paketleme mantigi HLS ile hizalandi
 - yeni kayitlar icin temiz remux kaynagi uretilmeye baslandi
 
@@ -186,7 +207,7 @@ Bugun icin en dogru tanim:
 
 - iyi bir tek-node medya sunucusu
 - urunlesmis bir yayin cekirdegi
-- operasyon merkezi, telemetry ve depolama omurgasi olan HLS merkezli dagitim urunu
+- operasyon, depolama ve player/embed paneli olan HLS merkezli dagitim urunu
 
 Bu haliyle su alanlar icin ciddi bicimde kullanilabilir:
 
@@ -196,155 +217,53 @@ Bu haliyle su alanlar icin ciddi bicimde kullanilabilir:
 - radyo ve audio streaming
 - markali player / embed dagitimi
 
-Hala enterprise seviyeye cikarmak icin gerekli ana farklar:
+Enterprise seviyeye cikarmak icin hala acik kalan ana farklar:
 
 - multi-node origin-edge
-- daha derin guvenlik ve playback policy
+- daha derin playback policy ve DRM
 - RBAC / SSO / audit
 - gercek dis ortam storage ve failover testleri
 - yuk testi ve soak testi
 
-## 6. Siradaki Buyuk Faz
+## 6. Siradaki Buyuk Fazlar
 
-### 6.1 Embed + Analitik + ABR Stüdyosu + Playback Guvenligi Fazı
+### 6.1 Admin Studio V2 Sonrasi Kisa Vade
 
-Bu faz, birbirinden kopuk duran ama ayni urun hissi eksigini tasiyan
-uc ekrani ayni paket icinde urun seviyesine tasir:
+Bu faz kapandi. Simdi en dogru siradaki isler:
 
-- `Embed Kodlari` menusu
-- `Analitik` sayfasi
-- `Teslimat / ABR` sayfasi
+- `audio-only DASH` akisini gercek audio-only kaynakla tarayici, dash.js ve VLC tarafinda dogrulamak
+- `Embed Studyosu`, `Player Sablonlari Studyosu` ve `Analitik Merkezi` ekranlarini canli veriyle uzun sureli operator kullanim testine sokmak
+- playback guvenligi V1 akisini domain/IP/token zorlamasi ile canli stream policy senaryolarinda sertlestirmek
+- `Logo ve Marka Merkezi` ile player sablonlari arasindaki varlik akisini saha kullaniminda ince ayarlamak
+- `Bakim ve Yedek` ile `Depolama ve Arsiv Merkezi` rol ayrimini gerekirse daha da sadeleştirmek
 
-Ayni faz icinde iki teknik sertlestirme hatti da kapatilir:
-
-- `audio-only DASH` istemci sertlestirmesi
-- `playback guvenligi v1`
-
-### 6.2 Embed Stüdyosu
-
-Hedef:
-
-- mevcut embed ekranini `Embed Stüdyosu` seviyesine tasimak
-- kod uretimini tek textarea yerine secilebilir, profilli ve canli onizlemeli bir merkez haline getirmek
+### 6.2 Harici Storage ve Saha Testleri
 
 Planlanan alt basliklar:
 
-- `Basit Mod` ve `Gelismis Mod`
-- hazir kullanim tipleri:
-  `Web sitesi`, `Haber portalı`, `Kurumsal sayfa`, `Mobil uyumlu`,
-  `Sadece ses`, `Gizli yayın`, `Token korumalı`, `Düşük gecikme`,
-  `DASH`, `HLS`, `MP4 fallback`
-- kartli cikislar:
-  `Iframe`, `Script embed`, `Player URL`, `Audio player`,
-  `Popup player`, `Direct manifest`, `VLC linki`
-- canli onizleme, kullanim aciklamasi ve `nerede kullanilir` kutusu
-- secilebilir opsiyonlar:
-  `responsive`, `autoplay`, `muted`, `poster`, `branding`,
-  `watermark`, `audio-only`, `start quality`, `token`,
-  `signed URL`, `referrer policy`
-- stream bazli kaydedilebilir `Embed Profili`
-- `Kopyala`, `Paylaş`, `Test Et`, `Yeni sekmede aç`, `Debug ile aç`
-- eksik veya gecersiz parametrelerde korumali uyari akisi
+- harici AWS S3 bucket ile gercek saha testi
+- rclone tabanli `Google Drive`, `OneDrive` ve `Dropbox` akisini gercek hesaplarla dogrulama
+- ayni VPS uzerindeki MinIO ve SFTP laboratuvar hedeflerini uzun sureli senaryolarla sertlestirme
+- buyuk dosya, uzun sureli kayit, servis restart ve gec finalize senaryolari
+- eski bozuk `TS` kayitlar icin kurtarma / uyari akisi
 
-### 6.3 Analitik Merkezi
-
-Hedef:
-
-- mevcut basit analitik ekranini tek merkezli bir `Analitik Merkezi` haline getirmek
+### 6.3 Playback Guvenligi V2 ve DRM Hazirligi
 
 Planlanan alt basliklar:
 
-- ust sabit filtre blogu:
-  `tarih aralığı`, `stream seçimi`, `canlı görünüm`, `geçmiş rapor`
-- KPI kartlari:
-  `aktif izleyici`, `tepe izleyici`, `ortalama buffer`, `stall`,
-  `kalite geçişi`, `audio switch`, `hata oranı`, `en çok izlenen stream`
-- tum streamler ve tek stream gorunumu ayni sayfada
-- gelismis grafikler:
-  `izleyici zaman serisi`, `buffer trendi`, `stall trendi`,
-  `kalite dağılımı`, `cihaz/oynatıcı kaynağı`,
-  `audio track kullanımı`, `ABR katman dağılımı`
-- `Sorunlu yayınlar` bolumu
-- ayri kartlar:
-  `Kalite geçiş raporu`, `Audio track değişim raporu`
-- `CSV` ve `JSON` disa aktarma
-- ilgili streamin `Operasyon Merkezi` sayfasina gecis
-- `Analitik alarm merkezi` ve esik asimi kartlari
-
-### 6.4 ABR Profilleri ve Teslimat Merkezi
-
-Hedef:
-
-- mevcut JSON odakli ekranı `ABR Profilleri ve Teslimat Merkezi` seviyesine tasimak
-
-Planlanan alt basliklar:
-
-- hazir profil secimi korunacak ama yanina form tabanli profil olusturucu gelecek
-- kullanici JSON yazmak zorunda kalmayacak
-- `katman ekle`, `katman sil`, `surukle sirala`
-- alanlar:
-  `çözünürlük`, `bitrate`, `max bitrate`, `buffer`, `fps`,
-  `preset`, `audio bitrate`
-- hazir kartli presetler:
-  `Mobil`, `Dengeli`, `Dayanıklı`, `TV`, `Yüksek kalite`,
-  `Audio-only`, `Radyo`, `Sadece düşük bant`
-- `Profili kaydet`, `çoğalt`, `içe al`, `dışa aktar`
-- `JSON görünümü` sadece gelismis modda
-- her profil icin:
-  `tahmini CPU yükü`, `tahmini upload`, `düşük bant uyumu`,
-  `önerilen kullanım`
-- secilen profil icin beklenen HLS / DASH cikisini gosteren canli test kutusu
-- `varsayılan profil`, `stream bazlı özel profil`, `global profil kütüphanesi`
-- `Yayin bazli öneri motoru`
-
-### 6.5 Audio-only DASH Sertlestirme
-
-Planlanan alt basliklar:
-
-- tarayici, dash.js ve VLC tarafinda `audio-only DASH` dogrulamasi
-- `audio.mpd`, `manifest.mpd`, `init segment`, codec ve MIME basliklarini gercek istemcilerle test
-- `Sadece ses oynatici` icin daha net UI
-- `audio-only embed` ve `audio-only direct link` gorunurlugu
-- DASH ses cikisi icin `hazır / bekliyor / sorunlu` tanisini daha netlestirme
-- radyo ve podcast presetleri
-
-### 6.6 Playback Guvenligi V1
-
-Planlanan alt basliklar:
-
-- `signed playback URL`
-- `signed manifest ve segment erişimi`
-- `süreli token`
-- `tek domain / referrer kısıtı`
-- `iframe domain pinning`
-- `IP kısıtı`
-- `tek kullanımlık token` veya `oturum bağlı token`
-- `görünür watermark`
-- `oturuma özel izleme izi`
-- `embed güvenlik profilleri`
-
-### 6.7 Bu Fazda Ayni Anda Eklenebilecek Guzel Parcalar
-
-- `Embed Şablon Kütüphanesi`
-- `Paylaşım Paketleri`
-- `A/B kalite testi`
-- `Teslimat sağlık özeti`
-- `Yayın bazlı öneri motoru`
-- `Analitik alarm merkezi`
-- `Preset import/export`
-- `Stream’e profil bağla / profili miras al`
-- `Gömme kodları için marka profili`
-- `Kısa link ve paylaşım linki üretimi`
+- signed playback politikasini daha zengin presetlerle genisletmek
+- oturum bagli watermark ve izleme izi tarafini saha verisiyle sertlestirmek
+- AES-128 HLS key servis ve policy modeli icin zemin hazirlamak
+- DRM abstraction katmani ve lisans baglantilari icin enterprise tasarim cikarmak
 
 ## 7. Sonraki Kisa Vade Sertlestirme Basliklari
 
 - `Depolama ve Arsiv Merkezi` teknik terimlerini daha da azalt
 - kullaniciya secim yardimi ve hazir preset sihirbazi ekle
-- rclone tabanli Drive / OneDrive / Dropbox akisini gercek saha testleriyle dogrula
-- harici AWS S3 bucket ile gercek saha testi al
-- ayni VPS uzerindeki MinIO + SFTP laboratuvar hedeflerini uzun sureli testlerle sertlestir
-- buyuk dosya, uzun sureli kayit, servis restart ve gec finalize senaryolari
-- eski bozuk `TS` kayitlar icin kurtarma / uyari akisi
+- harici AWS S3 ve populer bulut hedeflerinin gercek saha testlerini yap
+- `audio-only DASH` akisini farkli istemcilerde sertlestir
+- buyuk dosya, uzun sureli kayit, servis restart ve gec finalize senaryolarini teste sok
+- onceki bozuk `TS` kayitlar icin kurtarma / uyari akisi ekle
 
 ## 8. Tam DRM Hazirligi
 
@@ -355,25 +274,6 @@ Planlanan alt basliklar:
 ## 9. Orta Vade Buyuk Fazlar
 
 - multi-node origin-edge mimarisi
-- RBAC, audit log, SSO
+- RBAC, audit log ve SSO
 - SSAI ve monetizasyon
 - uzun sureli soak test / yuk testi
-
-## 10. Cekirdek Sonrasi Fazlar
-
-- konferans odalari
-- canli chat
-- moderasyonlu soru-cevap
-- sanal sinif rolleri
-- yoklama ve breakout room
-- takim ici mesajlasma
-
-## 11. Sonraki En Dogru Sira
-
-1. `Embed Stüdyosu` ekranini kur
-2. `Analitik Merkezi` ekranini urun seviyesine tası
-3. `ABR Profilleri ve Teslimat Merkezi` profil mantigini devreye al
-4. ayni faz icinde `audio-only DASH` istemci sertlestirmesini kapat
-5. ayni faz icinde `Playback Guvenligi V1` katmanini ekle
-6. sonra depolama sertlestirmesi ve harici AWS S3 saha testine don
-7. sonra DRM ve origin-edge mimarisi tasarimina gec

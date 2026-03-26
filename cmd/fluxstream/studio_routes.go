@@ -5,9 +5,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -29,10 +33,57 @@ func registerStudioAdminRoutes(
 	tcManager *transcode.Manager,
 	playerTelemetry *playerTelemetryCollector,
 	tokenMgr *security.TokenManager,
+	dataDir string,
 ) {
 	if webServer == nil || db == nil || cfg == nil {
 		return
 	}
+
+	webServer.RegisterAdminHandler("/api/admin/assets", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			category := studioAssetCategory(r.URL.Query().Get("category"))
+			items, err := listStudioAssets(dataDir, category)
+			if err != nil {
+				http.Error(w, err.Error(), 500)
+				return
+			}
+			jsonResp(w, map[string]interface{}{"items": items})
+		case http.MethodPost:
+			if err := r.ParseMultipartForm(16 << 20); err != nil {
+				http.Error(w, "Dosya yukleme istegi okunamadi", 400)
+				return
+			}
+			category := studioAssetCategory(r.FormValue("category"))
+			file, header, err := r.FormFile("file")
+			if err != nil {
+				http.Error(w, "Yuklenecek dosya bulunamadi", 400)
+				return
+			}
+			defer file.Close()
+			item, err := saveStudioAsset(dataDir, category, header.Filename, file)
+			if err != nil {
+				http.Error(w, err.Error(), 500)
+				return
+			}
+			jsonResp(w, map[string]interface{}{"success": true, "item": item})
+		case http.MethodDelete:
+			var req struct {
+				Path string `json:"path"`
+			}
+			if err := decodeJSON(r, &req); err != nil {
+				http.Error(w, err.Error(), 400)
+				return
+			}
+			if err := deleteStudioAsset(dataDir, req.Path); err != nil {
+				http.Error(w, err.Error(), 400)
+				return
+			}
+			jsonResp(w, map[string]interface{}{"success": true})
+		default:
+			http.Error(w, "Method not allowed", 405)
+		}
+	})
 
 	webServer.RegisterAdminHandler("/api/admin/embed-profiles", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
@@ -933,6 +984,117 @@ func studioSlug(raw, fallback string) string {
 		return fallback
 	}
 	return result
+}
+
+func studioAssetCategory(raw string) string {
+	value := studioSlug(raw, "branding")
+	switch value {
+	case "branding", "logos", "posters", "players", "embed":
+		return value
+	default:
+		return "branding"
+	}
+}
+
+func studioAssetsDir(dataDir, category string) string {
+	return filepath.Join(dataDir, "assets", studioAssetCategory(category))
+}
+
+func studioAssetURL(category, name string) string {
+	return "/media-assets/" + studioAssetCategory(category) + "/" + urlQueryEscape(name)
+}
+
+func listStudioAssets(dataDir, category string) ([]map[string]interface{}, error) {
+	dir := studioAssetsDir(dataDir, category)
+	_ = os.MkdirAll(dir, 0755)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]map[string]interface{}, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		name := entry.Name()
+		items = append(items, map[string]interface{}{
+			"name":      name,
+			"category":  studioAssetCategory(category),
+			"path":      studioAssetCategory(category) + "/" + name,
+			"url":       studioAssetURL(category, name),
+			"size":      info.Size(),
+			"mod_time":  info.ModTime().UTC().Format(time.RFC3339),
+			"extension": strings.ToLower(filepath.Ext(name)),
+		})
+	}
+	sort.Slice(items, func(i, j int) bool {
+		left, _ := time.Parse(time.RFC3339, asString(items[i]["mod_time"]))
+		right, _ := time.Parse(time.RFC3339, asString(items[j]["mod_time"]))
+		return right.Before(left)
+	})
+	return items, nil
+}
+
+func saveStudioAsset(dataDir, category, originalName string, src io.Reader) (map[string]interface{}, error) {
+	dir := studioAssetsDir(dataDir, category)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return nil, err
+	}
+	base := strings.TrimSuffix(filepath.Base(strings.TrimSpace(originalName)), filepath.Ext(strings.TrimSpace(originalName)))
+	base = studioSlug(base, "asset")
+	ext := strings.ToLower(strings.TrimSpace(filepath.Ext(originalName)))
+	if ext == "" {
+		ext = ".bin"
+	}
+	filename := fmt.Sprintf("%s-%s%s", base, time.Now().UTC().Format("20060102-150405"), ext)
+	target := filepath.Join(dir, filename)
+	out, err := os.Create(target)
+	if err != nil {
+		return nil, err
+	}
+	defer out.Close()
+	size, err := io.Copy(out, src)
+	if err != nil {
+		return nil, err
+	}
+	info, err := out.Stat()
+	if err != nil {
+		return nil, err
+	}
+	return map[string]interface{}{
+		"name":      filename,
+		"category":  studioAssetCategory(category),
+		"path":      studioAssetCategory(category) + "/" + filename,
+		"url":       studioAssetURL(category, filename),
+		"size":      size,
+		"mod_time":  info.ModTime().UTC().Format(time.RFC3339),
+		"extension": ext,
+	}, nil
+}
+
+func deleteStudioAsset(dataDir, relPath string) error {
+	relPath = strings.Trim(strings.TrimSpace(relPath), "/\\")
+	if relPath == "" {
+		return fmt.Errorf("Silinecek dosya yolu gerekli")
+	}
+	parts := strings.FieldsFunc(relPath, func(r rune) bool { return r == '/' || r == '\\' })
+	if len(parts) != 2 {
+		return fmt.Errorf("Gecersiz asset yolu")
+	}
+	category := studioAssetCategory(parts[0])
+	name := filepath.Base(parts[1])
+	if name == "." || name == "" || strings.Contains(name, "..") {
+		return fmt.Errorf("Gecersiz asset adi")
+	}
+	target := filepath.Join(studioAssetsDir(dataDir, category), name)
+	if err := os.Remove(target); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
 }
 
 func asString(value interface{}) string {

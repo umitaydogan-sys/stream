@@ -12,6 +12,8 @@ canli yayin sunucusu.
 - `Operasyon Merkezi`
 - QoE, telemetry, Prometheus ve OTel-benzeri cikis
 - recording, archive, backup ve `Depolama ve Arsiv Merkezi`
+- `Embed Studyosu`, `Analitik Merkezi` ve `ABR Profilleri ve Teslimat Merkezi`
+- `Admin Studio V2`, `Logo ve Marka Merkezi`, `Teshis ve Tedavi Merkezi`
 - Linux servis, deploy ve backup/restore omurgasi
 
 ## Bu Repo Nerede
@@ -42,7 +44,7 @@ icin kullanilabilir durumdadir.
 
 Tam enterprise seviye icin sonraki buyuk fazlar:
 
-- playback guvenligi ve DRM
+- playback guvenligi v2 ve DRM
 - harici storage ve failover sertlestirmesi
 - origin-edge / cluster
 - RBAC, audit log ve SSO

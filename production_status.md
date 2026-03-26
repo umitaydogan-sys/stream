@@ -12,15 +12,18 @@ ayni zamanda:
 - analitik okuyan
 - ABR profili tasarlayan
 - operasyon ve depolama akislarini tek panelden veren
+- marka varligi ve player sablonu yoneten
+- tani ve tedavi aksiyonlarini panelden sunan
 
 bir yayin urunu iskeletine donusmus durumda.
 
 En yeni kazanım:
 
-- `Embed Studyosu`
-- `Analitik Merkezi`
-- `ABR Profilleri ve Teslimat Merkezi`
-- `Playback Guvenligi V1`
+- `Admin Studio V2`
+- `Logo ve Marka Merkezi`
+- `Player Sablonlari Studyosu`
+- `Teshis ve Tedavi Merkezi`
+- `Dashboard / Streams / Security / Protocols / Outputs` studio katmani
 
 aynı urun diliyle panel icine oturdu.
 
@@ -34,7 +37,8 @@ Bu fazdan hemen sonra cekirdekte su kapanislar yapildi:
 - tokenli HLS / DASH teslimat artik daha korumali `private, no-store` cache basliklari kullaniyor
 - `audio-only DASH` tarafinda `audio.mpd`, `audio_init.mp4` ve `audio_*.m4s` icin daha net istemci uyumlulugu saglandi
 - teshis ekraninda `Audio-only DASH manifest` ve `DASH ses representation` artik gorunur
-- `Bakim ve Yedek` ile `Depolama ve Arsiv Merkezi` gorev ayrimi panel icinde daha net
+- admin asset yukleme / listeleme / silme omurgasi eklendi
+- `/media-assets/` uzerinden marka varliklari servis edilmeye baslandi
 
 ## 1. Genel Karar
 
@@ -49,6 +53,7 @@ Bugun itibariyla:
 - player/embed/template uretebilen
 - QoE ve operasyon merkezi sunan
 - kayit, arsiv ve sistem yedegini tek merkezde yonetebilen
+- marka varligi ve tanilama aksiyonlarini panelden sunan
 
 bir medya sunucusu haline geldi.
 
@@ -97,8 +102,9 @@ Durum:
 - `Operasyon Merkezi`
 - canli QoE, telemetry, track ve manifest gorunurlugu
 - kullanim ve tanilama rehberleri
-- Prometheus ve OTel-benzeri cikis
+- Prometheus ve OTel benzeri cikis
 - QoE riskli yayinlar ve saglik uyari mantigi
+- `Teshis ve Tedavi Merkezi`
 
 Karar:
 
@@ -122,9 +128,47 @@ Karar:
 
 - kayit tarafi sadece ham dosya toplamaktan cikti, gercek kutuphane / arsiv mantigina yaklasti
 
+### 2.5 Admin Studio V2
+
+Durum:
+
+- `Dashboard`, `Streams`, `Quick Settings`, `Genel Ayarlar`
+- `Gelişmis Embed` ve `Embed Studyosu`
+- `Player Sablonlari Studyosu`
+- `Domain ve Embed`, `Giris Protokolleri`, `Cikis Formatlari`
+- `Security`, `Health & Alerts`, `Transkod / FFmpeg`
+- `Izleyiciler`, `Transcode Isleri`
+- `Tokens`
+- `Logo ve Marka`
+
+Karar:
+
+- panel artik birbirinden kopuk admin formlari degil, ayni dilde urunlasmis ekranlar toplulugu gibi hissettiriyor
+
 ## 3. Bu Turda Kapanan Onemli Fazlar
 
-### 3.0 Embed + Analitik + ABR + Playback Guvenligi Fazı
+### 3.0 Admin Studio V2
+
+Kapananlar:
+
+- dashboard ve streams ekranlarinin studio katmanina alinmasi
+- quick settings ve genel ayarlarin daha buyuk, kategorili yapıya kavusmasi
+- gelişmis embed ekraninin yeniden urunlestirilmesi
+- player sablonlari modalinin kapanmadan calismasi
+- logo upload ve medya varlik kutuphanesi
+- domain/embed, protocols, outputs ve security ekranlarinin studio diline alinmasi
+- viewers ve transcode jobs ekranlarinin studio gorunumu
+- diagnostics ekraninin tani + tedavi aksiyonlari veren merkez haline gelmesi
+- maintenance ile storage arasindaki rol ayriminin netlestirilmesi
+- tokens ve logos ekranlarinin birinci sinif urun bileseni haline gelmesi
+- global textarea/input/select audit'i
+
+Karar:
+
+- panel artik yalnizca yonetim ekrani degil, urun seviyesi operator araci
+- teknik derinlik ile kullanilabilirlik arasinda belirgin sicrama var
+
+### 3.1 Embed + Analitik + ABR + Playback Guvenligi Fazı
 
 Kapananlar:
 
@@ -136,12 +180,7 @@ Kapananlar:
 - preset kutuphanesi, profil kaydetme, cogaltma, uygulama ve oneri akisi
 - `audio-only DASH` link ve teslimat gorunurlugu
 
-Karar:
-
-- panel artik yalnizca yonetim ekrani degil, urun seviyesi operator araci
-- teknik derinlik ile kullanilabilirlik arasinda onceki turlara gore belirgin sicrama var
-
-### 3.1 Storage UI ve Crash Hatti
+### 3.2 Storage UI ve Crash Hatti
 
 Kapananlar:
 
@@ -150,7 +189,7 @@ Kapananlar:
 - `MP4 Hazirla` isini arka plan isi olarak surdurme
 - sistem yedegi silme ve recording aksiyonlarini calisir hale getirme
 
-### 3.2 Recording ve Remux
+### 3.3 Recording ve Remux
 
 Kapananlar:
 
@@ -159,7 +198,7 @@ Kapananlar:
 - MP4 remux icin kaynagi guvenilir hale getirme
 - `TS`, `FLV` ve `MKV` kayitlari panelden `MP4 Hazirla` ile donusturebilme
 
-### 3.3 Storage ve Bulut Genisleme
+### 3.4 Storage ve Bulut Genisleme
 
 Kapananlar:
 
@@ -171,13 +210,6 @@ Kapananlar:
 - rclone tabanli `Google Drive`, `OneDrive`, `Dropbox`, `Google Cloud Storage`, `Azure Blob`, `Box`, `pCloud`, `MEGA`, `Nextcloud`, `WebDAV` profilleri
 - hedef bazli baglanti testi
 
-### 3.4 Audio-only DASH
-
-Kapananlar:
-
-- `audio-only DASH` icin ayri `audio.mpd`
-- audio-only init segment uretimi
-
 ## 4. Hala Beta veya Sertlestirme Gerektiren Alanlar
 
 - `audio-only DASH` icin farkli client saha dogrulamasi
@@ -187,7 +219,7 @@ Kapananlar:
 - kayit finalize/remux akisinin buyuk dosya ve servis restart senaryolarinda sertlestirilmesi
 - onceki bozuk `TS` kayitlar icin kurtarma / uyari akisi
 - storage ekraninin daha da sade, teknik terimi azaltan UX'e kavusmasi
-- signed URL, playback token, hotlink korumasi ve watermark gibi playback security fazi
+- playback security politikalarinin saha verisiyle ikinci kez sertlestirilmesi
 - AES-128 key servis ve DRM hazirligi
 - RBAC, audit log, SSO
 - multi-node origin-edge
@@ -207,9 +239,9 @@ Canli host:
 - host: `23.94.220.222`
 - servis: `fluxstream`
 - health: `http://127.0.0.1:8844/api/health`
-- guncel Linux binary SHA256: `44E5A33FD771B67934CF0187F2A0F9ABCE5A6DE544F77F3F7B00A97321DA9E70`
-- onceki canli dogrulama: HLS master `2` video katmani, DASH MPD `3` representation
+- guncel Linux binary SHA256: `5907711E9FBCD31345A46A890C66277EDD8EBD6D7066B77BEB9F77515C6EC60A`
 - ayni VPS uzerinde MinIO test ortami ve ayri SFTP hedefi ile recording + backup upload / restore basariyla dogrulandi
+- admin panelde yeni studio katmani, logo yukleme ve tani merkezi calisiyor
 
 Not:
 
@@ -221,10 +253,11 @@ Not:
 Guclu taraflar:
 
 - tek binary ile kolay kurulum
-- ayni urunde admin paneli + stream CRUD + embed + template + operasyon merkezi
+- ayni urunde admin panel + stream CRUD + embed + template + operasyon merkezi
 - zengin output matrisi
 - OBS multitrack ve telemetry gorunurlugu
 - storage / arsiv / yedek omurgasinin urunlesmeye yaklasmasi
+- yeni studio katmaniyla daha tutarli operator deneyimi
 
 Zayif taraflar:
 
@@ -243,7 +276,7 @@ Daha dogru tanim:
 
 - iyi bir tek-node medya sunucusu
 - urunlesmis bir yayin cekirdegi
-- operasyon merkezi ve depolama omurgasi olan canli dagitim urunu
+- operasyon merkezi, depolama omurgasi ve studyo paneli olan canli dagitim urunu
 
 Su alanlar icin artik ciddi bicimde kullanilabilir:
 
@@ -261,15 +294,13 @@ Bunu demek icin kapanmasi gereken fark yaratan alanlar:
 - multi-node cluster
 - audit / SSO / RBAC
 - daha derin observability ve alarm otomasyonu
-- playback security ve DRM
+- playback security v2 ve DRM
 - gercek dis ortam storage / failover testleri
 
 ## 8. Siradaki En Dogru Hedefler
 
-1. `Embed Stüdyosu` ekranini urun seviyesine tası
-2. `Analitik Merkezi` ekranini yeniden kur
-3. `ABR Profilleri ve Teslimat Merkezi`ni form tabanli profil mantigina gecir
-4. ayni faz icinde `audio-only DASH` istemci sertlestirmesini kapat
-5. ayni faz icinde `Playback Guvenligi V1` katmanini ekle
-6. sonra harici AWS S3 bucket ve populer bulut hedefleri icin gercek saha testlerine don
-7. daha sonra tam DRM ve origin-edge fazina gec
+1. `audio-only DASH` akisini gercek kaynak ve farkli istemcilerle saha testine sok
+2. playback guvenligi V1 politikasini canli stream policy senaryolariyla sertlestir
+3. harici AWS S3 ve populer bulut hedefleri icin gercek saha testlerine don
+4. storage / backup akislarini buyuk dosya ve restart senaryolariyla test et
+5. sonra AES-128, DRM hazirligi ve origin-edge lite tasarimina gec

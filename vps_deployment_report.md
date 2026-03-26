@@ -95,10 +95,22 @@ asagidaki alanlar sahada dogrulandi:
 - recording `mp4` varsayilani ve `TS capture + remux` modeli
 - storage ekranindaki crash zincirinin kapanmasi
 - ayni VPS uzerinde MinIO ve SFTP ile recording + backup upload / restore
+- `Embed Studyosu`, `Analitik Merkezi` ve `ABR Profilleri ve Teslimat Merkezi`
+- `Admin Studio V2`
+- `Logo ve Marka Merkezi`
+- `Teshis ve Tedavi Merkezi`
+- admin asset upload ve `/media-assets/` servisi
+
+Son deploy notu:
+
+- servis: `active`
+- health: `http://127.0.0.1:8844/api/health`
+- canli Linux binary SHA256:
+  `5907711E9FBCD31345A46A890C66277EDD8EBD6D7066B77BEB9F77515C6EC60A`
 
 Sonraki anlamli VPS dogrulama hedefleri:
 
 1. harici AWS S3 bucket ile gercek saha testi
 2. rclone tabanli populer bulut hedeflerinde gercek hesap testi
 3. `audio-only DASH` davranisinin farkli istemcilerde dogrulanmasi
-4. playback security fazina giris
+4. playback security politikasinin canli stream policy senaryolariyla sertlestirilmesi

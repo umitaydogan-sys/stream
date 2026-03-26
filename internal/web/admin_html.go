@@ -553,6 +553,7 @@ function renderApp(){
         '<div class="nav-section"><div class="nav-section-title">'+t('Ayarlar')+'</div>'+
           navItem('guided-settings','bi-magic',t('Kolay Ayarlar'))+
           navItem('settings-general','bi-gear-fill',t('Genel'))+
+          navItem('logos','bi-images',t('Logo ve Marka'))+
           navItem('settings-embed','bi-globe2',t('Alan Adi / Embed'))+
           navItem('settings-protocols','bi-diagram-3-fill',t('Protokoller'))+
           navItem('settings-outputs','bi-boxes',t('Cikis Formatlari'))+
@@ -726,6 +727,7 @@ async function loadPage(page){
   else if(page==='embed-codes')await renderEmbedCodes(c);
   else if(page.startsWith('stream-detail-'))await renderStreamDetail(c,page.replace('stream-detail-',''));
   else if(page==='operations-center')await renderOperationsCenter(c);
+  else if(page==='logos')await renderLogos(c);
   else if(page==='settings-general')await renderSettingsGeneral(c);
   else if(page==='settings-embed')await renderSettingsEmbed(c);
   else if(page==='settings-protocols')await renderSettingsProtocols(c);
@@ -4939,6 +4941,12 @@ async function renderSecurityTokens(c){
     '<div class="card"><div class="card-header"><h3 class="card-title">Kullanim Notu</h3></div>'+
       '<div class="card-body"><div class="form-hint">Uretilen degeri uygulama katmaninda <code>token</code> parametresi veya yetkilendirme basligi olarak tasiyabilirsiniz. Panel bu ekranda yalnizca token uretir; hangi client tarafinda nasil eklenecegi entegrasyona gore belirlenir.</div></div>'+
     '</div>';
+}
+
+async function renderLogos(c){
+  c.innerHTML=
+    '<div class="page-header"><h1 class="page-title">Logo ve Marka</h1></div>'+
+    '<div class="card"><div class="empty-state"><div class="icon"><i class="bi bi-images"></i></div><h3>Marka studyosu yukleniyor</h3><p style="color:var(--text-muted)">Bu sayfa yeni studio katmani ile yuklenir. Sayfayi yenileyip tekrar deneyin.</p></div></div>';
 }
 async function generateStreamToken(){
   const key=document.getElementById('token-stream')?.value||'';
