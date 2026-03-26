@@ -1726,7 +1726,7 @@
   window.renderAdvancedEmbed = async function(container){
     const rendered=await studioRenderLegacy(container,'advancedEmbed',{
       title:'Gelismis Embed Studyosu',
-      subtitle:'Tum direkt linkler, output sekmeleri ve canli onizleme panelleri burada. HLS, DASH, MP4, ses cikislari ve protokol bazli teslimat linkleri eski guclu davranisiyla geri doner.',
+      subtitle:'Tum teslimat baglantilarini, sekmeli onizlemeleri ve oynatici testlerini tek ekranda yonet. HLS, DASH, MP4 ve ses ciktilari ayni merkezde gorunur.',
       pills:[{label:'Tum outputlar',active:true},{label:'Direkt linkler'},{label:'Sekmeli onizleme'}],
       actionsHTML:'<button class="btn btn-secondary btn-sm" onclick="navigate(\'embed-codes\')"><i class="bi bi-grid"></i> Embed Studyosuna Don</button>'
     });
@@ -1736,9 +1736,9 @@
       if(hero){
         studioInsertAfter(hero,
           '<section class="studio-grid studio-grid-3">'+
-            '<div class="studio-summary"><span>Direkt linkler</span><strong>Tum teslimat ciktilari</strong><div class="form-hint">HLS, DASH, MP4, ses ve protokol bazli linkler ayni ekranda listelenir.</div></div>'+
-            '<div class="studio-summary"><span>Guvenli erisim testi</span><strong>Token ve imzali link</strong><div class="form-hint">Korumali oynatim baglantilarini burada uretebilir ve yayina etkisini test edebilirsin.</div></div>'+
-            '<div class="studio-summary"><span>Onizleme sekmeleri</span><strong>Tarayici ve harici oynatici</strong><div class="form-hint">Player, manifest ve medya linklerini ayni yerden dogrulayabilirsin.</div></div>'+
+            '<div class="studio-summary"><span>Direkt baglantilar</span><strong>HLS, DASH, MP4 ve ses cikislari</strong><div class="form-hint">Tayfaya uygun teslimat linklerini kopyalayabilir, manifest ve medya URL\'lerini dogrudan gorebilirsin.</div></div>'+
+            '<div class="studio-summary"><span>Guvenli oynatim</span><strong>Token, signed URL ve erisim testi</strong><div class="form-hint">Korumali playback baglantilarini uretir, etkiyi onizlemede dogrular ve kalici policy ihtiyacini net gorursun.</div></div>'+
+            '<div class="studio-summary"><span>Onizleme sekmeleri</span><strong>Tarayici, manifest ve harici oynatici testi</strong><div class="form-hint">Player, embed, manifest ve dis oynatici linklerini ayni merkezden kontrol edebilirsin.</div></div>'+
           '</section>'
         );
       }

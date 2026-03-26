@@ -135,16 +135,16 @@
 .studio-page .form-select,
 .studio-page .input,
 .studio-page .copy-input{
-  min-height:44px;
-  padding:9px 13px;
-  border-radius:10px !important;
-  border:1px solid rgba(148,163,184,.22) !important;
-  background:linear-gradient(180deg,#ffffff 0%,#f6faff 100%) !important;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.92), 0 6px 16px rgba(15,23,42,.035);
+  min-height:38px;
+  padding:7px 11px;
+  border-radius:7px !important;
+  border:1px solid rgba(148,163,184,.28) !important;
+  background:#ffffff !important;
+  box-shadow:none;
   font-size:13px;
-  line-height:1.35;
+  line-height:1.45;
   color:var(--text-primary);
-  transition:border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+  transition:border-color .18s ease, box-shadow .18s ease, background-color .18s ease;
 }
 .studio-control:focus,
 .studio-page .form-input:focus,
@@ -152,22 +152,21 @@
 .studio-page .input:focus,
 .studio-page .copy-input:focus{
   outline:none;
-  border-color:rgba(37,99,235,.34) !important;
-  box-shadow:0 0 0 3px rgba(37,99,235,.10), 0 12px 22px rgba(37,99,235,.08) !important;
-  transform:translateY(-1px);
+  border-color:rgba(37,99,235,.42) !important;
+  box-shadow:0 0 0 2px rgba(37,99,235,.10) !important;
 }
 .studio-textarea,
 .studio-page textarea,
 .studio-page .form-textarea,
 .studio-page textarea.input{
   width:100%;
-  min-height:140px;
-  border-radius:12px !important;
-  border:1px solid rgba(148,163,184,.24) !important;
-  background:linear-gradient(180deg,#ffffff 0%,#f7fbff 100%) !important;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.92), 0 8px 18px rgba(15,23,42,.045);
-  padding:10px 13px;
-  font:13px/1.65 Consolas, Monaco, 'Courier New', monospace;
+  min-height:120px;
+  border-radius:7px !important;
+  border:1px solid rgba(148,163,184,.28) !important;
+  background:#ffffff !important;
+  box-shadow:none;
+  padding:9px 11px;
+  font:13px/1.55 inherit;
   color:var(--text-primary);
   resize:vertical;
 }
@@ -175,8 +174,8 @@
 .studio-page textarea:focus,
 .studio-page .form-textarea:focus{
   outline:none;
-  border-color:rgba(37,99,235,.34) !important;
-  box-shadow:0 0 0 4px rgba(37,99,235,.10), 0 16px 30px rgba(37,99,235,.10) !important;
+  border-color:rgba(37,99,235,.42) !important;
+  box-shadow:0 0 0 2px rgba(37,99,235,.10) !important;
 }
 .studio-page select.input,
 .studio-page .form-select{
@@ -191,10 +190,10 @@
   display:flex;
   flex-direction:column;
   gap:7px;
-  padding:9px 10px 8px;
+  padding:8px 9px 7px;
   border:1px solid rgba(148,163,184,.12);
-  border-radius:12px;
-  background:linear-gradient(180deg,rgba(255,255,255,.92) 0%,rgba(248,251,255,.92) 100%);
+  border-radius:9px;
+  background:linear-gradient(180deg,rgba(255,255,255,.96) 0%,rgba(249,251,255,.96) 100%);
 }
 .studio-field .form-label{
   margin-bottom:0;

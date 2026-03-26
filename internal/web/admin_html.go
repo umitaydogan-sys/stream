@@ -97,11 +97,11 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
 .btn-icon{padding:8px;width:36px;height:36px;justify-content:center}
 .form-group{margin-bottom:16px}
 .form-label{display:block;font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:6px}
-.form-input,.form-select,.form-textarea{width:100%;padding:9px 13px;background:linear-gradient(180deg,#ffffff 0%,#f7fbff 100%);border:1px solid rgba(148,163,184,.22);border-radius:10px;color:var(--text-primary);font-size:13px;line-height:1.35;font-family:inherit;transition:border-color .2s, box-shadow .2s, transform .2s;outline:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.92),0 6px 16px rgba(15,23,42,.04)}
-.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:rgba(37,99,235,.34);box-shadow:0 0 0 3px rgba(37,99,235,.10),0 12px 22px rgba(37,99,235,.08);transform:translateY(-1px)}
+.form-input,.form-select,.form-textarea{width:100%;min-height:38px;padding:7px 11px;background:#ffffff;border:1px solid rgba(148,163,184,.28);border-radius:7px;color:var(--text-primary);font-size:13px;line-height:1.45;font-family:inherit;transition:border-color .2s, box-shadow .2s, background-color .2s;outline:none;box-shadow:none}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:rgba(37,99,235,.42);box-shadow:0 0 0 2px rgba(37,99,235,.10)}
 .form-input::placeholder{color:var(--text-muted)}
 .form-select{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='M5 7.5L10 12.5L15 7.5' stroke='%2364758B' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;padding-right:36px}
-.form-textarea{min-height:110px;resize:vertical;border-radius:12px;line-height:1.45}
+.form-textarea{min-height:120px;resize:vertical;border-radius:7px;line-height:1.55}
 .form-hint{font-size:12px;color:var(--text-muted);margin-top:4px}
 table{width:100%;border-collapse:collapse}
 th{text-align:left;padding:12px 16px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);border-bottom:1px solid var(--border)}

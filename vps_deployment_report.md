@@ -31,7 +31,7 @@ Tamamlananlar:
 ## Current Live Binary
 
 - Linux SHA256:
-  `1D3E59FC42B27944DF9B533E8A6D557E3BA1C73F9BA59E83D49D2E059E9035BE`
+  `1C9A346CF3A6682D2BA5CA205D15A3E8DAB9D4163AE0254110854202313B4F0F`
 
 ## Validation
 
@@ -52,6 +52,8 @@ Tamamlananlar:
 - `Embed Studyosu`, `Analitik Merkezi`, `ABR Profilleri`
 - `Admin Studio V2`
 - stream bazinda sonradan `adaptive teslimat` akisi
+- HTTPS embed preview ve SSL listener durum senkronu
+- daha kompakt admin form kontrolleri
 
 ## Next Useful VPS Checks
 

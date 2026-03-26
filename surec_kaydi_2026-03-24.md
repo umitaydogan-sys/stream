@@ -69,6 +69,8 @@ Ancak o asamada:
 - token, domain ve IP tabanli playback policy
 - watermark ve guvenlik presetleri
 - form tabanli ABR profil mantigi
+- HTTPS embed preview ve SSL durum karti hizalamasi
+- tum panelde daha kompakt form kontrol dili
 
 ## 3. Son Yeni Milestone
 

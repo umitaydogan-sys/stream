@@ -11,6 +11,9 @@ Bu turda iki kritik alan birlikte kapatildi:
 - Windows ve Linux dagitimlari yeniden uretildi
 - VPS'e temiz kurulum yapildi
 - tum temel urun dokumanlari yeni duruma gore hizalandi
+- admin panelin form kontrolleri daha kompakt ve daha okunur hale getirildi
+- `Gelismis Embed` kart metinleri musteriye uygun teknik anlatima cekildi
+- SSL / HTTPS durum kartlari gercek listener durumu ile hizalandi
 
 ## 0.1 Yeni Adaptive Teslimat Akisi
 
@@ -65,14 +68,14 @@ Canli host:
 - servis: `active`
 - health: `http://127.0.0.1:8844/api/health`
 - canli Linux binary SHA256:
-  `1D3E59FC42B27944DF9B533E8A6D557E3BA1C73F9BA59E83D49D2E059E9035BE`
+  `1C9A346CF3A6682D2BA5CA205D15A3E8DAB9D4163AE0254110854202313B4F0F`
 
 Windows paket hashleri:
 
 - portable / service `fluxstream.exe`:
-  `7339CC5296C8BF3AF520CDC440B4DAD52D8FA04BFE16D58D0233C39F199EC6D2`
+  `6DDCA324D743C1ED3D09586DD128E7F2BC9CDA86B3696331083FB804C9F38FF7`
 - installer `FluxStream-Setup.exe`:
-  `BB72700A328CEE2B0E4A13D3837E03C45D5705FE6CE6B366BFDAB943CE142EEA`
+  `4434110600A31F0AA9F5560F681A165F782B9FB040EA82D7A38C954F3A3A87F5`
 
 ## 1. Bugune Kadar Kapanan Buyuk Fazlar
 
@@ -133,6 +136,8 @@ Bu turun yeni cekirdek kazanimlari:
 - stream listesi ve detay ekraninda adaptive durum rozetleri eklendi
 - yeni buildler hem Windows hem Linux icin yeniden uretildi
 - VPS temiz kurulum ile paket dogrulamasi alindi
+- tum panelde `input / select / textarea` kontrolleri daha sade ve daha tutarli tasarima cekildi
+- embed preview davranisi HTTPS tarafinda request origin ile hizalandi
 
 ## 3. Bugunku Uretim Degerlendirmesi
 

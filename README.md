@@ -8,10 +8,11 @@ sunucusu.
 - RTMP, RTMPS, SRT, RTP, RTSP, WebRTC/WHIP, MPEG-TS ve HTTP Push ingest
 - HLS, LL-HLS, DASH, HTTP-FLV, MP4, WebM ve audio cikislari
 - OBS multitrack video ve audio dagitimi
-- `Embed Studyosu`, `Gelişmis Embed`, `Player Sablonlari Studyosu`
+- `Embed Studyosu`, `Gelismis Embed`, `Player Sablonlari Studyosu`
 - `Analitik Merkezi`, `Operasyon Merkezi`, `Teshis ve Tedavi Merkezi`
 - `ABR Profilleri ve Teslimat Merkezi`
 - sonradan `adaptive teslimat` acma akisi
+- HTTPS / RTMPS secure teslimat hizli ayarlari
 - recording, archive, backup ve `Depolama ve Arsiv Merkezi`
 - playback guvenligi V1
 - `Admin Studio V2`

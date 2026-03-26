@@ -34,6 +34,7 @@ flowchart LR
 | Embed + Analitik + ABR Studyosu | Tamamlandi | embed, analitik ve ABR ekranlari urunlesti |
 | Admin Studio V2 | Tamamlandi | dashboard, streams, ayarlar, diagnostics ve marka ekranlari urunlesti |
 | Adaptive Teslimat Sonradan Acma | Tamamlandi | stream sonradan adaptive teslimata alinabiliyor |
+| Form ve SSL polish | Tamamlandi | form kontrolleri, HTTPS embed preview ve SSL durum kartlari son urun diline cekildi |
 | Harici storage saha testi | Kismen tamamlandi | ayni VPS uzerinde MinIO + SFTP test edildi, gercek S3 sirada |
 | Playback guvenligi V1 | Buyuk oranda tamamlandi | signed URL, token, domain/IP kisiti ve watermark omurgasi var |
 | DRM | Baslamadi | AES-128 ve abstraction katmani acik |

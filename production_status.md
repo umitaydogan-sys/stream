@@ -14,6 +14,8 @@ Bu turun yeni kritik kazanimi:
 - bu islem hem sonraki publish hem de canli yayin icin urun akisina baglandi
 - `ABR Profilleri ve Teslimat Merkezi` tekrar genel adaptive ac/kapa ve
   secure teslimat hizli kontrol paneline kavustu
+- panel yuzeyi genelinde form kontrolleri daha kompakt ve daha tutarli hale getirildi
+- `Gelismis Embed` kart metinleri son kullaniciya daha anlasilir teknik dil ile yenilendi
 
 ## 1. Bugunku Uretim Konumu
 
@@ -28,6 +30,7 @@ Guclu alanlar:
 - recording, archive, backup ve bulut hedefleri
 - playback guvenligi V1
 - studio diline tasinmis admin panel
+- HTTPS / SSL durum gostergeleri gercek listener bazli hale getirildi
 
 Bugun icin en dogru tanim:
 
@@ -88,13 +91,13 @@ Etkisi:
 Yerel buildler:
 
 - Windows portable `fluxstream.exe` SHA256:
-  `7339CC5296C8BF3AF520CDC440B4DAD52D8FA04BFE16D58D0233C39F199EC6D2`
+  `6DDCA324D743C1ED3D09586DD128E7F2BC9CDA86B3696331083FB804C9F38FF7`
 - Windows service `fluxstream.exe` SHA256:
-  `7339CC5296C8BF3AF520CDC440B4DAD52D8FA04BFE16D58D0233C39F199EC6D2`
+  `6DDCA324D743C1ED3D09586DD128E7F2BC9CDA86B3696331083FB804C9F38FF7`
 - Windows installer `FluxStream-Setup.exe` SHA256:
-  `BB72700A328CEE2B0E4A13D3837E03C45D5705FE6CE6B366BFDAB943CE142EEA`
+  `4434110600A31F0AA9F5560F681A165F782B9FB040EA82D7A38C954F3A3A87F5`
 - Linux `fluxstream` SHA256:
-  `1D3E59FC42B27944DF9B533E8A6D557E3BA1C73F9BA59E83D49D2E059E9035BE`
+  `1C9A346CF3A6682D2BA5CA205D15A3E8DAB9D4163AE0254110854202313B4F0F`
 
 Canli host:
 
@@ -102,7 +105,7 @@ Canli host:
 - servis: `fluxstream`
 - health: `http://127.0.0.1:8844/api/health`
 - aktif Linux binary SHA256:
-  `1D3E59FC42B27944DF9B533E8A6D557E3BA1C73F9BA59E83D49D2E059E9035BE`
+  `1C9A346CF3A6682D2BA5CA205D15A3E8DAB9D4163AE0254110854202313B4F0F`
 
 ## 5. Genel Degerlendirme
 

@@ -19,6 +19,9 @@ Tarih: 26 Mart 2026
 - [x] VPS'e temiz kurulum yap
 - [x] temel md dokumanlarini yeni surume gore guncelle
 - [x] kokte kalan gereksiz build artefaktlarini temizle
+- [x] `Gelismis Embed` ust kart metinlerini musteriye uygun teknik dile cek
+- [x] tum panelde `input / select / textarea` yuzlerini daha kompakt ve daha net hale getir
+- [x] HTTPS embed preview ve SSL durum kartlarini gercek listener durumu ile hizala
 
 ## 1. Daha Once Kapanan Buyuk Fazlar
 
