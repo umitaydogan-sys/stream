@@ -516,3 +516,13 @@ linux productization (.deb + upgrade + rollback)
 FluxClass / FluxMeet mimari tasarımı
 
 Codex iletilerin tükendi
+## 26 Mart 2026 Ek Notu
+
+Bu arsiv notundan sonra urunde ek olarak su kritik adim kapatildi:
+
+- tek kalite baslayan bir stream sonradan `adaptive teslimat` moduna alinabilir hale geldi
+- bu akisa `sonraki yayinda etkinlestir` ve `canli yayina hemen uygula` secenekleri eklendi
+- Windows portable, Windows service, Windows installer ve Linux systemd paketleri yeniden uretildi
+- VPS'e temiz kurulum yapildi ve canli Linux binary SHA256 degeri
+  `15D7CE047BC886ACB39C2B594C669C0B150F9C706E7179E36056216A369923F4`
+  olarak dogrulandi
